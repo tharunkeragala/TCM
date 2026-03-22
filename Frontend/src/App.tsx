@@ -8,6 +8,7 @@ import UserProfiles from "./pages/UserProfiles";
 import AppLayout from "./layout/AppLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
+import Users from "./pages/Users";
 // import { Calendar } from "@fullcalendar/core/index.js";
 
 export default function App() {
@@ -39,6 +40,8 @@ export default function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/profile" element={<UserProfiles />} />
+            <Route path="/users" element={<Users />} />
+
             {/* Add other protected routes here */}
           </Route>
         </Route>
