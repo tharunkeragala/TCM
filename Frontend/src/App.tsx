@@ -9,6 +9,7 @@ import AppLayout from "./layout/AppLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
 import Users from "./pages/Users";
+import Departments from "./pages/Departments";
 // import { Calendar } from "@fullcalendar/core/index.js";
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/departments" element={<Departments />} />
 
             {/* Add other protected routes here */}
           </Route>

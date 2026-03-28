@@ -27,3 +27,7 @@ app.use("/api/auth", authRoutes);
 // User Managements
 const userRoutes = require("./routes/userRoutes");
 app.use("/api/users", userRoutes);
+
+// Department
+const departmentRoutes = require("./routes/departmentRoutes");
+app.use("/api/departments", departmentRoutes);

@@ -18,54 +18,77 @@ export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
-  const fetchUsers = async () => {
-    try {
-      const res = await API.get<User[]>("/api/users");
-      setUsers(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+    const fetchUsers = async () => {
+      try {
+        const res = await API.get<User[]>("/api/users");
+        setUsers(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
-  fetchUsers();
-}, []);
+    fetchUsers();
+  }, []);
 
   return (
     <div>
-      <PageMeta
-        title="User Management"
-        description="User management page"
-      />
-      <PageBreadcrumb pageTitle="Users" />
+      <PageMeta title="User Management" description="User management page" />
+      <PageBreadcrumb pageTitle="User Management" />
 
-      <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-10 xl:py-12">
-        <h3 className="mb-6 font-semibold text-gray-800 text-xl dark:text-white/90">
+      {/* <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-10 xl:py-12"> */}
+      <div>
+        {/* <h3 className="mb-6 font-semibold text-gray-800 text-xl dark:text-white/90">
           User Management
-        </h3>
+        </h3> */}
 
-        <div className="overflow-x-auto">
-          <table className="w-full border border-gray-200 dark:border-gray-700">
-            <thead className="bg-gray-100 dark:bg-gray-800">
+        <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <table className="w-full text-sm text-left">
+            {/* Header */}
+            <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
               <tr>
-                <th className="p-3 text-left">Username</th>
-                <th className="p-3 text-left">Role</th>
-                <th className="p-3 text-left">Department</th>
-                <th className="p-3 text-left">Source</th>
-                <th className="p-3 text-left">Status</th>
+                <th className="px-5 py-3">Username</th>
+                <th className="px-5 py-3">Role</th>
+                <th className="px-5 py-3">Department</th>
+                <th className="px-5 py-3">Source</th>
+                <th className="px-5 py-3">Status</th>
               </tr>
             </thead>
-            <tbody>
-              {users.map((u) => (
+
+            {/* Body */}
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+              {users.map((item) => (
                 <tr
-                  key={u.id}
-                  className="border-t border-gray-200 dark:border-gray-700"
+                  key={item.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
                 >
-                  <td className="p-3">{u.username}</td>
-                  <td className="p-3">{u.role_name}</td>
-                  <td className="p-3">{u.department_name}</td>
-                  <td className="p-3">{u.source}</td>
-                  <td className="p-3">
-                    {u.is_active ? "Active" : "Inactive"}
+                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                    {item.username}
+                  </td>
+
+                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                    {item.role_name}
+                  </td>
+
+                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                    {item.department_name}
+                  </td>
+
+                  <td className="px-5 py-3">
+                    <span className="px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {item.source}
+                    </span>
+                  </td>
+
+                  <td className="px-5 py-3">
+                    <span
+                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        item.is_active
+                          ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                      }`}
+                    >
+                      {item.is_active ? "Active" : "Inactive"}
+                    </span>
                   </td>
                 </tr>
               ))}

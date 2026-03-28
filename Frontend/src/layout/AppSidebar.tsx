@@ -49,7 +49,11 @@ const navItems: NavItem[] = [
   {
     name: "System Configuration",
     icon: <ListIcon />,
-    subItems: [{ name: "Users", path: "/users", pro: false }],
+    subItems: [
+      { name: "User Management", path: "/users", pro: false },
+      { name: "Roles", path: "/roles", pro: false },
+      { name: "Departments", path: "/departments", pro: false },
+    ],
   },
   {
     name: "Tables",
@@ -107,14 +111,14 @@ const AppSidebar: React.FC = () => {
   } | null>(null);
 
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
-    {}
+    {},
   );
 
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isActive = useCallback(
     (path: string) => location.pathname === path,
-    [location.pathname]
+    [location.pathname],
   );
 
   // ✅ NEW: Detect parent active state
@@ -122,10 +126,10 @@ const AppSidebar: React.FC = () => {
     (nav: NavItem) => {
       if (!nav.subItems) return false;
       return nav.subItems.some((subItem) =>
-        location.pathname.startsWith(subItem.path)
+        location.pathname.startsWith(subItem.path),
       );
     },
-    [location.pathname]
+    [location.pathname],
   );
 
   useEffect(() => {
@@ -188,8 +192,7 @@ const AppSidebar: React.FC = () => {
               onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group ${
                 isParentActive(nav) ||
-                (openSubmenu?.type === menuType &&
-                  openSubmenu?.index === index)
+                (openSubmenu?.type === menuType && openSubmenu?.index === index)
                   ? "menu-item-active"
                   : "menu-item-inactive"
               } cursor-pointer ${
@@ -230,9 +233,7 @@ const AppSidebar: React.FC = () => {
               <Link
                 to={nav.path}
                 className={`menu-item group ${
-                  isActive(nav.path)
-                    ? "menu-item-active"
-                    : "menu-item-inactive"
+                  isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                 }`}
               >
                 <span
@@ -260,8 +261,7 @@ const AppSidebar: React.FC = () => {
               className="overflow-hidden transition-all duration-300"
               style={{
                 height:
-                  openSubmenu?.type === menuType &&
-                  openSubmenu?.index === index
+                  openSubmenu?.type === menuType && openSubmenu?.index === index
                     ? `${subMenuHeight[`${menuType}-${index}`]}px`
                     : "0px",
               }}
@@ -322,8 +322,8 @@ const AppSidebar: React.FC = () => {
           isExpanded || isMobileOpen
             ? "w-[290px]"
             : isHovered
-            ? "w-[290px]"
-            : "w-[90px]"
+              ? "w-[290px]"
+              : "w-[90px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}

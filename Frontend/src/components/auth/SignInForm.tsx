@@ -100,7 +100,7 @@ export default function SignInForm() {
             Sign In
           </h1>
           <p className="text-sm text-gray-500">
-            Enter your email and password to sign in!
+            Enter your Username and password to sign in!
           </p>
         </div>
 
@@ -117,9 +117,9 @@ export default function SignInForm() {
         <form onSubmit={handleLogin}>
           <div className="space-y-6">
             <div>
-              <Label>Email</Label>
+              <Label>Username</Label>
               <Input
-                placeholder="info@gmail.com"
+                placeholder="Username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -166,12 +166,12 @@ export default function SignInForm() {
           Login with Windows
         </button>
 
-        <div className="mt-5 text-center">
+        {/* <div className="mt-5 text-center">
           <p className="text-sm text-gray-700">
             Don’t have an account?{" "}
             <Link to="/signup" className="text-brand-500">Sign Up</Link>
           </p>
-        </div>
+        </div> */}
       </div>
     </div>
   );
