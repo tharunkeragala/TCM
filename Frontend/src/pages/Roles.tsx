@@ -37,19 +37,19 @@ export default function Roles() {
         {!loading && !error && (
           <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs">
+              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-5 py-3">Role ID</th>
                   <th className="px-5 py-3">Role Name</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y bg-white dark:bg-gray-900">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                 {roles && roles.length > 0 ? (
                   roles.map((role) => (
-                    <tr key={role.id}>
-                      <td className="px-5 py-3">{role.id}</td>
-                      <td className="px-5 py-3">{role.role_name}</td>
+                    <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150">
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{role.id}</td>
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{role.role_name}</td>
                     </tr>
                   ))
                 ) : (
