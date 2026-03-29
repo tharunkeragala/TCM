@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import API from "../services/api";
-import Alert from "../components/ui/alert/Alert"; // ✅ add this
+import Alert from "../components/ui/alert/Alert";
+import useFetchWithAuth from "../hooks/useFetchWithAuth";
 
 // ✅ Define User type
 interface User {
@@ -14,58 +13,12 @@ interface User {
   is_active: boolean;
 }
 
-// ✅ API response type (fixing your response shape)
-interface ApiResponse {
-  success: boolean;
-  data: User[];
-}
-
 export default function Users() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);   // ✅ added
-  const [error, setError] = useState<string>("");          // ✅ added
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const token =
-        localStorage.getItem("token") ||
-        sessionStorage.getItem("token");
-
-      if (!token) {
-        setError("User not authenticated");
-        return;
-      }
-
-      const res = await API.get<ApiResponse>("/api/users", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setUsers(res.data.data);
-    } catch (err: any) {
-      console.error("Failed to fetch users:", err);
-
-      if (err.response?.status === 403) {
-        setError(
-          "Access denied. You do not have permission to view users."
-        );
-      } else if (err.response?.status === 401) {
-        setError("Unauthorized. Please login again.");
-      } else {
-        setError("Failed to load users.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: users,
+    loading,
+    error,
+  } = useFetchWithAuth<User[]>("/api/users");
 
   return (
     <div>
@@ -94,7 +47,7 @@ export default function Users() {
 
         {/* ✅ Table */}
         {!loading && !error && (
-        //   <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-10 xl:py-12">
+          //   <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-10 xl:py-12">
       
         // <h3 className="mb-6 font-semibold text-gray-800 text-xl dark:text-white/90">
         //   User Management
@@ -112,7 +65,7 @@ export default function Users() {
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                {users.length > 0 ? (
+                {users && users.length > 0 ? (
                   users.map((item) => (
                     <tr
                       key={item.id}

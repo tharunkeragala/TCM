@@ -1,64 +1,16 @@
-import { useEffect, useState } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import API from "../services/api";
 import Alert from "../components/ui/alert/Alert";
+import useFetchWithAuth from "../hooks/useFetchWithAuth";
 
 interface Role {
   id: number;
   role_name: string;
 }
 
-interface ApiResponse {
-  success: boolean;
-  data: Role[];
-}
-
 export default function Roles() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
-
-  useEffect(() => {
-    fetchRoles();
-  }, []);
-
-  const fetchRoles = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      // ✅ Get token from storage
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      if (!token) {
-        setError("User not authenticated");
-        setLoading(false);
-        return;
-      }
-
-      const res = await API.get<ApiResponse>("/api/roles", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setRoles(res.data.data);
-
-    } catch (err: any) {
-      console.error("Error fetching roles:", err);
-
-      // ✅ Show specific messages based on status
-      if (err.response?.status === 403) {
-        setError("Access denied. You do not have permission to view roles.");
-      } else if (err.response?.status === 401) {
-        setError("Unauthorized. Please login again.");
-      } else {
-        setError("Failed to load roles.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: roles, loading, error } =
+    useFetchWithAuth<Role[]>("/api/roles");
 
   return (
     <div>
@@ -67,15 +19,10 @@ export default function Roles() {
 
       <div className="mt-4">
 
-        {/* ✅ Show Alert if error */}
+        {/* ✅ Alert */}
         {error && (
           <div className="mb-4">
-            <Alert
-              variant="error"
-              title="Error"
-              message={error}
-            />
-            
+            <Alert variant="error" title="Error" message={error} />
           </div>
         )}
 
@@ -90,34 +37,24 @@ export default function Roles() {
         {!loading && !error && (
           <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
+              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs">
                 <tr>
                   <th className="px-5 py-3">Role ID</th>
                   <th className="px-5 py-3">Role Name</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                {roles.length > 0 ? (
+              <tbody className="divide-y bg-white dark:bg-gray-900">
+                {roles && roles.length > 0 ? (
                   roles.map((role) => (
-                    <tr
-                      key={role.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
-                    >
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                        {role.id}
-                      </td>
-
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                        {role.role_name}
-                      </td>
-
-                      
+                    <tr key={role.id}>
+                      <td className="px-5 py-3">{role.id}</td>
+                      <td className="px-5 py-3">{role.role_name}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={2} className="text-center py-5 text-gray-500">
+                    <td colSpan={2} className="text-center py-5">
                       No roles found
                     </td>
                   </tr>

@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import API from "../services/api";
 import Alert from "../components/ui/alert/Alert";
+import useFetchWithAuth from "../hooks/useFetchWithAuth";
 
 interface Department {
   id: number;
@@ -10,56 +9,12 @@ interface Department {
   is_active: boolean;
 }
 
-// ✅ API response type
-interface ApiResponse {
-  success: boolean;
-  data: Department[];
-}
-
 export default function Departments() {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
-
-  useEffect(() => {
-    fetchDepartments();
-  }, []);
-
-  const fetchDepartments = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      // ✅ Get token from storage
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      if (!token) {
-        setError("User not authenticated");
-        return;
-      }
-
-      const res = await API.get<ApiResponse>("/api/departments", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setDepartments(res.data.data);
-
-    } catch (err: any) {
-      console.error("Error fetching departments:", err);
-
-      // ✅ Show specific messages based on status
-      if (err.response?.status === 403) {
-        setError("Access denied. You do not have permission to view departments.");
-      } else if (err.response?.status === 401) {
-        setError("Unauthorized. Please login again.");
-      } else {
-        setError("Failed to load departments.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: departments,
+    loading,
+    error,
+  } = useFetchWithAuth<Department[]>("/api/departments");
 
   return (
     <div>
@@ -68,7 +23,7 @@ export default function Departments() {
 
       <div className="mt-4">
 
-        {/* ✅ Show Alert if error */}
+        {/* ✅ Alert */}
         {error && (
           <div className="mb-4">
             <Alert
@@ -76,7 +31,6 @@ export default function Departments() {
               title="Error"
               message={error}
             />
-            
           </div>
         )}
 
@@ -100,7 +54,7 @@ export default function Departments() {
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                {departments.length > 0 ? (
+                {departments && departments.length > 0 ? (
                   departments.map((dept) => (
                     <tr
                       key={dept.id}
