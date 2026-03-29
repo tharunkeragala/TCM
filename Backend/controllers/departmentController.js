@@ -1,8 +1,13 @@
 const { poolPromise } = require("../config/db");
 
-// Get all departments
 exports.getDepartments = async (req, res) => {
     try {
+        if (req.user.role !== "Admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Access denied"
+            });
+        }
         const pool = await poolPromise;
 
         const result = await pool.request().query(`

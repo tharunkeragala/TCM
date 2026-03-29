@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import API from "../services/api";
+import Alert from "../components/ui/alert/Alert"; // make sure this path is correct
 
 // ✅ Department type
 interface Department {
@@ -27,14 +28,35 @@ export default function Departments() {
 
   const fetchDepartments = async () => {
     try {
-      const res = await API.get<ApiResponse>("/api/departments");
+      setLoading(true);
+      setError("");
 
-      // ✅ Correct data mapping
+      // ✅ Get token from storage
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        setError("User not authenticated");
+        return;
+      }
+
+      const res = await API.get<ApiResponse>("/api/departments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       setDepartments(res.data.data);
 
     } catch (err: any) {
       console.error("Error fetching departments:", err);
-      setError("Failed to load departments");
+
+      // ✅ Show specific messages based on status
+      if (err.response?.status === 403) {
+        setError("Access denied. You do not have permission to view departments.");
+      } else if (err.response?.status === 401) {
+        setError("Unauthorized. Please login again.");
+      } else {
+        setError("Failed to load departments.");
+      }
     } finally {
       setLoading(false);
     }
@@ -47,17 +69,22 @@ export default function Departments() {
 
       <div className="mt-4">
 
-        {/* ✅ Loading */}
-        {loading && (
-          <div className="text-gray-500 dark:text-gray-400">
-            Loading departments...
+        {/* ✅ Show Alert if error */}
+        {error && (
+          <div className="mb-4">
+            <Alert
+              variant="error"
+              title="Error"
+              message={error}
+            />
+            
           </div>
         )}
 
-        {/* ❌ Error */}
-        {error && (
-          <div className="text-red-500 mb-4">
-            {error}
+        {/* ✅ Loading */}
+        {loading && !error && (
+          <div className="text-gray-500 dark:text-gray-400">
+            Loading departments...
           </div>
         )}
 
@@ -65,8 +92,6 @@ export default function Departments() {
         {!loading && !error && (
           <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-sm text-left">
-              
-              {/* Header */}
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-5 py-3">Department ID</th>
@@ -75,7 +100,6 @@ export default function Departments() {
                 </tr>
               </thead>
 
-              {/* Body */}
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                 {departments.length > 0 ? (
                   departments.map((dept) => (
@@ -106,16 +130,12 @@ export default function Departments() {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={3}
-                      className="text-center py-5 text-gray-500"
-                    >
+                    <td colSpan={3} className="text-center py-5 text-gray-500">
                       No departments found
                     </td>
                   </tr>
                 )}
               </tbody>
-
             </table>
           </div>
         )}

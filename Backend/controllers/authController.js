@@ -1,14 +1,15 @@
 const { sql, poolPromise } = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
-const SECRET = "testcase_secret";
+const SECRET = process.env.JWT_SECRET;
 
 exports.login = async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        const pool = await poolPromise; // ✅ THIS is the real pool
+        const pool = await poolPromise;
 
         const result = await pool.request()
             .input("username", sql.VarChar, username)

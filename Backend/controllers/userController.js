@@ -2,6 +2,12 @@ const { sql, poolPromise } = require("../config/db");
 
 exports.getUsers = async (req, res) => {
     try {
+        if (req.user.role !== "Admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Access denied"
+            });
+        }
         const pool = await poolPromise;
 
         const result = await pool.request().query(`
@@ -13,11 +19,24 @@ exports.getUsers = async (req, res) => {
             LEFT JOIN departments d ON u.department_id = d.id
         `);
 
-        res.json(result.recordset);
+        const users = result.recordset;
+
+        return res.status(200).json({
+            success: true,
+            message: "Users fetched successfully",
+            count: users.length,
+            data: users
+        });
 
     } catch (err) {
         console.error("SQL Server Error:", err);
-        res.status(500).json({ error: err.message });
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch users",
+            // Only expose detailed error in development
+            error: process.env.NODE_ENV === "development" ? err.message : undefined
+        });
     }
 };
 
