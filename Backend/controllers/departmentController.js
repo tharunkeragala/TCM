@@ -13,7 +13,7 @@ exports.getDepartments = async (req, res) => {
         const result = await pool.request().query(`
             SELECT id, department_name, is_active
             FROM test_case_manager.dbo.departments
-            ORDER BY id DESC
+            ORDER BY id ASC
         `);
 
         res.status(200).json({

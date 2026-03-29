@@ -4,28 +4,26 @@ import PageMeta from "../components/common/PageMeta";
 import API from "../services/api";
 import Alert from "../components/ui/alert/Alert";
 
-interface Department {
+interface Role {
   id: number;
-  department_name: string;
-  is_active: boolean;
+  role_name: string;
 }
 
-// ✅ API response type
 interface ApiResponse {
   success: boolean;
-  data: Department[];
+  data: Role[];
 }
 
-export default function Departments() {
-  const [departments, setDepartments] = useState<Department[]>([]);
+export default function Roles() {
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    fetchDepartments();
+    fetchRoles();
   }, []);
 
-  const fetchDepartments = async () => {
+  const fetchRoles = async () => {
     try {
       setLoading(true);
       setError("");
@@ -34,27 +32,28 @@ export default function Departments() {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         setError("User not authenticated");
+        setLoading(false);
         return;
       }
 
-      const res = await API.get<ApiResponse>("/api/departments", {
+      const res = await API.get<ApiResponse>("/api/roles", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      setDepartments(res.data.data);
+      setRoles(res.data.data);
 
     } catch (err: any) {
-      console.error("Error fetching departments:", err);
+      console.error("Error fetching roles:", err);
 
       // ✅ Show specific messages based on status
       if (err.response?.status === 403) {
-        setError("Access denied. You do not have permission to view departments.");
+        setError("Access denied. You do not have permission to view roles.");
       } else if (err.response?.status === 401) {
         setError("Unauthorized. Please login again.");
       } else {
-        setError("Failed to load departments.");
+        setError("Failed to load roles.");
       }
     } finally {
       setLoading(false);
@@ -63,8 +62,8 @@ export default function Departments() {
 
   return (
     <div>
-      <PageMeta title="Departments" description="Departments page" />
-      <PageBreadcrumb pageTitle="Departments" />
+      <PageMeta title="Roles" description="Roles page" />
+      <PageBreadcrumb pageTitle="Roles" />
 
       <div className="mt-4">
 
@@ -83,7 +82,7 @@ export default function Departments() {
         {/* ✅ Loading */}
         {loading && !error && (
           <div className="text-gray-500 dark:text-gray-400">
-            Loading departments...
+            Loading roles...
           </div>
         )}
 
@@ -93,44 +92,33 @@ export default function Departments() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                 <tr>
-                  <th className="px-5 py-3">Department ID</th>
-                  <th className="px-5 py-3">Department Name</th>
-                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Role ID</th>
+                  <th className="px-5 py-3">Role Name</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                {departments.length > 0 ? (
-                  departments.map((dept) => (
+                {roles.length > 0 ? (
+                  roles.map((role) => (
                     <tr
-                      key={dept.id}
+                      key={role.id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
                     >
                       <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                        {dept.id}
+                        {role.id}
                       </td>
 
                       <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                        {dept.department_name}
+                        {role.role_name}
                       </td>
 
-                      <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            dept.is_active
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                          }`}
-                        >
-                          {dept.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
+                      
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="text-center py-5 text-gray-500">
-                      No departments found
+                    <td colSpan={2} className="text-center py-5 text-gray-500">
+                      No roles found
                     </td>
                   </tr>
                 )}
