@@ -414,86 +414,114 @@ export default function Roles() {
 
         {/* ─── Permissions Panel ────────────────────────────────────────────── */}
         {selectedRoleId !== null && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-800 dark:text-white">
-                Permissions for:{" "}
-                <span className="text-blue-600">
-                  {roles?.find((r) => r.id === selectedRoleId)?.role_name}
-                </span>
-              </h2>
-              <button
-                onClick={() => {
-                  setSelectedRoleId(null);
-                  setChecked([]);
-                  setPermAlert(null);
-                  setMenuAlert(null);
-                }}
-                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                ✕ Close
-              </button>
-            </div>
+  <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md">
+    <div className="relative w-full max-w-2xl mx-4 rounded-2xl border border-white/10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
 
-            {menuAlert && (
-              <div className="mb-4">
-                <Alert variant="error" title="Menu Error" message={menuAlert} />
-              </div>
-            )}
-            {permAlert && (
-              <div className="mb-4">
-                <Alert
-                  variant={permAlert.type}
-                  title={permAlert.type === "success" ? "Success" : "Error"}
-                  message={permAlert.message}
-                />
-              </div>
-            )}
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-400/50 dark:border-gray-700/50">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Permissions
+          <span className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+            {roles?.find((r) => r.id === selectedRoleId)?.role_name}
+          </span>
+        </h2>
 
-            {loadingMenus || loadingPermissions ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Loading permissions...
-              </div>
-            ) : menus.length === 0 ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                No menus found.{" "}
-                <button onClick={loadMenus} className="text-blue-500 underline">
-                  retry
-                </button>
-              </div>
-            ) : (
-              <CheckboxTree
-                nodes={menus}
-                checked={checked}
-                expanded={expanded}
-                onCheck={(val) => setChecked(val as number[])}
-                onExpand={(val) => setExpanded(val as number[])}
-                icons={{
-                  check: <span className="text-blue-600">✔</span>,
-                  uncheck: <span className="text-gray-400">☐</span>,
-                  halfCheck: <span className="text-blue-300">▣</span>,
-                  expandClose: <span className="text-gray-500">▶</span>,
-                  expandOpen: <span className="text-gray-500">▼</span>,
-                  expandAll: <span />,
-                  collapseAll: <span />,
-                  parentClose: <span>📁</span>,
-                  parentOpen: <span>📂</span>,
-                  leaf: <span>📄</span>,
-                }}
-              />
-            )}
+        <button
+          onClick={() => {
+            setSelectedRoleId(null);
+            setChecked([]);
+            setPermAlert(null);
+            setMenuAlert(null);
+          }}
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200/60 dark:hover:bg-gray-700/60 transition"
+        >
+          <span className="text-lg text-gray-500 hover:text-gray-800 dark:hover:text-white">
+            ✕
+          </span>
+        </button>
+      </div>
 
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={savePermissions}
-                disabled={saving}
-                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
-              >
-                {saving ? "Saving..." : "Save Permissions"}
-              </button>
-            </div>
+      {/* Alerts */}
+      <div className="px-6 pt-4 space-y-3">
+        {menuAlert && (
+          <Alert
+            variant="error"
+            title="Menu Error"
+            message={menuAlert}
+          />
+        )}
+
+        {permAlert && (
+          <Alert
+            variant={permAlert.type}
+            title={permAlert.type === "success" ? "Success" : "Error"}
+            message={permAlert.message}
+          />
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="px-6 py-4">
+        {loadingMenus || loadingPermissions ? (
+          <div className="animate-pulse space-y-3">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+          </div>
+        ) : menus.length === 0 ? (
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+            No menus found.
+            <button
+              onClick={loadMenus}
+              className="ml-2 text-blue-500 hover:text-blue-600 font-medium underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="max-h-[400px] overflow-y-auto rounded-lg border p-3 pr-2 bg-gray-50 text-gray-900 dark:bg-gray-800/40 dark:text-white dark:border-gray-700">
+            <CheckboxTree
+              nodes={menus}
+              checked={checked}
+              expanded={expanded}
+              onCheck={(val) => setChecked(val as number[])}
+              onExpand={(val) => setExpanded(val as number[])}
+              icons={{
+                check: <span className="text-blue-600">✔</span>,
+                uncheck: <span className="text-gray-400">☐</span>,
+                halfCheck: <span className="text-blue-400">▣</span>,
+                expandClose: <span className="text-gray-500">▶</span>,
+                expandOpen: <span className="text-gray-500">▼</span>,
+                expandAll: <span />,
+                collapseAll: <span />,
+                parentClose: <span>📁</span>,
+                parentOpen: <span>📂</span>,
+                leaf: <span>📄</span>,
+              }}
+            />
           </div>
         )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-400/50 dark:border-gray-700/50">
+        <button
+          onClick={() => setSelectedRoleId(null)}
+          className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={savePermissions}
+          disabled={saving}
+          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150">
+          {saving ? "Saving..." : "Save Permissions"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
 
       {/* ─── Create Role Modal ────────────────────────────────────────────────── */}
