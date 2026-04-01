@@ -19,53 +19,56 @@ export default function Departments() {
   } = useFetchWithAuth<Department[]>("/api/departments");
 
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ department_name: "", is_active: true });
+  const [formData, setFormData] = useState({
+    department_name: "",
+    is_active: true,
+  });
   const [submitting, setSubmitting] = useState(false);
-  const [formAlert, setFormAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [formAlert, setFormAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleCreate = async () => {
-  if (!formData.department_name.trim()) {
-    setFormAlert({ type: "error", message: "Department name is required." });
-    return;
-  }
+    if (!formData.department_name.trim()) {
+      setFormAlert({ type: "error", message: "Department name is required." });
+      return;
+    }
 
-  setSubmitting(true);
-  setFormAlert(null);
+    setSubmitting(true);
+    setFormAlert(null);
 
-  try {
-    const token =
-      localStorage.getItem("token") ||
-      sessionStorage.getItem("token");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
 
-    const res = await API.post(
-      "/api/departments/create",
-      formData,
-      {
+      const res = await API.post("/api/departments/create", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+      });
+
+      if (res.data.success) {
+        setFormAlert({
+          type: "success",
+          message: "Department created successfully!",
+        });
+        setTimeout(() => {
+          setShowModal(false);
+          setFormData({ department_name: "", is_active: true });
+          setFormAlert(null);
+          window.location.reload();
+        }, 1200);
       }
-    );
-
-    if (res.data.success) {
-      setFormAlert({ type: "success", message: "Department created successfully!" });
-      setTimeout(() => {
-        setShowModal(false);
-        setFormData({ department_name: "", is_active: true });
-        setFormAlert(null);
-        window.location.reload();
-      }, 1200);
+    } catch (err: any) {
+      console.error("Full error:", err.response);
+      const message =
+        err.response?.data?.message || "Failed to create department.";
+      setFormAlert({ type: "error", message });
+    } finally {
+      setSubmitting(false);
     }
-
-  } catch (err: any) {
-    console.error("Full error:", err.response);
-    const message =
-      err.response?.data?.message || "Failed to create department.";
-    setFormAlert({ type: "error", message });
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   const handleCloseModal = () => {
     setShowModal(false);
@@ -79,7 +82,6 @@ export default function Departments() {
       <PageBreadcrumb pageTitle="Departments" />
 
       <div className="mt-4">
-
         {/* ✅ Top bar with Create button */}
         <div className="flex justify-end mb-4">
           <button
@@ -99,7 +101,9 @@ export default function Departments() {
 
         {/* ✅ Loading */}
         {loading && !error && (
-          <div className="text-gray-500 dark:text-gray-400">Loading departments...</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            Loading departments...
+          </div>
         )}
 
         {/* ✅ Table */}
@@ -108,23 +112,35 @@ export default function Departments() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                 <tr>
-                  <th className="px-5 py-3">Department ID</th>
+                  <th className="px-5 py-3">#</th>
                   <th className="px-5 py-3">Department Name</th>
                   <th className="px-5 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                 {departments && departments.length > 0 ? (
-                  departments.map((dept) => (
-                    <tr key={dept.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150">
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{dept.id}</td>
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{dept.department_name}</td>
+                  departments.map((dept, index) => (
+                    <tr
+                      key={dept.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
+                    >
+                      {/* ✅ Sequence Number */}
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                        {index + 1}
+                      </td>
+
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                        {dept.department_name}
+                      </td>
+
                       <td className="px-5 py-3">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          dept.is_active
-                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                            : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                        }`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            dept.is_active
+                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                          }`}
+                        >
                           {dept.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
@@ -132,7 +148,9 @@ export default function Departments() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="text-center py-5 text-gray-500">No departments found</td>
+                    <td colSpan={3} className="text-center py-5 text-gray-500">
+                      No departments found
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -145,10 +163,11 @@ export default function Departments() {
       {showModal && (
         <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create Department</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Create Department
+              </h2>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold leading-none"
@@ -176,7 +195,9 @@ export default function Departments() {
               <input
                 type="text"
                 value={formData.department_name}
-                onChange={(e) => setFormData({ ...formData, department_name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, department_name: e.target.value })
+                }
                 placeholder="e.g. Engineering"
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -184,16 +205,24 @@ export default function Departments() {
 
             {/* Is Active Toggle */}
             <div className="mb-6 flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Active
+              </span>
               <button
-                onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                onClick={() =>
+                  setFormData({ ...formData, is_active: !formData.is_active })
+                }
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                  formData.is_active ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+                  formData.is_active
+                    ? "bg-blue-600"
+                    : "bg-gray-300 dark:bg-gray-600"
                 }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                  formData.is_active ? "translate-x-6" : "translate-x-1"
-                }`} />
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                    formData.is_active ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
               </button>
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {formData.is_active ? "Active" : "Inactive"}
@@ -216,7 +245,6 @@ export default function Departments() {
                 {submitting ? "Creating..." : "Create"}
               </button>
             </div>
-
           </div>
         </div>
       )}

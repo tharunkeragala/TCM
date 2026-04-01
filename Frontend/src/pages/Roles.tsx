@@ -34,37 +34,54 @@ interface Permission {
 
 export default function Roles() {
   // ─── Roles Table ──────────────────────────────────────────────────────────
-  const { data: roles, loading, error, refetch } = useFetchWithAuth<Role[]>("/api/roles");
+  const {
+    data: roles,
+    loading,
+    error,
+    refetch,
+  } = useFetchWithAuth<Role[]>("/api/roles");
 
   // ─── Permissions State ────────────────────────────────────────────────────
-  const [menus, setMenus]                         = useState<MenuNode[]>([]);
-  const [checked, setChecked]                     = useState<number[]>([]);
-  const [expanded, setExpanded]                   = useState<number[]>([]);
-  const [selectedRoleId, setSelectedRoleId]       = useState<number | null>(null);
-  const [loadingMenus, setLoadingMenus]           = useState<boolean>(false);
+  const [menus, setMenus] = useState<MenuNode[]>([]);
+  const [checked, setChecked] = useState<number[]>([]);
+  const [expanded, setExpanded] = useState<number[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [loadingMenus, setLoadingMenus] = useState<boolean>(false);
   const [loadingPermissions, setLoadingPermissions] = useState<boolean>(false);
-  const [saving, setSaving]                       = useState<boolean>(false);
-  const [menuAlert, setMenuAlert]                 = useState<string | null>(null);
-  const [permAlert, setPermAlert]                 = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [menuAlert, setMenuAlert] = useState<string | null>(null);
+  const [permAlert, setPermAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ─── Create Role Modal ────────────────────────────────────────────────────
-  const [showCreateModal, setShowCreateModal]     = useState<boolean>(false);
-  const [createName, setCreateName]               = useState<string>("");
-  const [creating, setCreating]                   = useState<boolean>(false);
-  const [createAlert, setCreateAlert]             = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [createName, setCreateName] = useState<string>("");
+  const [creating, setCreating] = useState<boolean>(false);
+  const [createAlert, setCreateAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ─── Edit Role Modal ──────────────────────────────────────────────────────
-  const [showEditModal, setShowEditModal]         = useState<boolean>(false);
-  const [editRole, setEditRole]                   = useState<Role | null>(null);
-  const [editName, setEditName]                   = useState<string>("");
-  const [editing, setEditing]                     = useState<boolean>(false);
-  const [editAlert, setEditAlert]                 = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [editRole, setEditRole] = useState<Role | null>(null);
+  const [editName, setEditName] = useState<string>("");
+  const [editing, setEditing] = useState<boolean>(false);
+  const [editAlert, setEditAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ─── Delete Confirm Modal ─────────────────────────────────────────────────
-  const [showDeleteModal, setShowDeleteModal]     = useState<boolean>(false);
-  const [deleteRole, setDeleteRole]               = useState<Role | null>(null);
-  const [deleting, setDeleting]                   = useState<boolean>(false);
-  const [deleteAlert, setDeleteAlert]             = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [deleteRole, setDeleteRole] = useState<Role | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [deleteAlert, setDeleteAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ─── Load Menus Once ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -96,7 +113,10 @@ export default function Roles() {
         data.map((m) => ({
           value: m.id,
           label: m.menu_name,
-          children: m.children && m.children.length > 0 ? format(m.children) : undefined,
+          children:
+            m.children && m.children.length > 0
+              ? format(m.children)
+              : undefined,
         }));
       setMenus(format(raw));
     } catch (err: any) {
@@ -114,7 +134,10 @@ export default function Roles() {
       const res = await API.get(`/api/roles/${id}/permissions`);
       const raw: Permission[] = res.data?.data ?? res.data;
       if (!Array.isArray(raw)) {
-        setPermAlert({ type: "error", message: "Unexpected permissions response." });
+        setPermAlert({
+          type: "error",
+          message: "Unexpected permissions response.",
+        });
         return;
       }
       setChecked(raw.filter((p) => p.can_view).map((p) => p.menu_id));
@@ -123,7 +146,10 @@ export default function Roles() {
       if (status === 403) {
         setPermAlert({ type: "error", message: "Access denied." });
       } else if (status === 404) {
-        setPermAlert({ type: "error", message: "Permissions endpoint not found." });
+        setPermAlert({
+          type: "error",
+          message: "Permissions endpoint not found.",
+        });
       } else {
         setPermAlert({ type: "error", message: "Failed to load permissions." });
       }
@@ -148,8 +174,14 @@ export default function Roles() {
         can_edit: 1,
         can_delete: 1,
       }));
-      await API.post("/api/roles/save", { roleId: selectedRoleId, permissions });
-      setPermAlert({ type: "success", message: "Permissions saved successfully." });
+      await API.post("/api/roles/save", {
+        roleId: selectedRoleId,
+        permissions,
+      });
+      setPermAlert({
+        type: "success",
+        message: "Permissions saved successfully.",
+      });
     } catch {
       setPermAlert({ type: "error", message: "Failed to save permissions." });
     } finally {
@@ -167,7 +199,10 @@ export default function Roles() {
     setCreateAlert(null);
     try {
       await API.post("/api/roles/create", { role_name: createName.trim() });
-      setCreateAlert({ type: "success", message: "Role created successfully." });
+      setCreateAlert({
+        type: "success",
+        message: "Role created successfully.",
+      });
       setTimeout(() => {
         setShowCreateModal(false);
         setCreateName("");
@@ -175,7 +210,10 @@ export default function Roles() {
         refetch();
       }, 1200);
     } catch (err: any) {
-      setCreateAlert({ type: "error", message: err.response?.data?.message || "Failed to create role." });
+      setCreateAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed to create role.",
+      });
     } finally {
       setCreating(false);
     }
@@ -197,7 +235,9 @@ export default function Roles() {
     setEditing(true);
     setEditAlert(null);
     try {
-      await API.put(`/api/roles/${editRole?.id}`, { role_name: editName.trim() });
+      await API.put(`/api/roles/${editRole?.id}`, {
+        role_name: editName.trim(),
+      });
       setEditAlert({ type: "success", message: "Role updated successfully." });
       setTimeout(() => {
         setShowEditModal(false);
@@ -207,7 +247,10 @@ export default function Roles() {
         refetch();
       }, 1200);
     } catch (err: any) {
-      setEditAlert({ type: "error", message: err.response?.data?.message || "Failed to update role." });
+      setEditAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed to update role.",
+      });
     } finally {
       setEditing(false);
     }
@@ -225,7 +268,10 @@ export default function Roles() {
     setDeleteAlert(null);
     try {
       await API.delete(`/api/roles/${deleteRole?.id}`);
-      setDeleteAlert({ type: "success", message: "Role deleted successfully." });
+      setDeleteAlert({
+        type: "success",
+        message: "Role deleted successfully.",
+      });
       setTimeout(() => {
         setShowDeleteModal(false);
         setDeleteRole(null);
@@ -234,7 +280,10 @@ export default function Roles() {
         refetch();
       }, 1200);
     } catch (err: any) {
-      setDeleteAlert({ type: "error", message: err.response?.data?.message || "Failed to delete role." });
+      setDeleteAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed to delete role.",
+      });
     } finally {
       setDeleting(false);
     }
@@ -253,15 +302,21 @@ export default function Roles() {
 
   return (
     <div>
-      <PageMeta title="Roles & Permissions" description="Roles and permissions page" />
+      <PageMeta
+        title="Roles & Permissions"
+        description="Roles and permissions page"
+      />
       <PageBreadcrumb pageTitle="Roles & Permissions" />
 
       <div className="mt-4 space-y-6">
-
         {/* ─── Top Bar ─────────────────────────────────────────────────────── */}
         <div className="flex justify-end">
           <button
-            onClick={() => { setCreateName(""); setCreateAlert(null); setShowCreateModal(true); }}
+            onClick={() => {
+              setCreateName("");
+              setCreateAlert(null);
+              setShowCreateModal(true);
+            }}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-150"
           >
             + Add Role
@@ -276,7 +331,9 @@ export default function Roles() {
         )}
 
         {loading && !error && (
-          <div className="text-gray-500 dark:text-gray-400">Loading roles...</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            Loading roles...
+          </div>
         )}
 
         {!loading && !error && (
@@ -284,7 +341,7 @@ export default function Roles() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                 <tr>
-                  <th className="px-5 py-3">Role ID</th>
+                  <th className="px-5 py-3">#</th>
                   <th className="px-5 py-3">Role Name</th>
                   <th className="px-5 py-3">Permissions</th>
                   <th className="px-5 py-3">Actions</th>
@@ -292,17 +349,25 @@ export default function Roles() {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                 {roles && roles.length > 0 ? (
-                  roles.map((role) => (
+                  roles.map((role, index) => (
                     <tr
                       key={role.id}
                       className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150 ${
-                        selectedRoleId === role.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                        selectedRoleId === role.id
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : ""
                       }`}
                     >
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{role.id}</td>
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{role.role_name}</td>
+                      {/* ✅ Sequence Number */}
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                        {index + 1}
+                      </td>
 
-                      {/* ✅ Permissions Button */}
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                        {role.role_name}
+                      </td>
+
+                      {/* Permissions Button */}
                       <td className="px-5 py-3">
                         <button
                           onClick={() => setSelectedRoleId(role.id)}
@@ -312,11 +377,13 @@ export default function Roles() {
                               : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                           }`}
                         >
-                          {selectedRoleId === role.id ? "Selected" : "Set Permissions"}
+                          {selectedRoleId === role.id
+                            ? "Selected"
+                            : "Set Permissions"}
                         </button>
                       </td>
 
-                      {/* ✅ Edit / Delete */}
+                      {/* Edit / Delete */}
                       <td className="px-5 py-3 flex items-center gap-2">
                         <button
                           onClick={() => openEditModal(role)}
@@ -335,7 +402,9 @@ export default function Roles() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="text-center py-5 text-gray-500">No roles found</td>
+                    <td colSpan={4} className="text-center py-5 text-gray-500">
+                      No roles found
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -354,7 +423,12 @@ export default function Roles() {
                 </span>
               </h2>
               <button
-                onClick={() => { setSelectedRoleId(null); setChecked([]); setPermAlert(null); setMenuAlert(null); }}
+                onClick={() => {
+                  setSelectedRoleId(null);
+                  setChecked([]);
+                  setPermAlert(null);
+                  setMenuAlert(null);
+                }}
                 className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
               >
                 ✕ Close
@@ -377,11 +451,15 @@ export default function Roles() {
             )}
 
             {loadingMenus || loadingPermissions ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400">Loading permissions...</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Loading permissions...
+              </div>
             ) : menus.length === 0 ? (
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 No menus found.{" "}
-                <button onClick={loadMenus} className="text-blue-500 underline">retry</button>
+                <button onClick={loadMenus} className="text-blue-500 underline">
+                  retry
+                </button>
               </div>
             ) : (
               <CheckboxTree
@@ -391,16 +469,16 @@ export default function Roles() {
                 onCheck={(val) => setChecked(val as number[])}
                 onExpand={(val) => setExpanded(val as number[])}
                 icons={{
-                  check:       <span className="text-blue-600">✔</span>,
-                  uncheck:     <span className="text-gray-400">☐</span>,
-                  halfCheck:   <span className="text-blue-300">▣</span>,
+                  check: <span className="text-blue-600">✔</span>,
+                  uncheck: <span className="text-gray-400">☐</span>,
+                  halfCheck: <span className="text-blue-300">▣</span>,
                   expandClose: <span className="text-gray-500">▶</span>,
-                  expandOpen:  <span className="text-gray-500">▼</span>,
-                  expandAll:   <span />,
+                  expandOpen: <span className="text-gray-500">▼</span>,
+                  expandAll: <span />,
                   collapseAll: <span />,
                   parentClose: <span>📁</span>,
-                  parentOpen:  <span>📂</span>,
-                  leaf:        <span>📄</span>,
+                  parentOpen: <span>📂</span>,
+                  leaf: <span>📄</span>,
                 }}
               />
             )}
@@ -423,9 +501,15 @@ export default function Roles() {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Add Role</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Add Role
+              </h2>
               <button
-                onClick={() => { setShowCreateModal(false); setCreateName(""); setCreateAlert(null); }}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCreateName("");
+                  setCreateAlert(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -434,7 +518,11 @@ export default function Roles() {
 
             {createAlert && (
               <div className="mb-4">
-                <Alert variant={createAlert.type} title={createAlert.type === "success" ? "Success" : "Error"} message={createAlert.message} />
+                <Alert
+                  variant={createAlert.type}
+                  title={createAlert.type === "success" ? "Success" : "Error"}
+                  message={createAlert.message}
+                />
               </div>
             )}
 
@@ -453,7 +541,11 @@ export default function Roles() {
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowCreateModal(false); setCreateName(""); setCreateAlert(null); }}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCreateName("");
+                  setCreateAlert(null);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
               >
                 Cancel
@@ -475,9 +567,15 @@ export default function Roles() {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Role</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Edit Role
+              </h2>
               <button
-                onClick={() => { setShowEditModal(false); setEditRole(null); setEditAlert(null); }}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditRole(null);
+                  setEditAlert(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -486,7 +584,11 @@ export default function Roles() {
 
             {editAlert && (
               <div className="mb-4">
-                <Alert variant={editAlert.type} title={editAlert.type === "success" ? "Success" : "Error"} message={editAlert.message} />
+                <Alert
+                  variant={editAlert.type}
+                  title={editAlert.type === "success" ? "Success" : "Error"}
+                  message={editAlert.message}
+                />
               </div>
             )}
 
@@ -504,7 +606,11 @@ export default function Roles() {
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowEditModal(false); setEditRole(null); setEditAlert(null); }}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditRole(null);
+                  setEditAlert(null);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
               >
                 Cancel
@@ -526,9 +632,15 @@ export default function Roles() {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Role</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Delete Role
+              </h2>
               <button
-                onClick={() => { setShowDeleteModal(false); setDeleteRole(null); setDeleteAlert(null); }}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteRole(null);
+                  setDeleteAlert(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -537,19 +649,30 @@ export default function Roles() {
 
             {deleteAlert && (
               <div className="mb-4">
-                <Alert variant={deleteAlert.type} title={deleteAlert.type === "success" ? "Success" : "Error"} message={deleteAlert.message} />
+                <Alert
+                  variant={deleteAlert.type}
+                  title={deleteAlert.type === "success" ? "Success" : "Error"}
+                  message={deleteAlert.message}
+                />
               </div>
             )}
 
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
               Are you sure you want to delete role{" "}
-              <span className="font-semibold text-red-500">"{deleteRole?.role_name}"</span>?
-              This will also remove all its permissions. This action cannot be undone.
+              <span className="font-semibold text-red-500">
+                "{deleteRole?.role_name}"
+              </span>
+              ? This will also remove all its permissions. This action cannot be
+              undone.
             </p>
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowDeleteModal(false); setDeleteRole(null); setDeleteAlert(null); }}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteRole(null);
+                  setDeleteAlert(null);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
               >
                 Cancel
