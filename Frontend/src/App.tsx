@@ -11,7 +11,7 @@ import PublicRoute from "./components/auth/PublicRoute";
 import Users from "./pages/Users";
 import Departments from "./pages/Departments";
 import Roles from "./pages/Roles";
-// import { Calendar } from "@fullcalendar/core/index.js";
+import Unauthorized from "./pages/Unauthorized"; // ✅ add this
 
 export default function App() {
   return (
@@ -35,22 +35,26 @@ export default function App() {
           }
         />
 
+        {/* Unauthorized Route */}
+        <Route path="/unauthorized" element={<Unauthorized />} />
+
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
+            {/* Default redirect */}
             <Route path="/" element={<Navigate to="/home" replace />} />
+
+            {/* Protected pages */}
             <Route path="/home" element={<Home />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/users" element={<Users />} />
             <Route path="/departments" element={<Departments />} />
             <Route path="/roles" element={<Roles />} />
-
-            {/* Add other protected routes here */}
           </Route>
         </Route>
 
-        {/* Fallback */}
+        {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
