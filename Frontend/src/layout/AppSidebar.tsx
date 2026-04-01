@@ -456,13 +456,13 @@ const AppSidebar: React.FC = () => {
           <div className="flex flex-col gap-4">
 
             <div>
-              <h2 className="mb-4 text-xs uppercase flex leading-[20px] text-gray-400">
+              {/* <h2 className="mb-4 text-xs uppercase flex leading-[20px] text-gray-400">
                 {isExpanded || isHovered || isMobileOpen ? (
                   "Menu"
                 ) : (
                   <HorizontaLDots className="size-6" />
                 )}
-              </h2>
+              </h2> */}
               {filteredNavItems.length > 0 ? (
                 renderMenuItems(filteredNavItems, "main")
               ) : (
@@ -470,7 +470,7 @@ const AppSidebar: React.FC = () => {
               )}
             </div>
 
-            <div>
+            {/* <div>
               <h2 className="mb-4 text-xs uppercase flex leading-[20px] text-gray-400">
                 {isExpanded || isHovered || isMobileOpen ? (
                   "Others"
@@ -483,7 +483,7 @@ const AppSidebar: React.FC = () => {
               ) : (
                 <p className="text-xs text-gray-400 px-2">No access</p>
               )}
-            </div>
+            </div> */}
 
           </div>
         </nav>
