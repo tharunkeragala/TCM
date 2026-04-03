@@ -117,7 +117,6 @@ export default function Departments() {
         setAssignedUserCount(res.data.count ?? 0);
       }
     } catch {
-      // If check fails, still allow delete — count stays 0
       setAssignedUserCount(0);
     }
 
@@ -180,7 +179,7 @@ export default function Departments() {
 
       window.location.reload();
     } catch {
-      // no-op — could wire up a toast/alert here if desired
+      // no-op
     }
   };
 
@@ -285,7 +284,6 @@ export default function Departments() {
                           className="cursor-pointer text-blue-600"
                           onClick={() => handleEdit(dept)}
                         />
-
                         <FaTrash
                           className="cursor-pointer text-red-600"
                           onClick={() => handleDeleteClick(dept)}
@@ -398,7 +396,7 @@ export default function Departments() {
         </div>
       )}
 
-      {/* ✅ DELETE CONFIRMATION MODAL */}
+      {/* ✅ DELETE CONFIRMATION MODAL — matches Roles style exactly */}
       {showDeleteModal && deletingDept && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -426,7 +424,7 @@ export default function Departments() {
               </div>
             )}
 
-            {/* Warning icon + message */}
+            {/* Warning icon + message — same structure as Roles delete modal */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
                 <svg
@@ -445,11 +443,12 @@ export default function Departments() {
               </div>
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Are you sure you want to delete{" "}
+                  Are you sure you want to delete department{" "}
                   <span className="font-semibold text-gray-900 dark:text-white">
                     {deletingDept.department_name}
                   </span>
-                  ? This action cannot be undone.
+                  ? This will also remove all its associations and cannot be
+                  undone.
                 </p>
 
                 {/* ✅ Assigned users warning */}
@@ -468,6 +467,7 @@ export default function Departments() {
                     </p>
                   </div>
                 )}
+                
               </div>
             </div>
 

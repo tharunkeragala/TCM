@@ -82,6 +82,7 @@ export default function Roles() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [assignedUserCount, setAssignedUserCount] = useState<number>(0);
 
   // ─── Load Menus Once ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -256,13 +257,32 @@ export default function Roles() {
     }
   };
 
-  // ─── Delete Role ──────────────────────────────────────────────────────────
-  const openDeleteModal = (role: Role) => {
+  // ─── Open Delete Modal (fetch assigned user count first) ──────────────────
+  const openDeleteModal = async (role: Role) => {
     setDeleteRole(role);
     setDeleteAlert(null);
+    setAssignedUserCount(0);
+
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+
+      const res = await API.get(`/api/roles/${role.id}/assigned-users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.data.success) {
+        setAssignedUserCount(res.data.count ?? 0);
+      }
+    } catch {
+      // If check fails, still allow delete — count stays 0
+      setAssignedUserCount(0);
+    }
+
     setShowDeleteModal(true);
   };
 
+  // ─── Confirm Delete ───────────────────────────────────────────────────────
   const handleDelete = async () => {
     setDeleting(true);
     setDeleteAlert(null);
@@ -276,6 +296,7 @@ export default function Roles() {
         setShowDeleteModal(false);
         setDeleteRole(null);
         setDeleteAlert(null);
+        setAssignedUserCount(0);
         if (selectedRoleId === deleteRole?.id) setSelectedRoleId(null);
         refetch();
       }, 1200);
@@ -358,7 +379,6 @@ export default function Roles() {
                           : ""
                       }`}
                     >
-                      {/* ✅ Sequence Number */}
                       <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
                         {index + 1}
                       </td>
@@ -414,114 +434,108 @@ export default function Roles() {
 
         {/* ─── Permissions Panel ────────────────────────────────────────────── */}
         {selectedRoleId !== null && (
-  <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md">
-    <div className="relative w-full max-w-2xl mx-4 rounded-2xl border border-white/10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md">
+            <div className="relative w-full max-w-2xl mx-4 rounded-2xl border border-white/10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-gray-400/50 dark:border-gray-700/50">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Permissions
+                  <span className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                    {roles?.find((r) => r.id === selectedRoleId)?.role_name}
+                  </span>
+                </h2>
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-400/50 dark:border-gray-700/50">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Permissions
-          <span className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
-            {roles?.find((r) => r.id === selectedRoleId)?.role_name}
-          </span>
-        </h2>
+                <button
+                  onClick={() => {
+                    setSelectedRoleId(null);
+                    setChecked([]);
+                    setPermAlert(null);
+                    setMenuAlert(null);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200/60 dark:hover:bg-gray-700/60 transition"
+                >
+                  <span className="text-lg text-gray-500 hover:text-gray-800 dark:hover:text-white">
+                    ✕
+                  </span>
+                </button>
+              </div>
 
-        <button
-          onClick={() => {
-            setSelectedRoleId(null);
-            setChecked([]);
-            setPermAlert(null);
-            setMenuAlert(null);
-          }}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200/60 dark:hover:bg-gray-700/60 transition"
-        >
-          <span className="text-lg text-gray-500 hover:text-gray-800 dark:hover:text-white">
-            ✕
-          </span>
-        </button>
-      </div>
+              {/* Alerts */}
+              <div className="px-6 pt-4 space-y-3">
+                {menuAlert && (
+                  <Alert variant="error" title="Menu Error" message={menuAlert} />
+                )}
+                {permAlert && (
+                  <Alert
+                    variant={permAlert.type}
+                    title={permAlert.type === "success" ? "Success" : "Error"}
+                    message={permAlert.message}
+                  />
+                )}
+              </div>
 
-      {/* Alerts */}
-      <div className="px-6 pt-4 space-y-3">
-        {menuAlert && (
-          <Alert
-            variant="error"
-            title="Menu Error"
-            message={menuAlert}
-          />
-        )}
+              {/* Content */}
+              <div className="px-6 py-4">
+                {loadingMenus || loadingPermissions ? (
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                  </div>
+                ) : menus.length === 0 ? (
+                  <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+                    No menus found.
+                    <button
+                      onClick={loadMenus}
+                      className="ml-2 text-blue-500 hover:text-blue-600 font-medium underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div className="max-h-[400px] overflow-y-auto rounded-lg border p-3 pr-2 bg-gray-50 text-gray-900 dark:bg-gray-800/40 dark:text-white dark:border-gray-700">
+                    <CheckboxTree
+                      nodes={menus}
+                      checked={checked}
+                      expanded={expanded}
+                      onCheck={(val) => setChecked(val as number[])}
+                      onExpand={(val) => setExpanded(val as number[])}
+                      icons={{
+                        check: <span className="text-blue-600">✔</span>,
+                        uncheck: <span className="text-gray-400">☐</span>,
+                        halfCheck: <span className="text-blue-400">▣</span>,
+                        expandClose: <span className="text-gray-500">▶</span>,
+                        expandOpen: <span className="text-gray-500">▼</span>,
+                        expandAll: <span />,
+                        collapseAll: <span />,
+                        parentClose: <span>📁</span>,
+                        parentOpen: <span>📂</span>,
+                        leaf: <span>📄</span>,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
 
-        {permAlert && (
-          <Alert
-            variant={permAlert.type}
-            title={permAlert.type === "success" ? "Success" : "Error"}
-            message={permAlert.message}
-          />
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="px-6 py-4">
-        {loadingMenus || loadingPermissions ? (
-          <div className="animate-pulse space-y-3">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+              {/* Footer */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-400/50 dark:border-gray-700/50">
+                <button
+                  onClick={() => setSelectedRoleId(null)}
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={savePermissions}
+                  disabled={saving}
+                  className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
+                >
+                  {saving ? "Saving..." : "Save Permissions"}
+                </button>
+              </div>
+            </div>
           </div>
-        ) : menus.length === 0 ? (
-          <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-            No menus found.
-            <button
-              onClick={loadMenus}
-              className="ml-2 text-blue-500 hover:text-blue-600 font-medium underline"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <div className="max-h-[400px] overflow-y-auto rounded-lg border p-3 pr-2 bg-gray-50 text-gray-900 dark:bg-gray-800/40 dark:text-white dark:border-gray-700">
-            <CheckboxTree
-              nodes={menus}
-              checked={checked}
-              expanded={expanded}
-              onCheck={(val) => setChecked(val as number[])}
-              onExpand={(val) => setExpanded(val as number[])}
-              icons={{
-                check: <span className="text-blue-600">✔</span>,
-                uncheck: <span className="text-gray-400">☐</span>,
-                halfCheck: <span className="text-blue-400">▣</span>,
-                expandClose: <span className="text-gray-500">▶</span>,
-                expandOpen: <span className="text-gray-500">▼</span>,
-                expandAll: <span />,
-                collapseAll: <span />,
-                parentClose: <span>📁</span>,
-                parentOpen: <span>📂</span>,
-                leaf: <span>📄</span>,
-              }}
-            />
-          </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-400/50 dark:border-gray-700/50">
-        <button
-          onClick={() => setSelectedRoleId(null)}
-          className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={savePermissions}
-          disabled={saving}
-          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150">
-          {saving ? "Saving..." : "Save Permissions"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
       </div>
 
       {/* ─── Create Role Modal ────────────────────────────────────────────────── */}
@@ -656,7 +670,7 @@ export default function Roles() {
       )}
 
       {/* ─── Delete Confirm Modal ─────────────────────────────────────────────── */}
-      {showDeleteModal && (
+      {showDeleteModal && deleteRole && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
@@ -668,6 +682,7 @@ export default function Roles() {
                   setShowDeleteModal(false);
                   setDeleteRole(null);
                   setDeleteAlert(null);
+                  setAssignedUserCount(0);
                 }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
@@ -685,14 +700,51 @@ export default function Roles() {
               </div>
             )}
 
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete role{" "}
-              <span className="font-semibold text-red-500">
-                "{deleteRole?.role_name}"
-              </span>
-              ? This will also remove all its permissions. This action cannot be
-              undone.
-            </p>
+            {/* Warning icon + message */}
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
+                <svg
+                  className="w-5 h-5 text-red-600 dark:text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Are you sure you want to delete role{" "}
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {deleteRole.role_name}
+                  </span>
+                  ? This will also remove all its permissions and cannot be
+                  undone.
+                </p>
+
+                {/* ✅ Assigned users warning */}
+                {assignedUserCount > 0 && (
+                  <div className="mt-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
+                      ⚠️ {assignedUserCount} user
+                      {assignedUserCount > 1 ? "s are" : " is"} currently
+                      assigned to this role.
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                      Proceeding will detach{" "}
+                      {assignedUserCount > 1 ? "these users" : "this user"}{" "}
+                      from the role. You will need to reassign them to another
+                      role afterwards.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="flex justify-end gap-3">
               <button
@@ -700,7 +752,9 @@ export default function Roles() {
                   setShowDeleteModal(false);
                   setDeleteRole(null);
                   setDeleteAlert(null);
+                  setAssignedUserCount(0);
                 }}
+                disabled={deleting}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
               >
                 Cancel
