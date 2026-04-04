@@ -35,3 +35,7 @@ app.use("/api/departments", departmentRoutes);
 // Role
 const roleRoutes = require("./routes/roleRoutes");
 app.use("/api/roles", roleRoutes);
+
+// Team
+const teamRoutes = require("./routes/teamRoutes");
+app.use("/api/teams", teamRoutes);

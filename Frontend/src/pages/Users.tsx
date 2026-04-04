@@ -14,8 +14,12 @@ interface User {
   role_name: string;
   department_id: number | null;
   department_name: string | null;
+  team_id: number | null;
+  team_name: string | null;
   source: string;
   is_active: boolean;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface Role {
@@ -26,9 +30,36 @@ interface Role {
 interface Department {
   id: number;
   department_name: string;
+  is_active: boolean;
+}
+
+interface Team {
+  id: number;
+  team_name: string;
+  is_active: boolean;
+  department_id: number;
 }
 
 type UserType = "MANUAL" | "AD";
+
+// ✅ Format date helper
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr)
+    return <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>;
+  const d = new Date(dateStr);
+  return (
+    <span className="text-xs text-gray-600 dark:text-gray-400">
+      {d.toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })}{" "}
+      <span className="text-gray-400 dark:text-gray-500">
+        {d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+      </span>
+    </span>
+  );
+};
 
 export default function Users() {
   // ✅ Fetch users
@@ -43,6 +74,10 @@ export default function Users() {
   const { data: departments } =
     useFetchWithAuth<Department[]>("/api/departments");
 
+  // ✅ Teams — loaded dynamically by department
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+
   // ─── CREATE / EDIT MODAL ─────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -54,6 +89,7 @@ export default function Users() {
     windows_username: "",
     role_id: "",
     department_id: "",
+    team_id: "",
     is_active: true,
   });
 
@@ -76,6 +112,34 @@ export default function Users() {
   const getToken = () =>
     localStorage.getItem("token") || sessionStorage.getItem("token");
 
+  // ✅ Fetch teams by department
+  const fetchTeamsByDepartment = async (departmentId: string) => {
+    if (!departmentId) {
+      setTeams([]);
+      return;
+    }
+    setTeamsLoading(true);
+    try {
+      const token = getToken();
+      const res = await API.get(`/api/teams/department/${departmentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data.success) {
+        setTeams(res.data.data ?? []);
+      }
+    } catch {
+      setTeams([]);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
+
+  // ✅ Department change — reset team, re-fetch teams
+  const handleDepartmentChange = (departmentId: string) => {
+    setFormData((prev) => ({ ...prev, department_id: departmentId, team_id: "" }));
+    fetchTeamsByDepartment(departmentId);
+  };
+
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingUser(null);
@@ -86,9 +150,11 @@ export default function Users() {
       windows_username: "",
       role_id: "",
       department_id: "",
+      team_id: "",
       is_active: true,
     });
     setFormAlert(null);
+    setTeams([]);
   };
 
   const handleCloseDeleteModal = () => {
@@ -107,9 +173,11 @@ export default function Users() {
       windows_username: "",
       role_id: "",
       department_id: "",
+      team_id: "",
       is_active: true,
     });
     setFormAlert(null);
+    setTeams([]);
     setShowModal(true);
   };
 
@@ -123,15 +191,23 @@ export default function Users() {
       windows_username: user.source === "AD" ? user.username : "",
       role_id: String(user.role_id ?? ""),
       department_id: String(user.department_id ?? ""),
+      team_id: String(user.team_id ?? ""),
       is_active: user.is_active,
     });
     setFormAlert(null);
+
+    // Pre-load teams for the user's current department
+    if (user.department_id) {
+      fetchTeamsByDepartment(String(user.department_id));
+    } else {
+      setTeams([]);
+    }
+
     setShowModal(true);
   };
 
   // ─── SAVE (CREATE / UPDATE) ───────────────────────────────────────────────
   const handleSave = async () => {
-    // Validation
     if (editingUser) {
       if (!formData.role_id) {
         setFormAlert({ type: "error", message: "Role is required." });
@@ -153,10 +229,7 @@ export default function Users() {
         }
       } else {
         if (!formData.windows_username.trim()) {
-          setFormAlert({
-            type: "error",
-            message: "Windows username is required.",
-          });
+          setFormAlert({ type: "error", message: "Windows username is required." });
           return;
         }
         if (!formData.role_id) {
@@ -171,7 +244,6 @@ export default function Users() {
 
     try {
       const token = getToken();
-
       let res;
 
       if (editingUser) {
@@ -183,6 +255,7 @@ export default function Users() {
             department_id: formData.department_id
               ? Number(formData.department_id)
               : null,
+            team_id: formData.team_id ? Number(formData.team_id) : null,
             is_active: formData.is_active,
             ...(userType === "MANUAL" && formData.password
               ? { password: formData.password }
@@ -200,6 +273,7 @@ export default function Users() {
             department_id: formData.department_id
               ? Number(formData.department_id)
               : null,
+            team_id: formData.team_id ? Number(formData.team_id) : null,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -214,6 +288,7 @@ export default function Users() {
             department_id: formData.department_id
               ? Number(formData.department_id)
               : null,
+            team_id: formData.team_id ? Number(formData.team_id) : null,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -260,10 +335,7 @@ export default function Users() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setDeleteAlert({
-        type: "success",
-        message: "User deleted successfully.",
-      });
+      setDeleteAlert({ type: "success", message: "User deleted successfully." });
 
       setTimeout(() => {
         setShowDeleteModal(false);
@@ -293,7 +365,7 @@ export default function Users() {
 
       window.location.reload();
     } catch {
-      // silent — could wire up toast
+      // silent
     }
   };
 
@@ -321,9 +393,7 @@ export default function Users() {
         )}
 
         {loading && !error && (
-          <div className="text-gray-500 dark:text-gray-400">
-            Loading users...
-          </div>
+          <div className="text-gray-500 dark:text-gray-400">Loading users...</div>
         )}
 
         {!loading && !error && (
@@ -335,9 +405,12 @@ export default function Users() {
                   <th className="px-5 py-3">Username</th>
                   <th className="px-5 py-3">Role</th>
                   <th className="px-5 py-3">Department</th>
+                  <th className="px-5 py-3">Team</th>
                   <th className="px-5 py-3">Source</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3">Active</th>
+                  <th className="px-5 py-3">Created</th>
+                  <th className="px-5 py-3">Updated</th>
                   <th className="px-5 py-3">Actions</th>
                 </tr>
               </thead>
@@ -356,13 +429,24 @@ export default function Users() {
                       </td>
 
                       <td className="px-5 py-3">
-                        {user.role_name ? user.role_name : <span className="text-gray-400 dark:text-gray-500 italic text-xs">Unassigned</span>}
+                        {user.role_name ?? (
+                          <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                            Unassigned
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-5 py-3">
-                        {user.department_name ? (
-                          user.department_name
-                        ) : (
+                        {user.department_name ?? (
+                          <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                            Unassigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* ✅ Team Column */}
+                      <td className="px-5 py-3">
+                        {user.team_name ?? (
                           <span className="text-gray-400 dark:text-gray-500 italic text-xs">
                             Unassigned
                           </span>
@@ -406,6 +490,16 @@ export default function Users() {
                         </button>
                       </td>
 
+                      {/* ✅ Created At */}
+                      <td className="px-5 py-3 whitespace-nowrap">
+                        {formatDate(user.created_at)}
+                      </td>
+
+                      {/* ✅ Updated At */}
+                      <td className="px-5 py-3 whitespace-nowrap">
+                        {formatDate(user.updated_at)}
+                      </td>
+
                       {/* Actions */}
                       <td className="px-5 py-3 flex gap-3 items-center">
                         <FaEdit
@@ -421,7 +515,7 @@ export default function Users() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="text-center py-5 text-gray-500">
+                    <td colSpan={11} className="text-center py-5 text-gray-500">
                       No users found
                     </td>
                   </tr>
@@ -435,7 +529,7 @@ export default function Users() {
       {/* ✅ CREATE / EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -459,7 +553,7 @@ export default function Users() {
               </div>
             )}
 
-            {/* ✅ User Type Tabs — only shown on CREATE */}
+            {/* ✅ User Type Tabs — only on CREATE */}
             {!editingUser && (
               <div className="flex mb-5 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                 <button
@@ -488,7 +582,6 @@ export default function Users() {
             {/* ✅ MANUAL USER FIELDS */}
             {(userType === "MANUAL" || editingUser) && (
               <>
-                {/* Username — read-only on edit */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Username <span className="text-red-500">*</span>
@@ -510,7 +603,6 @@ export default function Users() {
                   )}
                 </div>
 
-                {/* Password */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Password{" "}
@@ -589,19 +681,60 @@ export default function Users() {
               </label>
               <select
                 value={formData.department_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, department_id: e.target.value })
-                }
+                onChange={(e) => handleDepartmentChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">No department</option>
                 {departments &&
-                  departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.department_name}
-                    </option>
-                  ))}
+                  departments
+                    .filter((d) => d.is_active)
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.department_name}
+                      </option>
+                    ))}
               </select>
+            </div>
+
+            {/* ✅ TEAM — always rendered, disabled until department chosen */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Team
+                <span className="text-gray-400 text-xs font-normal ml-1">
+                  (optional)
+                </span>
+              </label>
+              <select
+                value={formData.team_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, team_id: e.target.value })
+                }
+                disabled={!formData.department_id || teamsLoading}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {!formData.department_id
+                    ? "Select a department first"
+                    : teamsLoading
+                    ? "Loading teams..."
+                    : "No team"}
+                </option>
+                {!teamsLoading &&
+                  teams
+                    .filter((t) => t.is_active)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.team_name}
+                      </option>
+                    ))}
+              </select>
+              {formData.department_id &&
+                !teamsLoading &&
+                teams.filter((t) => t.is_active).length === 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    No active teams in this department.
+                  </p>
+                )}
             </div>
 
             {/* ✅ ACTIVE TOGGLE */}
@@ -661,7 +794,6 @@ export default function Users() {
       {showDeleteModal && deletingUser && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-            {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Delete User

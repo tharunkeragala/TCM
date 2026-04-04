@@ -14,13 +14,17 @@ exports.getUsers = async (req, res) => {
     const pool = await poolPromise;
 
     const result = await pool.request().query(`
-      SELECT u.id, u.username, u.source, u.is_active,
-             u.role_id, u.department_id,
-             r.role_name,
-             d.department_name
+      SELECT 
+        u.id, u.username, u.source, u.is_active,
+        u.role_id, u.department_id, u.team_id,
+        u.created_at, u.updated_at,
+        r.role_name,
+        d.department_name,
+        t.team_name
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
       LEFT JOIN departments d ON u.department_id = d.id
+      LEFT JOIN teams t ON u.team_id = t.id
       ORDER BY u.id ASC
     `);
 
@@ -50,7 +54,7 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    const { username, password, role_id, department_id } = req.body;
+    const { username, password, role_id, department_id, team_id } = req.body;
 
     if (!username || !password || !role_id) {
       return res.status(400).json({
@@ -65,9 +69,7 @@ exports.createUser = async (req, res) => {
     const existing = await pool
       .request()
       .input("username", sql.VarChar, username)
-      .query(`
-        SELECT id FROM users WHERE username = @username
-      `);
+      .query(`SELECT id FROM users WHERE username = @username`);
 
     if (existing.recordset.length > 0) {
       return res.status(400).json({
@@ -84,9 +86,10 @@ exports.createUser = async (req, res) => {
       .input("password", sql.VarChar, hashedPassword)
       .input("role_id", sql.Int, role_id)
       .input("department_id", sql.Int, department_id || null)
+      .input("team_id", sql.Int, team_id || null)
       .query(`
-        INSERT INTO users (username, password, role_id, department_id, source)
-        VALUES (@username, @password, @role_id, @department_id, 'MANUAL')
+        INSERT INTO users (username, password, role_id, department_id, team_id, source, created_at, updated_at)
+        VALUES (@username, @password, @role_id, @department_id, @team_id, 'MANUAL', GETDATE(), GETDATE())
       `);
 
     // 🧾 Audit log
@@ -122,7 +125,7 @@ exports.addADUser = async (req, res) => {
       });
     }
 
-    const { windows_username, role_id, department_id } = req.body;
+    const { windows_username, role_id, department_id, team_id } = req.body;
 
     if (!windows_username || !role_id) {
       return res.status(400).json({
@@ -137,9 +140,7 @@ exports.addADUser = async (req, res) => {
     const existing = await pool
       .request()
       .input("username", sql.VarChar, windows_username)
-      .query(`
-        SELECT id FROM users WHERE username = @username
-      `);
+      .query(`SELECT id FROM users WHERE username = @username`);
 
     if (existing.recordset.length > 0) {
       return res.status(400).json({
@@ -153,19 +154,16 @@ exports.addADUser = async (req, res) => {
       .input("username", sql.VarChar, windows_username)
       .input("role_id", sql.Int, role_id)
       .input("department_id", sql.Int, department_id || null)
+      .input("team_id", sql.Int, team_id || null)
       .query(`
-        INSERT INTO users (username, windows_username, role_id, department_id, source)
-        VALUES (@username, @username, @role_id, @department_id, 'AD')
+        INSERT INTO users (username, windows_username, role_id, department_id, team_id, source, created_at, updated_at)
+        VALUES (@username, @username, @role_id, @department_id, @team_id, 'AD', GETDATE(), GETDATE())
       `);
 
     // 🧾 Audit log
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `AD User ${windows_username} added`
-      )
+      .input("description", sql.VarChar, `AD User ${windows_username} added`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('CREATE', 'USER', @description)
@@ -196,7 +194,7 @@ exports.updateUser = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { role_id, department_id, is_active, password } = req.body;
+    const { role_id, department_id, team_id, is_active, password } = req.body;
 
     if (!role_id) {
       return res.status(400).json({
@@ -207,7 +205,6 @@ exports.updateUser = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // ✅ If a new password is provided, hash it
     if (password && password.trim()) {
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -216,14 +213,17 @@ exports.updateUser = async (req, res) => {
         .input("id", sql.Int, id)
         .input("role_id", sql.Int, role_id)
         .input("department_id", sql.Int, department_id || null)
+        .input("team_id", sql.Int, team_id || null)
         .input("is_active", sql.Bit, is_active)
         .input("password", sql.VarChar, hashedPassword)
         .query(`
           UPDATE users
-          SET role_id = @role_id,
+          SET role_id       = @role_id,
               department_id = @department_id,
-              is_active = @is_active,
-              password = @password
+              team_id       = @team_id,
+              is_active     = @is_active,
+              password      = @password,
+              updated_at    = GETDATE()
           WHERE id = @id
         `);
     } else {
@@ -232,12 +232,15 @@ exports.updateUser = async (req, res) => {
         .input("id", sql.Int, id)
         .input("role_id", sql.Int, role_id)
         .input("department_id", sql.Int, department_id || null)
+        .input("team_id", sql.Int, team_id || null)
         .input("is_active", sql.Bit, is_active)
         .query(`
           UPDATE users
-          SET role_id = @role_id,
+          SET role_id       = @role_id,
               department_id = @department_id,
-              is_active = @is_active
+              team_id       = @team_id,
+              is_active     = @is_active,
+              updated_at    = GETDATE()
           WHERE id = @id
         `);
     }
@@ -336,7 +339,8 @@ exports.toggleUser = async (req, res) => {
       .input("is_active", sql.Bit, is_active)
       .query(`
         UPDATE users
-        SET is_active = @is_active
+        SET is_active  = @is_active,
+            updated_at = GETDATE()
         WHERE id = @id
       `);
 

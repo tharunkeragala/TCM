@@ -55,6 +55,7 @@ const navItems: NavItem[] = [
       { name: "User Management", path: "/users", pro: false },
       { name: "Roles", path: "/roles", pro: false },
       { name: "Departments", path: "/departments", pro: false },
+      { name: "Teams", path: "/teams", pro: false },
     ],
   },
   {
@@ -488,7 +489,7 @@ const AppSidebar: React.FC = () => {
           </div>
         </nav>
 
-        {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
+        {/* {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null} */}
       </div>
     </aside>
   );
