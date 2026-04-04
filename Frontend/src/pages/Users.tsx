@@ -44,19 +44,32 @@ type UserType = "MANUAL" | "AD";
 
 // ✅ Format date helper
 const formatDate = (dateStr: string | null) => {
-  if (!dateStr)
-    return <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>;
-  const d = new Date(dateStr);
+  if (!dateStr) {
+    return (
+      <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
+    );
+  }
+
+  const d = new Date(dateStr); // ✅ no replace needed
+
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+
+  let hours = d.getUTCHours();
+  const minutes = String(d.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(d.getUTCSeconds()).padStart(2, "0");
+
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  const formattedDate = `${day}/${month}/${year}`;
+  const formattedTime = `${String(hours).padStart(2, "0")}.${minutes}.${seconds} ${ampm}`;
+
   return (
     <span className="text-xs text-gray-600 dark:text-gray-400">
-      {d.toLocaleDateString(undefined, {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })}{" "}
-      <span className="text-gray-400 dark:text-gray-500">
-        {d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-      </span>
+      {formattedDate}{" "}
+      <span className="text-gray-400 dark:text-gray-500">{formattedTime}</span>
     </span>
   );
 };
@@ -136,7 +149,11 @@ export default function Users() {
 
   // ✅ Department change — reset team, re-fetch teams
   const handleDepartmentChange = (departmentId: string) => {
-    setFormData((prev) => ({ ...prev, department_id: departmentId, team_id: "" }));
+    setFormData((prev) => ({
+      ...prev,
+      department_id: departmentId,
+      team_id: "",
+    }));
     fetchTeamsByDepartment(departmentId);
   };
 
@@ -229,7 +246,10 @@ export default function Users() {
         }
       } else {
         if (!formData.windows_username.trim()) {
-          setFormAlert({ type: "error", message: "Windows username is required." });
+          setFormAlert({
+            type: "error",
+            message: "Windows username is required.",
+          });
           return;
         }
         if (!formData.role_id) {
@@ -261,7 +281,7 @@ export default function Users() {
               ? { password: formData.password }
               : {}),
           },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } else if (userType === "AD") {
         // ✅ CREATE AD USER
@@ -275,7 +295,7 @@ export default function Users() {
               : null,
             team_id: formData.team_id ? Number(formData.team_id) : null,
           },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
         // ✅ CREATE MANUAL USER
@@ -290,7 +310,7 @@ export default function Users() {
               : null,
             team_id: formData.team_id ? Number(formData.team_id) : null,
           },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       }
 
@@ -335,7 +355,10 @@ export default function Users() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setDeleteAlert({ type: "success", message: "User deleted successfully." });
+      setDeleteAlert({
+        type: "success",
+        message: "User deleted successfully.",
+      });
 
       setTimeout(() => {
         setShowDeleteModal(false);
@@ -344,8 +367,7 @@ export default function Users() {
         window.location.reload();
       }, 1200);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || "Failed to delete user.";
+      const message = err.response?.data?.message || "Failed to delete user.";
       setDeleteAlert({ type: "error", message });
     } finally {
       setDeletingInProgress(false);
@@ -360,7 +382,7 @@ export default function Users() {
       await API.put(
         `/api/users/toggle/${user.id}`,
         { is_active: !user.is_active },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       window.location.reload();
@@ -393,7 +415,9 @@ export default function Users() {
         )}
 
         {loading && !error && (
-          <div className="text-gray-500 dark:text-gray-400">Loading users...</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            Loading users...
+          </div>
         )}
 
         {!loading && !error && (
@@ -716,8 +740,8 @@ export default function Users() {
                   {!formData.department_id
                     ? "Select a department first"
                     : teamsLoading
-                    ? "Loading teams..."
-                    : "No team"}
+                      ? "Loading teams..."
+                      : "No team"}
                 </option>
                 {!teamsLoading &&
                   teams
@@ -782,8 +806,8 @@ export default function Users() {
                     ? "Updating..."
                     : "Creating..."
                   : editingUser
-                  ? "Update"
-                  : "Create"}
+                    ? "Update"
+                    : "Create"}
               </button>
             </div>
           </div>

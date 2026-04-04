@@ -13,6 +13,7 @@ import Departments from "./pages/Departments";
 import Roles from "./pages/Roles";
 import Unauthorized from "./pages/Unauthorized"; // ✅ add this
 import Teams from "./pages/Teams";
+import UserReport from './pages/UserReport';
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/departments" element={<Departments />} />
             <Route path="/roles" element={<Roles />} />
             <Route path="/teams" element={<Teams />} />
+            <Route path="/reports/users" element={<UserReport />} />
           </Route>
         </Route>
 

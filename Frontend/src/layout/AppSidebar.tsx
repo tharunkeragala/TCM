@@ -58,6 +58,14 @@ const navItems: NavItem[] = [
       { name: "Teams", path: "/teams", pro: false },
     ],
   },
+{
+    name: "Reports",
+    icon: <ListIcon />,
+    subItems: [
+      { name: "User Reports", path: "/reports/users", pro: false },
+    ],
+  },
+
   {
     name: "Tables",
     icon: <TableIcon />,
