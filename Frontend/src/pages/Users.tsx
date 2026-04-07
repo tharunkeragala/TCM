@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -50,7 +50,7 @@ const formatDate = (dateStr: string | null) => {
     );
   }
 
-  const d = new Date(dateStr); // ✅ no replace needed
+  const d = new Date(dateStr);
 
   const day = String(d.getUTCDate()).padStart(2, "0");
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -74,6 +74,8 @@ const formatDate = (dateStr: string | null) => {
   );
 };
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 export default function Users() {
   // ✅ Fetch users
   const {
@@ -90,6 +92,17 @@ export default function Users() {
   // ✅ Teams — loaded dynamically by department
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
+
+  // ─── SEARCH & FILTER STATE ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState("");
+  const [filterSource, setFilterSource] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
+  // ─── PAGINATION STATE ───────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // ─── CREATE / EDIT MODAL ─────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
@@ -213,7 +226,6 @@ export default function Users() {
     });
     setFormAlert(null);
 
-    // Pre-load teams for the user's current department
     if (user.department_id) {
       fetchTeamsByDepartment(String(user.department_id));
     } else {
@@ -267,7 +279,6 @@ export default function Users() {
       let res;
 
       if (editingUser) {
-        // ✅ UPDATE
         res = await API.put(
           `/api/users/update/${editingUser.id}`,
           {
@@ -284,7 +295,6 @@ export default function Users() {
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } else if (userType === "AD") {
-        // ✅ CREATE AD USER
         res = await API.post(
           "/api/users/ad-user",
           {
@@ -298,7 +308,6 @@ export default function Users() {
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
-        // ✅ CREATE MANUAL USER
         res = await API.post(
           "/api/users/create",
           {
@@ -391,6 +400,114 @@ export default function Users() {
     }
   };
 
+  // ─── SEARCH + FILTER LOGIC ───────────────────────────────────────────────
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+
+    return users.filter((user) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        user.username.toLowerCase().includes(q) ||
+        (user.role_name ?? "").toLowerCase().includes(q) ||
+        (user.department_name ?? "").toLowerCase().includes(q) ||
+        (user.team_name ?? "").toLowerCase().includes(q);
+
+      const matchesRole =
+        !filterRole || String(user.role_id) === filterRole;
+
+      const matchesDepartment =
+        !filterDepartment ||
+        String(user.department_id) === filterDepartment;
+
+      const matchesSource =
+        !filterSource || user.source === filterSource;
+
+      const matchesStatus =
+        !filterStatus ||
+        (filterStatus === "active" ? user.is_active : !user.is_active);
+
+      return (
+        matchesSearch &&
+        matchesRole &&
+        matchesDepartment &&
+        matchesSource &&
+        matchesStatus
+      );
+    });
+  }, [users, searchQuery, filterRole, filterDepartment, filterSource, filterStatus]);
+
+  // ─── PAGINATION LOGIC ────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedUsers = filteredUsers.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  // Reset to page 1 whenever filters change
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterRoleChange = (val: string) => {
+    setFilterRole(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterDepartmentChange = (val: string) => {
+    setFilterDepartment(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterSourceChange = (val: string) => {
+    setFilterSource(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterStatusChange = (val: string) => {
+    setFilterStatus(val);
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters =
+    searchQuery || filterRole || filterDepartment || filterSource || filterStatus;
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setFilterRole("");
+    setFilterDepartment("");
+    setFilterSource("");
+    setFilterStatus("");
+    setCurrentPage(1);
+  };
+
+  // ─── PAGINATION RANGE ────────────────────────────────────────────────────
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, safePage - delta);
+    const right = Math.min(totalPages - 1, safePage + delta);
+
+    range.push(1);
+    if (left > 2) range.push("...");
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) range.push("...");
+    if (totalPages > 1) range.push(totalPages);
+
+    return range;
+  };
+
   // ─── RENDER ──────────────────────────────────────────────────────────────
   return (
     <div>
@@ -398,7 +515,7 @@ export default function Users() {
       <PageBreadcrumb pageTitle="User Management" />
 
       <div className="mt-4">
-        {/* Top bar */}
+        {/* ── Top bar ── */}
         <div className="flex justify-end mb-4">
           <button
             onClick={handleOpenCreate}
@@ -406,6 +523,112 @@ export default function Users() {
           >
             + Create User
           </button>
+        </div>
+
+        {/* ── Search & Filters ── */}
+        <div className="mb-4 space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.15z"
+              />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search by username, role, department or team..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Filter row */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Role filter */}
+            <select
+              value={filterRole}
+              onChange={(e) => handleFilterRoleChange(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All roles</option>
+              {roles?.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.role_name}
+                </option>
+              ))}
+            </select>
+
+            {/* Department filter */}
+            <select
+              value={filterDepartment}
+              onChange={(e) => handleFilterDepartmentChange(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All departments</option>
+              {departments
+                ?.filter((d) => d.is_active)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.department_name}
+                  </option>
+                ))}
+            </select>
+
+            {/* Source filter */}
+            <select
+              value={filterSource}
+              onChange={(e) => handleFilterSourceChange(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All sources</option>
+              <option value="MANUAL">Manual</option>
+              <option value="AD">AD</option>
+            </select>
+
+            {/* Status filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => handleFilterStatusChange(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+
+            {/* Clear filters */}
+            {hasActiveFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 flex items-center gap-1"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear filters
+              </button>
+            )}
+
+            {/* Result count */}
+            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+              {filteredUsers.length} {filteredUsers.length === 1 ? "user" : "users"} found
+            </span>
+          </div>
         </div>
 
         {error && (
@@ -421,132 +644,233 @@ export default function Users() {
         )}
 
         {!loading && !error && (
-          <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
-                <tr>
-                  <th className="px-5 py-3">#</th>
-                  <th className="px-5 py-3">Username</th>
-                  <th className="px-5 py-3">Role</th>
-                  <th className="px-5 py-3">Department</th>
-                  <th className="px-5 py-3">Team</th>
-                  <th className="px-5 py-3">Source</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Active</th>
-                  <th className="px-5 py-3">Created</th>
-                  <th className="px-5 py-3">Updated</th>
-                  <th className="px-5 py-3">Actions</th>
-                </tr>
-              </thead>
+          <>
+            <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
+                  <tr>
+                    <th className="px-5 py-3">#</th>
+                    <th className="px-5 py-3">Username</th>
+                    <th className="px-5 py-3">Role</th>
+                    <th className="px-5 py-3">Department</th>
+                    <th className="px-5 py-3">Team</th>
+                    <th className="px-5 py-3">Source</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Active</th>
+                    <th className="px-5 py-3">Created</th>
+                    <th className="px-5 py-3">Updated</th>
+                    <th className="px-5 py-3">Actions</th>
+                  </tr>
+                </thead>
 
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
-                {users && users.length > 0 ? (
-                  users.map((user, index) => (
-                    <tr
-                      key={user.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
-                    >
-                      <td className="px-5 py-3">{index + 1}</td>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
+                  {paginatedUsers.length > 0 ? (
+                    paginatedUsers.map((user, index) => (
+                      <tr
+                        key={user.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
+                      >
+                        <td className="px-5 py-3">
+                          {(safePage - 1) * pageSize + index + 1}
+                        </td>
 
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                        {user.username}
-                      </td>
+                        <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                          {user.username}
+                        </td>
 
-                      <td className="px-5 py-3">
-                        {user.role_name ?? (
-                          <span className="text-gray-400 dark:text-gray-500 italic text-xs">
-                            Unassigned
+                        <td className="px-5 py-3">
+                          {user.role_name ?? (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-3">
+                          {user.department_name ?? (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-3">
+                          {user.team_name ?? (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <span className="px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                            {user.source}
                           </span>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="px-5 py-3">
-                        {user.department_name ?? (
-                          <span className="text-gray-400 dark:text-gray-500 italic text-xs">
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
-
-                      {/* ✅ Team Column */}
-                      <td className="px-5 py-3">
-                        {user.team_name ?? (
-                          <span className="text-gray-400 dark:text-gray-500 italic text-xs">
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-3">
-                        <span className="px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                          {user.source}
-                        </span>
-                      </td>
-
-                      {/* Status Badge */}
-                      <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.is_active
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                          }`}
-                        >
-                          {user.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-
-                      {/* Toggle */}
-                      <td className="px-5 py-3">
-                        <button
-                          onClick={() => handleToggleStatus(user)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                            user.is_active
-                              ? "bg-blue-600"
-                              : "bg-gray-300 dark:bg-gray-600"
-                          }`}
-                        >
+                        <td className="px-5 py-3">
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                              user.is_active ? "translate-x-6" : "translate-x-1"
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.is_active
+                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                             }`}
+                          >
+                            {user.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <button
+                            onClick={() => handleToggleStatus(user)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                              user.is_active
+                                ? "bg-blue-600"
+                                : "bg-gray-300 dark:bg-gray-600"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                                user.is_active ? "translate-x-6" : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {formatDate(user.created_at)}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {formatDate(user.updated_at)}
+                        </td>
+
+                        <td className="px-5 py-3 flex gap-3 items-center">
+                          <FaEdit
+                            className="cursor-pointer text-blue-600"
+                            onClick={() => handleEdit(user)}
                           />
-                        </button>
-                      </td>
-
-                      {/* ✅ Created At */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {formatDate(user.created_at)}
-                      </td>
-
-                      {/* ✅ Updated At */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {formatDate(user.updated_at)}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-5 py-3 flex gap-3 items-center">
-                        <FaEdit
-                          className="cursor-pointer text-blue-600"
-                          onClick={() => handleEdit(user)}
-                        />
-                        <FaTrash
-                          className="cursor-pointer text-red-600"
-                          onClick={() => handleDeleteClick(user)}
-                        />
+                          <FaTrash
+                            className="cursor-pointer text-red-600"
+                            onClick={() => handleDeleteClick(user)}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={11} className="text-center py-10 text-gray-500 dark:text-gray-400">
+                        {hasActiveFilters
+                          ? "No users match your search or filters."
+                          : "No users found."}
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={11} className="text-center py-5 text-gray-500">
-                      No users found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Pagination ── */}
+            {filteredUsers.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                {/* Left: page size + info */}
+                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <span>Rows per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <span>
+                    {(safePage - 1) * pageSize + 1}–
+                    {Math.min(safePage * pageSize, filteredUsers.length)} of{" "}
+                    {filteredUsers.length}
+                  </span>
+                </div>
+
+                {/* Right: page controls */}
+                <div className="flex items-center gap-1">
+                  {/* First */}
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={safePage === 1}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="First page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Prev */}
+                  <button
+                    onClick={() => handlePageChange(safePage - 1)}
+                    disabled={safePage === 1}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Previous page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Page numbers */}
+                  {getPaginationRange().map((item, i) =>
+                    item === "..." ? (
+                      <span
+                        key={`ellipsis-${i}`}
+                        className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => handlePageChange(item as number)}
+                        className={`min-w-[32px] px-2 py-1 rounded-md text-sm font-medium transition ${
+                          safePage === item
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ),
+                  )}
+
+                  {/* Next */}
+                  <button
+                    onClick={() => handlePageChange(safePage + 1)}
+                    disabled={safePage === totalPages}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Next page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  {/* Last */}
+                  <button
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={safePage === totalPages}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Last page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -554,7 +878,6 @@ export default function Users() {
       {showModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingUser ? "Edit User" : "Create User"}
@@ -577,7 +900,6 @@ export default function Users() {
               </div>
             )}
 
-            {/* ✅ User Type Tabs — only on CREATE */}
             {!editingUser && (
               <div className="flex mb-5 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                 <button
@@ -603,7 +925,6 @@ export default function Users() {
               </div>
             )}
 
-            {/* ✅ MANUAL USER FIELDS */}
             {(userType === "MANUAL" || editingUser) && (
               <>
                 <div className="mb-4">
@@ -652,7 +973,6 @@ export default function Users() {
               </>
             )}
 
-            {/* ✅ AD USER FIELDS */}
             {userType === "AD" && !editingUser && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -673,7 +993,6 @@ export default function Users() {
               </div>
             )}
 
-            {/* ✅ ROLE */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Role <span className="text-red-500">*</span>
@@ -695,7 +1014,6 @@ export default function Users() {
               </select>
             </div>
 
-            {/* ✅ DEPARTMENT */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Department
@@ -720,7 +1038,6 @@ export default function Users() {
               </select>
             </div>
 
-            {/* ✅ TEAM — always rendered, disabled until department chosen */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Team
@@ -761,7 +1078,6 @@ export default function Users() {
                 )}
             </div>
 
-            {/* ✅ ACTIVE TOGGLE */}
             <div className="mb-6 flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Active
@@ -787,7 +1103,6 @@ export default function Users() {
               </span>
             </div>
 
-            {/* Footer */}
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleCloseModal}
