@@ -1,15 +1,9 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 
-//
-// ✅ GET ALL TEAMS (with department)
-//
+// ✅ GET ALL TEAMS
 exports.getTeams = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const pool = await poolPromise;
 
     const result = await pool.request().query(`
@@ -31,9 +25,7 @@ exports.getTeams = async (req, res) => {
   }
 };
 
-//
 // ✅ GET TEAMS BY DEPARTMENT
-//
 exports.getTeamsByDepartment = async (req, res) => {
   try {
     const { department_id } = req.params;
@@ -60,15 +52,9 @@ exports.getTeamsByDepartment = async (req, res) => {
   }
 };
 
-//
 // ✅ GET ASSIGNED USER COUNT FOR TEAM
-//
 exports.getAssignedUserCount = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const { id } = req.params;
 
     const pool = await poolPromise;
@@ -96,15 +82,9 @@ exports.getAssignedUserCount = async (req, res) => {
   }
 };
 
-//
 // ✅ CREATE TEAM
-//
 exports.createTeam = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const { team_name, department_id, is_active } = req.body;
 
     if (!team_name || !department_id) {
@@ -116,7 +96,6 @@ exports.createTeam = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // 🔍 Check duplicate within same department
     const existing = await pool
       .request()
       .input("team_name", sql.VarChar, team_name)
@@ -143,14 +122,9 @@ exports.createTeam = async (req, res) => {
         VALUES (@team_name, @department_id, @is_active)
       `);
 
-    // 🧾 Audit log
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Team ${team_name} created under Department ID ${department_id}`
-      )
+      .input("description", sql.VarChar, `Team ${team_name} created under Department ID ${department_id}`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('CREATE', 'TEAM', @description)
@@ -170,21 +144,14 @@ exports.createTeam = async (req, res) => {
   }
 };
 
-//
 // ✅ UPDATE TEAM
-//
 exports.updateTeam = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const { id } = req.params;
     const { team_name, department_id, is_active } = req.body;
 
     const pool = await poolPromise;
 
-    // 🔍 Check duplicate
     const existing = await pool
       .request()
       .input("team_name", sql.VarChar, team_name)
@@ -192,7 +159,7 @@ exports.updateTeam = async (req, res) => {
       .input("id", sql.Int, id)
       .query(`
         SELECT id FROM test_case_manager.dbo.teams
-        WHERE team_name = @team_name 
+        WHERE team_name = @team_name
         AND department_id = @department_id
         AND id != @id
       `);
@@ -212,29 +179,21 @@ exports.updateTeam = async (req, res) => {
       .input("is_active", sql.Bit, is_active)
       .query(`
         UPDATE test_case_manager.dbo.teams
-        SET team_name = @team_name,
+        SET team_name     = @team_name,
             department_id = @department_id,
-            is_active = @is_active
+            is_active     = @is_active
         WHERE id = @id
       `);
 
-    // 🧾 Audit
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Team ID ${id} updated`
-      )
+      .input("description", sql.VarChar, `Team ID ${id} updated`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('UPDATE', 'TEAM', @description)
       `);
 
-    res.json({
-      success: true,
-      message: "Team updated successfully",
-    });
+    res.json({ success: true, message: "Team updated successfully" });
   } catch (err) {
     console.error("UPDATE Team Error:", err);
     res.status(500).json({
@@ -245,19 +204,12 @@ exports.updateTeam = async (req, res) => {
   }
 };
 
-//
-// ✅ DELETE TEAM (detach users)
-//
+// ✅ DELETE TEAM (detach users first)
 exports.deleteTeam = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const { id } = req.params;
     const pool = await poolPromise;
 
-    // Count users
     const result = await pool
       .request()
       .input("team_id", sql.Int, id)
@@ -269,7 +221,6 @@ exports.deleteTeam = async (req, res) => {
 
     const count = result.recordset[0]?.user_count ?? 0;
 
-    // Detach users
     if (count > 0) {
       await pool
         .request()
@@ -282,26 +233,18 @@ exports.deleteTeam = async (req, res) => {
 
       await pool
         .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `${count} user(s) detached from Team ID ${id}`
-        )
+        .input("description", sql.VarChar, `${count} user(s) detached from Team ID ${id}`)
         .query(`
           INSERT INTO audit_logs (action, module, description)
           VALUES ('DETACH', 'TEAM', @description)
         `);
     }
 
-    // Delete
     await pool
       .request()
       .input("id", sql.Int, id)
-      .query(`
-        DELETE FROM test_case_manager.dbo.teams WHERE id = @id
-      `);
+      .query(`DELETE FROM test_case_manager.dbo.teams WHERE id = @id`);
 
-    // Audit
     await pool
       .request()
       .input("description", sql.VarChar, `Team ID ${id} deleted`)
@@ -327,15 +270,9 @@ exports.deleteTeam = async (req, res) => {
   }
 };
 
-//
 // ✅ TOGGLE TEAM STATUS
-//
 exports.toggleTeam = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
     const { id } = req.params;
     const { is_active } = req.body;
 
@@ -353,20 +290,13 @@ exports.toggleTeam = async (req, res) => {
 
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Team ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`
-      )
+      .input("description", sql.VarChar, `Team ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('STATUS_CHANGE', 'TEAM', @description)
       `);
 
-    res.json({
-      success: true,
-      message: "Team status updated",
-    });
+    res.json({ success: true, message: "Team status updated" });
   } catch (err) {
     console.error("TOGGLE Team Error:", err);
     res.status(500).json({

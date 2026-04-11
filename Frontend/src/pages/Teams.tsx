@@ -29,7 +29,7 @@ export default function Teams() {
 
   const {
     data: departments,
-  } = useFetchWithAuth<Department[]>("/api/departments");
+  } = useFetchWithAuth<Department[]>("/api/dropdown/departments");
 
   const [showModal, setShowModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);

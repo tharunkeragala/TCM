@@ -1,7 +1,7 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 
-// ─── Roles Dropdown ───────────────────────────────────────────────────────────
+// ─── Roles ────────────────────────────────────────────────────────────────────
 exports.getRolesDropdown = async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -19,7 +19,7 @@ exports.getRolesDropdown = async (req, res) => {
   }
 };
 
-// ─── Departments Dropdown ─────────────────────────────────────────────────────
+// ─── Departments ──────────────────────────────────────────────────────────────
 exports.getDepartmentsDropdown = async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -38,7 +38,7 @@ exports.getDepartmentsDropdown = async (req, res) => {
   }
 };
 
-// ─── Teams Dropdown (all) ─────────────────────────────────────────────────────
+// ─── Teams (all active) ───────────────────────────────────────────────────────
 exports.getTeamsDropdown = async (req, res) => {
   try {
     const pool = await poolPromise;
