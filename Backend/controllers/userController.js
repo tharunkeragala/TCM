@@ -4,13 +4,6 @@ const bcrypt = require("bcrypt");
 // ✅ GET ALL USERS
 exports.getUsers = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const pool = await poolPromise;
 
     const result = await pool.request().query(`
@@ -18,19 +11,13 @@ exports.getUsers = async (req, res) => {
         u.id, u.username, u.source, u.is_active,
         u.role_id, u.department_id, u.team_id,
         u.created_at, u.updated_at,
-
-        -- 👇 USER IDs
         u.created_by,
         u.updated_by,
-      
-        -- 👇 USERNAMES (JOIN)
         uc.username AS created_by_username,
         uu.username AS updated_by_username,
-
         r.role_name,
         d.department_name,
         t.team_name
-
       FROM users u
       LEFT JOIN users uc ON u.created_by = uc.id
       LEFT JOIN users uu ON u.updated_by = uu.id
@@ -59,13 +46,6 @@ exports.getUsers = async (req, res) => {
 // ✅ CREATE MANUAL USER
 exports.createUser = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { username, password, role_id, department_id, team_id } = req.body;
 
     if (!username || !password || !role_id) {
@@ -76,10 +56,8 @@ exports.createUser = async (req, res) => {
     }
 
     const pool = await poolPromise;
+    const createdBy = req.user.id;
 
-    const createdBy = req.user.id; // ✅ USER ID
-
-    // 🔍 Check duplicate
     const existing = await pool
       .request()
       .input("username", sql.VarChar, username)
@@ -109,7 +87,6 @@ exports.createUser = async (req, res) => {
         (@username, @password, @role_id, @department_id, @team_id, 'MANUAL', @created_by, GETDATE(), GETDATE())
       `);
 
-    // 🧾 Audit log
     await pool
       .request()
       .input("description", sql.VarChar, `User ${username} created by ID ${createdBy}`)
@@ -135,13 +112,6 @@ exports.createUser = async (req, res) => {
 // ✅ ADD AD USER
 exports.addADUser = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { windows_username, role_id, department_id, team_id } = req.body;
 
     if (!windows_username || !role_id) {
@@ -152,10 +122,8 @@ exports.addADUser = async (req, res) => {
     }
 
     const pool = await poolPromise;
-
     const createdBy = req.user.id;
 
-    // 🔍 Check duplicate
     const existing = await pool
       .request()
       .input("username", sql.VarChar, windows_username)
@@ -207,13 +175,6 @@ exports.addADUser = async (req, res) => {
 // ✅ UPDATE USER
 exports.updateUser = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
     const { role_id, department_id, team_id, is_active, password } = req.body;
 
@@ -225,7 +186,6 @@ exports.updateUser = async (req, res) => {
     }
 
     const updatedBy = req.user.id;
-
     const pool = await poolPromise;
 
     if (password && password.trim()) {
@@ -297,16 +257,8 @@ exports.updateUser = async (req, res) => {
 // ✅ DELETE USER
 exports.deleteUser = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
     const deletedBy = req.user.id;
-
     const pool = await poolPromise;
 
     const userResult = await pool
@@ -346,18 +298,9 @@ exports.deleteUser = async (req, res) => {
 // ✅ TOGGLE ACTIVE STATUS
 exports.toggleUser = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
     const { is_active } = req.body;
-
     const updatedBy = req.user.id;
-
     const pool = await poolPromise;
 
     await pool
@@ -375,11 +318,7 @@ exports.toggleUser = async (req, res) => {
 
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `User ID ${id} status changed by ID ${updatedBy}`
-      )
+      .input("description", sql.VarChar, `User ID ${id} status changed by ID ${updatedBy}`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('STATUS_CHANGE', 'USER', @description)

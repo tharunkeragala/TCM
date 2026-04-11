@@ -1,25 +1,55 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken } = require("../middleware/auth");
+const checkPermission = require("../middleware/checkPermission");
 const roleController = require("../controllers/roleController");
 
-// ─── Menu ─────────────────────────────────────────────────────────────────────
+const MENU = "/roles";
+
 router.get("/menus", verifyToken, roleController.getMenuTree);
-
-// ─── Permissions ──────────────────────────────────────────────────────────────
 router.get("/my-permissions", verifyToken, roleController.getMyPermissions);
-router.get("/:roleId/permissions", verifyToken, roleController.getRolePermissions);
-router.post("/save", verifyToken, roleController.saveRolePermissions);
 
-// ─── Roles CRUD ───────────────────────────────────────────────────────────────
-router.get("/", verifyToken, roleController.getRoles);
-router.post("/create", verifyToken, roleController.createRole);
-router.put("/:id", verifyToken, roleController.updateRole);
-router.delete("/:id", verifyToken, roleController.deleteRole);
-
-// ─── Assigned User Count (for delete warning) ─────────────────────────────────
-// NOTE: This must be placed AFTER the specific named routes above
-// to avoid ":id" capturing "assigned-users" as a param.
-router.get("/:id/assigned-users", verifyToken, roleController.getAssignedUserCount);
+router.get(
+  "/:roleId/permissions",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  roleController.getRolePermissions
+);
+router.post(
+  "/save",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  roleController.saveRolePermissions
+);
+router.get(
+  "/",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  roleController.getRoles
+);
+router.post(
+  "/create",
+  verifyToken,
+  checkPermission(MENU, "can_create"),
+  roleController.createRole
+);
+router.put(
+  "/:id",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  roleController.updateRole
+);
+router.delete(
+  "/:id",
+  verifyToken,
+  checkPermission(MENU, "can_delete"),
+  roleController.deleteRole
+);
+router.get(
+  "/:id/assigned-users",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  roleController.getAssignedUserCount
+);
 
 module.exports = router;

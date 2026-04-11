@@ -1,19 +1,46 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken } = require("../middleware/auth");
+const checkPermission = require("../middleware/checkPermission");
 const departmentController = require("../controllers/departmentController");
 
-router.get("/",verifyToken, departmentController.getDepartments);
-router.post("/create",verifyToken, departmentController.createDepartment);
-// router.post("/ad-user", departmentController.addADUser);
+const MENU = "/departments";
 
-router.put("/update/:id", verifyToken, departmentController.updateDepartment);
-router.delete("/delete/:id", verifyToken, departmentController.deleteDepartment);
-router.put("/toggle/:id", verifyToken, departmentController.toggleDepartment);
-
-// ─── Assigned User Count (for delete warning) ─────────────────────────────────
-// NOTE: This must be placed AFTER the specific named routes above
-// to avoid ":id" capturing "assigned-users" as a param.
-router.get("/:id/assigned-users", verifyToken, departmentController.getAssignedUserCount);
+router.get(
+  "/",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  departmentController.getDepartments
+);
+router.get(
+  "/:id/assigned-users",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  departmentController.getAssignedUserCount
+);
+router.post(
+  "/create",
+  verifyToken,
+  checkPermission(MENU, "can_create"),
+  departmentController.createDepartment
+);
+router.put(
+"/update/:id",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  departmentController.updateDepartment
+);
+router.delete(
+  "/delete/:id",
+  verifyToken,
+  checkPermission(MENU, "can_delete"),
+  departmentController.deleteDepartment
+);
+router.put(
+"/toggle/:id",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  departmentController.toggleDepartment
+);
 
 module.exports = router;

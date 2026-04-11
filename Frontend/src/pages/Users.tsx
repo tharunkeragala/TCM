@@ -84,10 +84,9 @@ export default function Users() {
     error,
   } = useFetchWithAuth<User[]>("/api/users");
 
-  // ✅ Fetch roles & departments for dropdowns
-  const { data: roles } = useFetchWithAuth<Role[]>("/api/roles");
-  const { data: departments } =
-    useFetchWithAuth<Department[]>("/api/departments");
+  // ✅ Fetch roles & departments — now using dropdown endpoints
+const { data: roles } = useFetchWithAuth<Role[]>("/api/dropdown/roles");
+const { data: departments } = useFetchWithAuth<Department[]>("/api/dropdown/departments");
 
   // ✅ Teams — loaded dynamically by department
   const [teams, setTeams] = useState<Team[]>([]);
@@ -138,27 +137,27 @@ export default function Users() {
   const getToken = () =>
     localStorage.getItem("token") || sessionStorage.getItem("token");
 
-  // ✅ Fetch teams by department
-  const fetchTeamsByDepartment = async (departmentId: string) => {
-    if (!departmentId) {
-      setTeams([]);
-      return;
+  // ✅ Fetch teams by department — now using dropdown endpoint
+const fetchTeamsByDepartment = async (departmentId: string) => {
+  if (!departmentId) {
+    setTeams([]);
+    return;
+  }
+  setTeamsLoading(true);
+  try {
+    const token = getToken();
+    const res = await API.get(`/api/dropdown/teams/department/${departmentId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.data.success) {
+      setTeams(res.data.data ?? []);
     }
-    setTeamsLoading(true);
-    try {
-      const token = getToken();
-      const res = await API.get(`/api/teams/department/${departmentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data.success) {
-        setTeams(res.data.data ?? []);
-      }
-    } catch {
-      setTeams([]);
-    } finally {
-      setTeamsLoading(false);
-    }
-  };
+  } catch {
+    setTeams([]);
+  } finally {
+    setTeamsLoading(false);
+  }
+};
 
   // ✅ Department change — reset team, re-fetch teams
   const handleDepartmentChange = (departmentId: string) => {

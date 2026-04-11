@@ -4,13 +4,6 @@ const sql = require("mssql");
 // ✅ GET ALL
 exports.getDepartments = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const pool = await poolPromise;
 
     const result = await pool.request().query(`
@@ -33,18 +26,10 @@ exports.getDepartments = async (req, res) => {
   }
 };
 
-// ✅ GET ASSIGNED USER COUNT FOR A DEPARTMENT
+// ✅ GET ASSIGNED USER COUNT
 exports.getAssignedUserCount = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
-
     const pool = await poolPromise;
 
     const result = await pool
@@ -75,13 +60,6 @@ exports.getAssignedUserCount = async (req, res) => {
 // ✅ CREATE
 exports.createDepartment = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { department_name, is_active } = req.body;
 
     if (!department_name) {
@@ -93,7 +71,6 @@ exports.createDepartment = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // 🔍 Check duplicate
     const existing = await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
@@ -109,7 +86,6 @@ exports.createDepartment = async (req, res) => {
       });
     }
 
-    // ➕ Insert
     await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
@@ -119,14 +95,9 @@ exports.createDepartment = async (req, res) => {
         VALUES (@department_name, @is_active)
       `);
 
-    // 🧾 Audit log
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Department ${department_name} created`
-      )
+      .input("description", sql.VarChar, `Department ${department_name} created`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('CREATE', 'DEPARTMENT', @description)
@@ -149,19 +120,11 @@ exports.createDepartment = async (req, res) => {
 // ✅ UPDATE
 exports.updateDepartment = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
     const { department_name, is_active } = req.body;
 
     const pool = await poolPromise;
 
-    // 🔍 Check duplicate (excluding current)
     const existing = await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
@@ -190,14 +153,9 @@ exports.updateDepartment = async (req, res) => {
         WHERE id = @id
       `);
 
-    // 🧾 Audit log
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Department ID ${id} updated`
-      )
+      .input("description", sql.VarChar, `Department ID ${id} updated`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('UPDATE', 'DEPARTMENT', @description)
@@ -220,18 +178,9 @@ exports.updateDepartment = async (req, res) => {
 // ✅ DELETE (detaches assigned users before deleting)
 exports.deleteDepartment = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
-
     const pool = await poolPromise;
 
-    // 🔍 Check how many users are assigned
     const assignedUsersResult = await pool
       .request()
       .input("department_id", sql.Int, id)
@@ -243,7 +192,6 @@ exports.deleteDepartment = async (req, res) => {
 
     const userCount = assignedUsersResult.recordset[0]?.user_count ?? 0;
 
-    // 🔗 Detach users from department (set department_id to NULL)
     if (userCount > 0) {
       await pool
         .request()
@@ -254,21 +202,15 @@ exports.deleteDepartment = async (req, res) => {
           WHERE department_id = @department_id
         `);
 
-      // 🧾 Audit log for detach
       await pool
         .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `${userCount} user(s) detached from Department ID ${id} before deletion`
-        )
+        .input("description", sql.VarChar, `${userCount} user(s) detached from Department ID ${id} before deletion`)
         .query(`
           INSERT INTO audit_logs (action, module, description)
           VALUES ('DETACH', 'DEPARTMENT', @description)
         `);
     }
 
-    // 🗑️ Delete the department
     await pool
       .request()
       .input("id", sql.Int, id)
@@ -277,14 +219,9 @@ exports.deleteDepartment = async (req, res) => {
         WHERE id = @id
       `);
 
-    // 🧾 Audit log for delete
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Department ID ${id} deleted`
-      )
+      .input("description", sql.VarChar, `Department ID ${id} deleted`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('DELETE', 'DEPARTMENT', @description)
@@ -310,16 +247,8 @@ exports.deleteDepartment = async (req, res) => {
 // ✅ TOGGLE ACTIVE
 exports.toggleDepartment = async (req, res) => {
   try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
     const { is_active } = req.body;
-
     const pool = await poolPromise;
 
     await pool
@@ -332,14 +261,9 @@ exports.toggleDepartment = async (req, res) => {
         WHERE id = @id
       `);
 
-    // 🧾 Audit log
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Department ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`
-      )
+      .input("description", sql.VarChar, `Department ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`)
       .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('STATUS_CHANGE', 'DEPARTMENT', @description)

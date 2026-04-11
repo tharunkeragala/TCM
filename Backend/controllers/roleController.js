@@ -39,13 +39,6 @@ exports.getMenuTree = async (req, res) => {
 // ─── Get All Roles ────────────────────────────────────────────────────────────
 exports.getRoles = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const pool = await poolPromise;
 
     const result = await pool.request().query(`
@@ -71,13 +64,6 @@ exports.getRoles = async (req, res) => {
 // ─── Get Assigned User Count For A Role ───────────────────────────────────────
 exports.getAssignedUserCount = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
 
     const pool = await poolPromise;
@@ -110,13 +96,6 @@ exports.getAssignedUserCount = async (req, res) => {
 // ─── Create Role ──────────────────────────────────────────────────────────────
 exports.createRole = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { role_name } = req.body;
 
     if (!role_name || !role_name.trim()) {
@@ -179,13 +158,6 @@ exports.createRole = async (req, res) => {
 // ─── Edit Role ────────────────────────────────────────────────────────────────
 exports.updateRole = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
     const { role_name } = req.body;
 
@@ -245,11 +217,7 @@ exports.updateRole = async (req, res) => {
     // ✅ Audit log
     await pool
       .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Role ID ${id} updated to '${role_name}'`
-      )
+      .input("description", sql.VarChar, `Role ID ${id} updated to '${role_name}'`)
       .query(`
         INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
         VALUES ('UPDATE', 'ROLE', @description)
@@ -269,16 +237,9 @@ exports.updateRole = async (req, res) => {
   }
 };
 
-// ─── Delete Role (detaches assigned users before deleting) ────────────────────
+// ─── Delete Role ──────────────────────────────────────────────────────────────
 exports.deleteRole = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
     const { id } = req.params;
 
     const pool = await poolPromise;
@@ -317,7 +278,7 @@ exports.deleteRole = async (req, res) => {
     await transaction.begin();
 
     try {
-      // ✅ Detach users from role (set role_id to NULL)
+      // ✅ Detach users from role
       if (userCount > 0) {
         await transaction
           .request()
@@ -328,14 +289,9 @@ exports.deleteRole = async (req, res) => {
             WHERE role_id = @id
           `);
 
-        // 🧾 Audit log for detach
         await transaction
           .request()
-          .input(
-            "description",
-            sql.VarChar,
-            `${userCount} user(s) detached from Role '${roleName}' (ID: ${id}) before deletion`
-          )
+          .input("description", sql.VarChar, `${userCount} user(s) detached from Role '${roleName}' (ID: ${id}) before deletion`)
           .query(`
             INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
             VALUES ('DETACH', 'ROLE', @description)
@@ -360,14 +316,9 @@ exports.deleteRole = async (req, res) => {
           WHERE id = @id
         `);
 
-      // 🧾 Audit log for delete
       await transaction
         .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `Role '${roleName}' (ID: ${id}) deleted`
-        )
+        .input("description", sql.VarChar, `Role '${roleName}' (ID: ${id}) deleted`)
         .query(`
           INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
           VALUES ('DELETE', 'ROLE', @description)
@@ -474,11 +425,7 @@ exports.saveRolePermissions = async (req, res) => {
       // ✅ Audit log
       await transaction
         .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `Permissions updated for role ${roleId}`
-        )
+        .input("description", sql.VarChar, `Permissions updated for role ${roleId}`)
         .query(`
           INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
           VALUES ('UPDATE', 'ROLE', @description)
