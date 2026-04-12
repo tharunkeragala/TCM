@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useEffect, useState } from "react";
 import API from "../../services/api";
+import useSessionTimeout from "../auth/useSessionTimeout";
 
 interface UserPermission {
   menu_name: string;
@@ -8,6 +9,7 @@ interface UserPermission {
 }
 
 export default function ProtectedRoute() {
+  useSessionTimeout();
   const location = useLocation();
 
   const token =
