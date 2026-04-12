@@ -1,0 +1,9 @@
+{
+  "name": "test-case-manager",
+  "private": true,
+  "description": "Build frontend into Backend/public, then deploy the Backend folder to IIS.",
+  "scripts": {
+    "build": "npm run build --prefix Frontend",
+    "build:iis": "npm run build && npm ci --omit=dev --prefix Backend"
+  }
+}

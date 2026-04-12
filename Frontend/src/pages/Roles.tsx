@@ -19,7 +19,7 @@ interface Menu {
 }
 
 interface MenuNode {
-  value: number;
+  value: string;
   label: string;
   children?: MenuNode[];
 }
@@ -43,8 +43,8 @@ export default function Roles() {
 
   // ─── Permissions State ────────────────────────────────────────────────────
   const [menus, setMenus] = useState<MenuNode[]>([]);
-  const [checked, setChecked] = useState<number[]>([]);
-  const [expanded, setExpanded] = useState<number[]>([]);
+  const [checked, setChecked] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<string[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [loadingMenus, setLoadingMenus] = useState<boolean>(false);
   const [loadingPermissions, setLoadingPermissions] = useState<boolean>(false);
@@ -112,7 +112,7 @@ export default function Roles() {
       }
       const format = (data: Menu[]): MenuNode[] =>
         data.map((m) => ({
-          value: m.id,
+          value: String(m.id),
           label: m.menu_name,
           children:
             m.children && m.children.length > 0
@@ -141,7 +141,9 @@ export default function Roles() {
         });
         return;
       }
-      setChecked(raw.filter((p) => p.can_view).map((p) => p.menu_id));
+      setChecked(
+        raw.filter((p) => p.can_view).map((p) => String(p.menu_id)),
+      );
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 403) {
@@ -169,7 +171,7 @@ export default function Roles() {
     setPermAlert(null);
     try {
       const permissions: Permission[] = checked.map((menuId) => ({
-        menu_id: menuId,
+        menu_id: Number(menuId),
         can_view: 1,
         can_create: 1,
         can_edit: 1,
@@ -498,8 +500,8 @@ export default function Roles() {
                       nodes={menus}
                       checked={checked}
                       expanded={expanded}
-                      onCheck={(val) => setChecked(val as number[])}
-                      onExpand={(val) => setExpanded(val as number[])}
+                      onCheck={(val) => setChecked(val)}
+                      onExpand={(val) => setExpanded(val)}
                       icons={{
                         check: <span className="text-blue-600">✔</span>,
                         uncheck: <span className="text-gray-400">☐</span>,

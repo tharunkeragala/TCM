@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? "";
+
 const API = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -9,8 +11,7 @@ const API = axios.create({
 
 API.interceptors.request.use((config) => {
   const token =
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("token");
+    localStorage.getItem("token") || sessionStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

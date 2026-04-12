@@ -40,11 +40,11 @@ export default function useFetchWithAuth<T>(url: string) {
       const responseData: any = res.data.data;
 
       if (Array.isArray(responseData)) {
-        setData(responseData);
+        setData(responseData as T);
       } else if (responseData?.data) {
-        setData(responseData.data);
+        setData(responseData.data as T);
       } else {
-        setData(responseData);
+        setData(responseData as T);
       }
 
     } catch (err: any) {
