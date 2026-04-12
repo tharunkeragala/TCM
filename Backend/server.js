@@ -43,3 +43,7 @@ app.use("/api/teams", teamRoutes);
 // Dropdowns
 const dropdownRoute = require("./routes/dropdownRoute");
 app.use("/api/dropdown", dropdownRoute);
+
+// Reports
+const reportRoutes = require("./routes/reportRoutes");
+app.use("/api/reports", reportRoutes);

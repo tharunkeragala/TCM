@@ -82,7 +82,7 @@ export default function UserReport() {
     data: users,
     loading,
     error,
-  } = useFetchWithAuth<User[]>("/api/users");
+  } = useFetchWithAuth<User[]>("/api/reports/users/list");
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
