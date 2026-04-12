@@ -14,10 +14,22 @@ exports.login = async (req, res) => {
         const result = await pool.request()
             .input("username", sql.VarChar, username)
             .query(`
-                SELECT users.*, roles.role_name 
-                FROM users 
-                JOIN roles ON users.role_id = roles.id
-                WHERE username = @username AND is_active = 1
+                SELECT TOP 1
+                    u.id,
+                    u.username,
+                    u.password,
+                    u.email,
+                    u.department_id,
+                    u.team_id,
+                    r.role_name,
+                    d.department_name,
+                    t.team_name
+                FROM users u
+                JOIN roles r ON u.role_id = r.id
+                LEFT JOIN departments d ON u.department_id = d.id
+                LEFT JOIN teams t ON u.team_id = t.id
+                WHERE u.username = @username 
+                  AND u.is_active = 1
             `);
 
         if (result.recordset.length === 0) {
@@ -40,8 +52,20 @@ exports.login = async (req, res) => {
 
         res.json({
             token,
-            username: user.username,
-            role: user.role_name
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role_name,
+                email: user.email,
+                department: {
+                    id: user.department_id,
+                    name: user.department_name
+                },
+                team: {
+                    id: user.team_id,
+                    name: user.team_name
+                }
+            }
         });
 
     } catch (err) {
