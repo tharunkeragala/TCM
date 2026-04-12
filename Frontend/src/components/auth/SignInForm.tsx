@@ -35,41 +35,39 @@ export default function SignInForm() {
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setAlert(null);
+  e.preventDefault();
+  try {
+    setLoading(true);
+    setAlert(null);
 
-      const res = await API.post("/api/auth/login", {
-        username: email,
-        password,
-      });
+    const res = await API.post("/api/auth/login", {
+      username: email,
+      password,
+    });
 
-      if (remember) {
-        localStorage.setItem("token", res.data.token);
-      } else {
-        sessionStorage.setItem("token", res.data.token);
-      }
+    const storage = remember ? localStorage : sessionStorage;
+    storage.setItem("token", res.data.token);
+    storage.setItem("user", JSON.stringify(res.data.user)); // ← add this
 
-      setAlert({
-        variant: "success",
-        title: "Login Successful",
-        message: "Redirecting to dashboard...",
-      });
+    setAlert({
+      variant: "success",
+      title: "Login Successful",
+      message: "Redirecting to dashboard...",
+    });
 
-      setTimeout(() => {
-        navigate("/home", { replace: true });
-      }, 1000);
-    } catch {
-      setAlert({
-        variant: "error",
-        title: "Login Failed",
-        message: "Invalid email or password.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    setTimeout(() => {
+      navigate("/home", { replace: true });
+    }, 1000);
+  } catch {
+    setAlert({
+      variant: "error",
+      title: "Login Failed",
+      message: "Invalid email or password.",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Optional Windows login
   const handleWindowsLogin = async () => {
