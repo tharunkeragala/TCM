@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
-import CheckboxTree from "react-checkbox-tree";
-import "react-checkbox-tree/lib/react-checkbox-tree.css";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Alert from "../components/ui/alert/Alert";
 import useFetchWithAuth from "../hooks/useFetchWithAuth";
+import React from "react";
 
 interface Role {
   id: number;
@@ -15,12 +14,14 @@ interface Role {
 interface Menu {
   id: number;
   menu_name: string;
+  supported_permissions?: string;
   children?: Menu[];
 }
 
 interface MenuNode {
   value: string;
   label: string;
+  supported_permissions: string[];
   children?: MenuNode[];
 }
 
@@ -31,6 +32,14 @@ interface Permission {
   can_edit: number;
   can_delete: number;
 }
+
+interface PermEntry {
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+}
+type PermMap = Record<number, PermEntry>;
 
 export default function Roles() {
   // ─── Roles Table ──────────────────────────────────────────────────────────
@@ -43,8 +52,7 @@ export default function Roles() {
 
   // ─── Permissions State ────────────────────────────────────────────────────
   const [menus, setMenus] = useState<MenuNode[]>([]);
-  const [checked, setChecked] = useState<string[]>([]);
-  const [expanded, setExpanded] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<PermMap>({});
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [loadingMenus, setLoadingMenus] = useState<boolean>(false);
   const [loadingPermissions, setLoadingPermissions] = useState<boolean>(false);
@@ -54,6 +62,33 @@ export default function Roles() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // ─── State (add this alongside your other state) ──────────────────────────
+  const [expandedMenus, setExpandedMenus] = useState<Set<number>>(new Set());
+
+  // ─── Toggle expand/collapse ───────────────────────────────────────────────
+  const toggleExpand = (menuId: number) => {
+    setExpandedMenus((prev) => {
+      const next = new Set(prev);
+      next.has(menuId) ? next.delete(menuId) : next.add(menuId);
+      return next;
+    });
+  };
+
+  // ─── Collect all descendant menu IDs ─────────────────────────────────────
+  const getDescendantIds = (nodes: MenuNode[]): number[] =>
+    nodes.flatMap((n) => [
+      Number(n.value),
+      ...(n.children ? getDescendantIds(n.children) : []),
+    ]);
+
+  // ─── Check if ALL children have a given perm checked ─────────────────────
+  // const areAllChildrenChecked = (
+  //   children: MenuNode[],
+  //   field: keyof PermEntry,
+  //   perms: PermMap,
+  // ): boolean =>
+  //   getDescendantIds(children).every((id) => perms[id]?.[field] === true);
 
   // ─── Create Role Modal ────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
@@ -93,10 +128,25 @@ export default function Roles() {
   useEffect(() => {
     if (selectedRoleId !== null) {
       setPermAlert(null);
-      setChecked([]);
+      setPermissions({});
       loadPermissions(selectedRoleId);
     }
   }, [selectedRoleId]);
+
+  // ─── Format menus recursively ─────────────────────────────────────────────
+  const format = (data: Menu[]): MenuNode[] =>
+    data.map((m) => ({
+      value: String(m.id),
+      label: m.menu_name,
+      supported_permissions: (
+        m.supported_permissions ?? "view,create,edit,delete"
+      ).split(","),
+      children: m.children?.length ? format(m.children) : undefined,
+    }));
+
+  // ─── Collect all menu nodes flat ──────────────────────────────────────────
+  const flattenMenus = (nodes: MenuNode[]): MenuNode[] =>
+    nodes.flatMap((n) => [n, ...(n.children ? flattenMenus(n.children) : [])]);
 
   // ─── Load Menus ───────────────────────────────────────────────────────────
   const loadMenus = async () => {
@@ -110,15 +160,6 @@ export default function Roles() {
         setMenus([]);
         return;
       }
-      const format = (data: Menu[]): MenuNode[] =>
-        data.map((m) => ({
-          value: String(m.id),
-          label: m.menu_name,
-          children:
-            m.children && m.children.length > 0
-              ? format(m.children)
-              : undefined,
-        }));
       setMenus(format(raw));
     } catch (err: any) {
       console.error("Menu fetch error:", err.response ?? err);
@@ -141,9 +182,16 @@ export default function Roles() {
         });
         return;
       }
-      setChecked(
-        raw.filter((p) => p.can_view).map((p) => String(p.menu_id)),
-      );
+      const map: PermMap = {};
+      raw.forEach((p) => {
+        map[p.menu_id] = {
+          can_view: !!p.can_view,
+          can_create: !!p.can_create,
+          can_edit: !!p.can_edit,
+          can_delete: !!p.can_delete,
+        };
+      });
+      setPermissions(map);
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 403) {
@@ -161,6 +209,52 @@ export default function Roles() {
     }
   };
 
+  // ─── Toggle a permission with parent→child and child→parent sync ──────────
+  const togglePerm = (
+    menuId: number,
+    field: keyof PermEntry,
+    node: MenuNode,
+  ) => {
+    setPermissions((prev: PermMap) => {
+      const next = { ...prev };
+
+      const getEntry = (id: number): PermEntry =>
+        next[id] ?? {
+          can_view: false,
+          can_create: false,
+          can_edit: false,
+          can_delete: false,
+        };
+
+      const setField = (id: number, f: keyof PermEntry, val: boolean) => {
+        const e = { ...getEntry(id), [f]: val };
+        // unchecking view clears all
+        if (f === "can_view" && !val) {
+          e.can_create = false;
+          e.can_edit = false;
+          e.can_delete = false;
+        }
+        // checking non-view auto-checks view
+        if (f !== "can_view" && val) e.can_view = true;
+        next[id] = e;
+      };
+
+      const currentVal = getEntry(menuId)[field];
+      const newVal = !currentVal;
+
+      // 1. Set on self
+      setField(menuId, field, newVal);
+
+      // 2. Cascade DOWN to all descendants
+      if (node.children) {
+        getDescendantIds(node.children).forEach((id) =>
+          setField(id, field, newVal),
+        );
+      }
+
+      return next;
+    });
+  };
   // ─── Save Permissions ─────────────────────────────────────────────────────
   const savePermissions = async () => {
     if (selectedRoleId === null) {
@@ -170,21 +264,28 @@ export default function Roles() {
     setSaving(true);
     setPermAlert(null);
     try {
-      const permissions: Permission[] = checked.map((menuId) => ({
-        menu_id: Number(menuId),
-        can_view: 1,
-        can_create: 1,
-        can_edit: 1,
-        can_delete: 1,
-      }));
+      const permissionsPayload = (
+        Object.entries(permissions) as [string, PermEntry][]
+      )
+        .filter(([, p]) => p.can_view)
+        .map(([menu_id, p]) => ({
+          menu_id: Number(menu_id),
+          can_view: p.can_view ? 1 : 0,
+          can_create: p.can_create ? 1 : 0,
+          can_edit: p.can_edit ? 1 : 0,
+          can_delete: p.can_delete ? 1 : 0,
+        }));
+
       await API.post("/api/roles/save", {
         roleId: selectedRoleId,
-        permissions,
+        permissions: permissionsPayload,
       });
-      setPermAlert({
-        type: "success",
-        message: "Permissions saved successfully.",
-      });
+
+      // Close modal on success
+      setSelectedRoleId(null);
+      setPermissions({});
+      setPermAlert(null);
+      setMenuAlert(null);
     } catch {
       setPermAlert({ type: "error", message: "Failed to save permissions." });
     } finally {
@@ -259,28 +360,21 @@ export default function Roles() {
     }
   };
 
-  // ─── Open Delete Modal (fetch assigned user count first) ──────────────────
+  // ─── Open Delete Modal ────────────────────────────────────────────────────
   const openDeleteModal = async (role: Role) => {
     setDeleteRole(role);
     setDeleteAlert(null);
     setAssignedUserCount(0);
-
     try {
       const token =
         localStorage.getItem("token") || sessionStorage.getItem("token");
-
       const res = await API.get(`/api/roles/${role.id}/assigned-users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (res.data.success) {
-        setAssignedUserCount(res.data.count ?? 0);
-      }
+      if (res.data.success) setAssignedUserCount(res.data.count ?? 0);
     } catch {
-      // If check fails, still allow delete — count stays 0
       setAssignedUserCount(0);
     }
-
     setShowDeleteModal(true);
   };
 
@@ -312,16 +406,135 @@ export default function Roles() {
     }
   };
 
-  // ─── Modal open/close body class ─────────────────────────────────────────
-  const isAnyModalOpen = showCreateModal || showEditModal || showDeleteModal;
+  // ─── Modal body class ─────────────────────────────────────────────────────
+  const isAnyModalOpen =
+    showCreateModal ||
+    showEditModal ||
+    showDeleteModal ||
+    selectedRoleId !== null;
   useEffect(() => {
-    if (isAnyModalOpen) {
-      document.body.classList.add("modal-open");
-    } else {
-      document.body.classList.remove("modal-open");
-    }
+    document.body.classList.toggle("modal-open", isAnyModalOpen);
     return () => document.body.classList.remove("modal-open");
   }, [isAnyModalOpen]);
+
+  // ─── Render rows (recursive) ──────────────────────────────────────────────
+  const renderMenuRows = (nodes: MenuNode[], depth = 0): React.ReactNode =>
+    nodes.map((node) => {
+      const menuId = Number(node.value);
+      const perm: PermEntry = permissions[menuId] ?? {
+        can_view: false,
+        can_create: false,
+        can_edit: false,
+        can_delete: false,
+      };
+      const supported = node.supported_permissions;
+      const hasChildren = !!(node.children && node.children.length > 0);
+      const isExpanded = expandedMenus.has(menuId);
+
+      // Determine indeterminate state per field (some but not all children checked)
+      const getIndeterminate = (field: keyof PermEntry): boolean => {
+        if (!hasChildren) return false;
+        const ids = getDescendantIds(node.children!);
+        const checkedCount = ids.filter(
+          (id) => permissions[id]?.[field],
+        ).length;
+        return checkedCount > 0 && checkedCount < ids.length;
+      };
+
+      return (
+        <React.Fragment key={node.value}>
+          <tr className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
+            {/* Menu label cell */}
+            <td
+              className="px-4 py-2 text-sm text-gray-800 dark:text-gray-200"
+              style={{ paddingLeft: `${16 + depth * 20}px` }}
+            >
+              <div className="flex items-center gap-2">
+                {hasChildren ? (
+                  <button
+                    onClick={() => toggleExpand(menuId)}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition text-gray-500 dark:text-gray-400 flex-shrink-0"
+                  >
+                    {isExpanded ? (
+                      // chevron down
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    ) : (
+                      // chevron right
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                ) : (
+                  <span className="w-5 flex-shrink-0 text-center text-gray-300 dark:text-gray-600 text-xs">
+                    {depth > 0 ? "↳" : ""}
+                  </span>
+                )}
+                <span className={hasChildren ? "font-medium" : ""}>
+                  {node.label}
+                </span>
+              </div>
+            </td>
+
+            {/* Permission checkboxes */}
+            {(
+              ["can_view", "can_create", "can_edit", "can_delete"] as const
+            ).map((field) => {
+              const permKey = field.replace("can_", "");
+              const isSupported = supported.includes(permKey);
+              const isIndeterminate = getIndeterminate(field);
+
+              return (
+                <td key={field} className="px-4 py-2 text-center">
+                  {isSupported ? (
+                    <input
+                      type="checkbox"
+                      checked={perm[field]}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isIndeterminate;
+                      }}
+                      onChange={() => togglePerm(menuId, field, node)}
+                      className="w-4 h-4 accent-blue-600 cursor-pointer"
+                    />
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600 text-xs">
+                      —
+                    </span>
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+
+          {/* Children (collapsible) */}
+          {hasChildren &&
+            isExpanded &&
+            renderMenuRows(node.children!, depth + 1)}
+        </React.Fragment>
+      );
+    });
 
   return (
     <div>
@@ -332,7 +545,7 @@ export default function Roles() {
       <PageBreadcrumb pageTitle="Roles & Permissions" />
 
       <div className="mt-4 space-y-6">
-        {/* ─── Top Bar ─────────────────────────────────────────────────────── */}
+        {/* ─── Top Bar ───────────────────────────────────────────────────── */}
         <div className="flex justify-end">
           <button
             onClick={() => {
@@ -346,7 +559,7 @@ export default function Roles() {
           </button>
         </div>
 
-        {/* ─── Roles Table ─────────────────────────────────────────────────── */}
+        {/* ─── Roles Table ───────────────────────────────────────────────── */}
         {error && (
           <div className="mb-4">
             <Alert variant="error" title="Error" message={error} />
@@ -384,12 +597,9 @@ export default function Roles() {
                       <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
                         {index + 1}
                       </td>
-
                       <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
                         {role.role_name}
                       </td>
-
-                      {/* Permissions Button */}
                       <td className="px-5 py-3">
                         <button
                           onClick={() => setSelectedRoleId(role.id)}
@@ -404,8 +614,6 @@ export default function Roles() {
                             : "Set Permissions"}
                         </button>
                       </td>
-
-                      {/* Edit / Delete */}
                       <td className="px-5 py-3 flex items-center gap-2">
                         <button
                           onClick={() => openEditModal(role)}
@@ -434,10 +642,10 @@ export default function Roles() {
           </div>
         )}
 
-        {/* ─── Permissions Panel ────────────────────────────────────────────── */}
+        {/* ─── Permissions Modal ─────────────────────────────────────────── */}
         {selectedRoleId !== null && (
           <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md">
-            <div className="relative w-full max-w-2xl mx-4 rounded-2xl border border-white/10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
+            <div className="relative w-full max-w-3xl mx-4 rounded-2xl border border-white/10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-gray-400/50 dark:border-gray-700/50">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -446,11 +654,10 @@ export default function Roles() {
                     {roles?.find((r) => r.id === selectedRoleId)?.role_name}
                   </span>
                 </h2>
-
                 <button
                   onClick={() => {
                     setSelectedRoleId(null);
-                    setChecked([]);
+                    setPermissions({});
                     setPermAlert(null);
                     setMenuAlert(null);
                   }}
@@ -465,7 +672,11 @@ export default function Roles() {
               {/* Alerts */}
               <div className="px-6 pt-4 space-y-3">
                 {menuAlert && (
-                  <Alert variant="error" title="Menu Error" message={menuAlert} />
+                  <Alert
+                    variant="error"
+                    title="Menu Error"
+                    message={menuAlert}
+                  />
                 )}
                 {permAlert && (
                   <Alert
@@ -480,9 +691,9 @@ export default function Roles() {
               <div className="px-6 py-4">
                 {loadingMenus || loadingPermissions ? (
                   <div className="animate-pulse space-y-3">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
                   </div>
                 ) : menus.length === 0 ? (
                   <div className="text-center text-sm text-gray-500 dark:text-gray-400">
@@ -495,26 +706,25 @@ export default function Roles() {
                     </button>
                   </div>
                 ) : (
-                  <div className="max-h-[400px] overflow-y-auto rounded-lg border p-3 pr-2 bg-gray-50 text-gray-900 dark:bg-gray-800/40 dark:text-white dark:border-gray-700">
-                    <CheckboxTree
-                      nodes={menus}
-                      checked={checked}
-                      expanded={expanded}
-                      onCheck={(val) => setChecked(val)}
-                      onExpand={(val) => setExpanded(val)}
-                      icons={{
-                        check: <span className="text-blue-600">✔</span>,
-                        uncheck: <span className="text-gray-400">☐</span>,
-                        halfCheck: <span className="text-blue-400">▣</span>,
-                        expandClose: <span className="text-gray-500">▶</span>,
-                        expandOpen: <span className="text-gray-500">▼</span>,
-                        expandAll: <span />,
-                        collapseAll: <span />,
-                        parentClose: <span>📁</span>,
-                        parentOpen: <span>📂</span>,
-                        leaf: <span>📄</span>,
-                      }}
-                    />
+                  <div className="max-h-[420px] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/40">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                            Menu
+                          </th>
+                          {["View", "Create", "Edit", "Delete"].map((h) => (
+                            <th
+                              key={h}
+                              className="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide w-20"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>{renderMenuRows(menus)}</tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -522,7 +732,12 @@ export default function Roles() {
               {/* Footer */}
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-400/50 dark:border-gray-700/50">
                 <button
-                  onClick={() => setSelectedRoleId(null)}
+                  onClick={() => {
+                    setSelectedRoleId(null);
+                    setPermissions({});
+                    setPermAlert(null);
+                    setMenuAlert(null);
+                  }}
                   className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                 >
                   Cancel
@@ -540,7 +755,7 @@ export default function Roles() {
         )}
       </div>
 
-      {/* ─── Create Role Modal ────────────────────────────────────────────────── */}
+      {/* ─── Create Role Modal ──────────────────────────────────────────────── */}
       {showCreateModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -559,7 +774,6 @@ export default function Roles() {
                 &times;
               </button>
             </div>
-
             {createAlert && (
               <div className="mb-4">
                 <Alert
@@ -569,7 +783,6 @@ export default function Roles() {
                 />
               </div>
             )}
-
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Role Name <span className="text-red-500">*</span>
@@ -582,7 +795,6 @@ export default function Roles() {
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -606,7 +818,7 @@ export default function Roles() {
         </div>
       )}
 
-      {/* ─── Edit Role Modal ──────────────────────────────────────────────────── */}
+      {/* ─── Edit Role Modal ────────────────────────────────────────────────── */}
       {showEditModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -625,7 +837,6 @@ export default function Roles() {
                 &times;
               </button>
             </div>
-
             {editAlert && (
               <div className="mb-4">
                 <Alert
@@ -635,7 +846,6 @@ export default function Roles() {
                 />
               </div>
             )}
-
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Role Name <span className="text-red-500">*</span>
@@ -647,7 +857,6 @@ export default function Roles() {
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -671,7 +880,7 @@ export default function Roles() {
         </div>
       )}
 
-      {/* ─── Delete Confirm Modal ─────────────────────────────────────────────── */}
+      {/* ─── Delete Confirm Modal ───────────────────────────────────────────── */}
       {showDeleteModal && deleteRole && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -691,7 +900,6 @@ export default function Roles() {
                 &times;
               </button>
             </div>
-
             {deleteAlert && (
               <div className="mb-4">
                 <Alert
@@ -701,8 +909,6 @@ export default function Roles() {
                 />
               </div>
             )}
-
-            {/* Warning icon + message */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
                 <svg
@@ -728,8 +934,6 @@ export default function Roles() {
                   ? This will also remove all its permissions and cannot be
                   undone.
                 </p>
-
-                {/* ✅ Assigned users warning */}
                 {assignedUserCount > 0 && (
                   <div className="mt-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700">
                     <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
@@ -739,15 +943,14 @@ export default function Roles() {
                     </p>
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                       Proceeding will detach{" "}
-                      {assignedUserCount > 1 ? "these users" : "this user"}{" "}
-                      from the role. You will need to reassign them to another
-                      role afterwards.
+                      {assignedUserCount > 1 ? "these users" : "this user"} from
+                      the role. You will need to reassign them to another role
+                      afterwards.
                     </p>
                   </div>
                 )}
               </div>
             </div>
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
