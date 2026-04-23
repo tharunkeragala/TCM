@@ -34,6 +34,14 @@ app.use("/api/roles", roleRoutes);
 const teamRoutes = require("./routes/teamRoutes");
 app.use("/api/teams", teamRoutes);
 
+// Project
+// const projectRoutes = require("./routes/projectRoutes");
+// app.use("/api/projects", projectRoutes);
+
+app.use("/api/projects",    require("./routes/projectRoutes"));
+app.use("/api/test-suites", require("./routes/testSuiteRoutes"));
+app.use("/api/test-cases",  require("./routes/testCaseRoutes"));
+
 // Dropdowns
 const dropdownRoute = require("./routes/dropdownRoute");
 app.use("/api/dropdown", dropdownRoute);

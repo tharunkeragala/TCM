@@ -31,6 +31,18 @@ const navItems: NavItem[] = [
     name: "Dashboard",
     path: "/home",
   },
+
+  {
+    name: "Test Repository",
+    icon: <ListIcon />,
+    subItems: [
+      { name: "Projects", path: "/projects", pro: false },
+      { name: "Test Suites", path: "/test-suites", pro: false },
+      { name: "Test Cases", path: "/test-cases", pro: false },
+      // { name: "Teams", path: "/teams", pro: false },
+    ],
+  },
+
   {
     icon: <CalenderIcon />,
     name: "Calendar",
