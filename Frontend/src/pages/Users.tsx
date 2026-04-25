@@ -46,9 +46,7 @@ type UserType = "MANUAL" | "AD";
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) {
     return (
-      <span className="text-gray-400 dark:text-gray-500 italic text-xs">
-        —
-      </span>
+      <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
     );
   }
 
@@ -70,12 +68,8 @@ const formatDate = (dateStr: string | null) => {
 
   return (
     <div className="flex flex-col text-xs leading-tight">
-      <span className="text-gray-700 dark:text-gray-200">
-        {formattedDate}
-      </span>
-      <span className="text-gray-400 dark:text-gray-500">
-        {formattedTime}
-      </span>
+      <span className="text-gray-700 dark:text-gray-200">{formattedDate}</span>
+      <span className="text-gray-400 dark:text-gray-500">{formattedTime}</span>
     </div>
   );
 };
@@ -91,9 +85,11 @@ export default function Users() {
   } = useFetchWithAuth<User[]>("/api/users");
 
   // ✅ Fetch roles & departments — now using dropdown endpoints
-const { data: roles } = useFetchWithAuth<Role[]>("/api/dropdown/roles");
-const { data: departments } = useFetchWithAuth<Department[]>("/api/dropdown/departments");
-const { data: allTeams } = useFetchWithAuth<Team[]>("/api/dropdown/teams");
+  const { data: roles } = useFetchWithAuth<Role[]>("/api/dropdown/roles");
+  const { data: departments } = useFetchWithAuth<Department[]>(
+    "/api/dropdown/departments",
+  );
+  const { data: allTeams } = useFetchWithAuth<Team[]>("/api/dropdown/teams");
 
   // ✅ Teams — loaded dynamically by department
   const [teams, setTeams] = useState<Team[]>([]);
@@ -146,26 +142,29 @@ const { data: allTeams } = useFetchWithAuth<Team[]>("/api/dropdown/teams");
     localStorage.getItem("token") || sessionStorage.getItem("token");
 
   // ✅ Fetch teams by department — now using dropdown endpoint
-const fetchTeamsByDepartment = async (departmentId: string) => {
-  if (!departmentId) {
-    setTeams([]);
-    return;
-  }
-  setTeamsLoading(true);
-  try {
-    const token = getToken();
-    const res = await API.get(`/api/dropdown/teams/department/${departmentId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.data.success) {
-      setTeams(res.data.data ?? []);
+  const fetchTeamsByDepartment = async (departmentId: string) => {
+    if (!departmentId) {
+      setTeams([]);
+      return;
     }
-  } catch {
-    setTeams([]);
-  } finally {
-    setTeamsLoading(false);
-  }
-};
+    setTeamsLoading(true);
+    try {
+      const token = getToken();
+      const res = await API.get(
+        `/api/dropdown/teams/department/${departmentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (res.data.success) {
+        setTeams(res.data.data ?? []);
+      }
+    } catch {
+      setTeams([]);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
 
   // ✅ Department change — reset team, re-fetch teams
   const handleDepartmentChange = (departmentId: string) => {
@@ -421,40 +420,47 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
         (user.team_name ?? "").toLowerCase().includes(q);
 
       const matchesRole = !filterRole
-  ? true
-  : filterRole === "UNASSIGNED"
-    ? user.role_id === null
-    : String(user.role_id) === filterRole;
+        ? true
+        : filterRole === "UNASSIGNED"
+          ? user.role_id === null
+          : String(user.role_id) === filterRole;
 
       const matchesDepartment = !filterDepartment
-  ? true
-  : filterDepartment === "UNASSIGNED"
-    ? user.department_id === null
-    : String(user.department_id) === filterDepartment;
+        ? true
+        : filterDepartment === "UNASSIGNED"
+          ? user.department_id === null
+          : String(user.department_id) === filterDepartment;
 
-    const matchesTeam = !filterTeam
-  ? true
-  : filterTeam === "UNASSIGNED"
-    ? user.team_id === null
-    : String(user.team_id) === filterTeam;
+      const matchesTeam = !filterTeam
+        ? true
+        : filterTeam === "UNASSIGNED"
+          ? user.team_id === null
+          : String(user.team_id) === filterTeam;
 
-      const matchesSource =
-        !filterSource || user.source === filterSource;
+      const matchesSource = !filterSource || user.source === filterSource;
 
       const matchesStatus =
         !filterStatus ||
         (filterStatus === "active" ? user.is_active : !user.is_active);
 
       return (
-  matchesSearch &&
-  matchesRole &&
-  matchesDepartment &&
-  matchesTeam &&
-  matchesSource &&
-  matchesStatus
-);
+        matchesSearch &&
+        matchesRole &&
+        matchesDepartment &&
+        matchesTeam &&
+        matchesSource &&
+        matchesStatus
+      );
     });
-}, [users, searchQuery, filterRole, filterDepartment, filterTeam, filterSource, filterStatus]);
+  }, [
+    users,
+    searchQuery,
+    filterRole,
+    filterDepartment,
+    filterTeam,
+    filterSource,
+    filterStatus,
+  ]);
 
   // ─── PAGINATION LOGIC ────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
@@ -490,9 +496,9 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
   };
 
   const handleFilterTeamChange = (val: string) => {
-  setFilterTeam(val);
-  setCurrentPage(1);
-};
+    setFilterTeam(val);
+    setCurrentPage(1);
+  };
 
   const handleFilterSourceChange = (val: string) => {
     setFilterSource(val);
@@ -505,22 +511,22 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
   };
 
   const hasActiveFilters =
-  searchQuery ||
-  filterRole ||
-  filterDepartment ||
-  filterTeam ||
-  filterSource ||
-  filterStatus;
+    searchQuery ||
+    filterRole ||
+    filterDepartment ||
+    filterTeam ||
+    filterSource ||
+    filterStatus;
 
   const handleClearFilters = () => {
-  setSearchQuery("");
-  setFilterRole("");
-  setFilterDepartment("");
-  setFilterTeam("");
-  setFilterSource("");
-  setFilterStatus("");
-  setCurrentPage(1);
-};
+    setSearchQuery("");
+    setFilterRole("");
+    setFilterDepartment("");
+    setFilterTeam("");
+    setFilterSource("");
+    setFilterStatus("");
+    setCurrentPage(1);
+  };
 
   // ─── PAGINATION RANGE ────────────────────────────────────────────────────
   const getPaginationRange = () => {
@@ -612,27 +618,26 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     {d.department_name}
                   </option>
                 ))}
-                <option value="UNASSIGNED">Unassigned</option>
+              <option value="UNASSIGNED">Unassigned</option>
             </select>
 
-{/* Team filter */}
+            {/* Team filter */}
             <select
-  value={filterTeam}
-  onChange={(e) => handleFilterTeamChange(e.target.value)}
-  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
->
-  <option value="">All teams</option>
+              value={filterTeam}
+              onChange={(e) => handleFilterTeamChange(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All teams</option>
 
-  {allTeams
-  ?.filter((t) => t.is_active)
-  .map((t) => (
-    <option key={t.id} value={t.id}>
-      {t.team_name}
-    </option>
-))}
-  <option value="UNASSIGNED">Unassigned</option>
-
-</select>
+              {allTeams
+                ?.filter((t) => t.is_active)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.team_name}
+                  </option>
+                ))}
+              <option value="UNASSIGNED">Unassigned</option>
+            </select>
 
             {/* Source filter */}
             <select
@@ -669,7 +674,11 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
                 Clear filters
               </button>
@@ -677,7 +686,8 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
 
             {/* Result count */}
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
-              {filteredUsers.length} {filteredUsers.length === 1 ? "user" : "users"} found
+              {filteredUsers.length}{" "}
+              {filteredUsers.length === 1 ? "user" : "users"} found
             </span>
           </div>
         </div>
@@ -782,7 +792,9 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                           >
                             <span
                               className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                                user.is_active ? "translate-x-6" : "translate-x-1"
+                                user.is_active
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
                               }`}
                             />
                           </button>
@@ -810,7 +822,10 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={11} className="text-center py-10 text-gray-500 dark:text-gray-400">
+                      <td
+                        colSpan={11}
+                        className="text-center py-10 text-gray-500 dark:text-gray-400"
+                      >
                         {hasActiveFilters
                           ? "No users match your search or filters."
                           : "No users found."}
@@ -829,7 +844,9 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                   <span>Rows per page:</span>
                   <select
                     value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    onChange={(e) =>
+                      handlePageSizeChange(Number(e.target.value))
+                    }
                     className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {PAGE_SIZE_OPTIONS.map((s) => (
@@ -854,8 +871,18 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="First page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
+                      />
                     </svg>
                   </button>
 
@@ -866,8 +893,18 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="Previous page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 19l-7-7 7-7"
+                      />
                     </svg>
                   </button>
 
@@ -902,8 +939,18 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="Next page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
 
@@ -914,8 +961,18 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="Last page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M13 5l7 7-7 7M6 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
                 </div>

@@ -30,9 +30,7 @@ interface User {
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) {
     return (
-      <span className="text-gray-400 dark:text-gray-500 italic text-xs">
-        —
-      </span>
+      <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
     );
   }
 
@@ -93,10 +91,10 @@ export default function UserReport() {
         ...new Set(
           (users ?? [])
             .map((u) => u.role_name)
-            .filter((v): v is string => Boolean(v))
+            .filter((v): v is string => Boolean(v)),
         ),
       ].sort(),
-    [users]
+    [users],
   );
   const departments = useMemo(
     () =>
@@ -104,10 +102,10 @@ export default function UserReport() {
         ...new Set(
           (users ?? [])
             .map((u) => u.department_name)
-            .filter((v): v is string => Boolean(v))
+            .filter((v): v is string => Boolean(v)),
         ),
       ].sort(),
-    [users]
+    [users],
   );
   const teams = useMemo(
     () =>
@@ -115,10 +113,10 @@ export default function UserReport() {
         ...new Set(
           (users ?? [])
             .map((u) => u.team_name)
-            .filter((v): v is string => Boolean(v))
+            .filter((v): v is string => Boolean(v)),
         ),
       ].sort(),
-    [users]
+    [users],
   );
 
   const activeFilterCount = [
@@ -145,10 +143,10 @@ export default function UserReport() {
     if (!users) return [];
     const q = search.toLowerCase().trim();
     const matchFilter = (value: string | null, filter: string) => {
-  if (!filter) return true;
-  if (filter === "UNASSIGNED") return value === null;
-  return value === filter;
-};
+      if (!filter) return true;
+      if (filter === "UNASSIGNED") return value === null;
+      return value === filter;
+    };
     return users.filter((u) => {
       if (
         q &&
@@ -162,21 +160,29 @@ export default function UserReport() {
       )
         return false;
       if (!matchFilter(u.department_name, filterDept)) return false;
-if (!matchFilter(u.team_name, filterTeam)) return false;
-if (!matchFilter(u.role_name, filterRole)) return false;
+      if (!matchFilter(u.team_name, filterTeam)) return false;
+      if (!matchFilter(u.role_name, filterRole)) return false;
       if (filterSource && u.source !== filterSource) return false;
       if (filterStatus === "active" && !u.is_active) return false;
       if (filterStatus === "inactive" && u.is_active) return false;
       return true;
     });
-  }, [users, search, filterRole, filterDept, filterTeam, filterSource, filterStatus]);
+  }, [
+    users,
+    search,
+    filterRole,
+    filterDept,
+    filterTeam,
+    filterSource,
+    filterStatus,
+  ]);
 
   // ── Pagination logic ──────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedUsers = filtered.slice(
     (safePage - 1) * pageSize,
-    safePage * pageSize
+    safePage * pageSize,
   );
 
   const handlePageChange = (page: number) => {
@@ -382,7 +388,9 @@ if (!matchFilter(u.role_name, filterRole)) return false;
             {/* Role */}
             <select
               value={filterRole}
-              onChange={(e) => handleFilterChange(setFilterRole)(e.target.value)}
+              onChange={(e) =>
+                handleFilterChange(setFilterRole)(e.target.value)
+              }
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterRole
                   ? "border-blue-400 dark:border-blue-500"
@@ -400,7 +408,9 @@ if (!matchFilter(u.role_name, filterRole)) return false;
             {/* Department */}
             <select
               value={filterDept}
-              onChange={(e) => handleFilterChange(setFilterDept)(e.target.value)}
+              onChange={(e) =>
+                handleFilterChange(setFilterDept)(e.target.value)
+              }
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterDept
                   ? "border-blue-400 dark:border-blue-500"
@@ -419,7 +429,9 @@ if (!matchFilter(u.role_name, filterRole)) return false;
             {/* Team */}
             <select
               value={filterTeam}
-              onChange={(e) => handleFilterChange(setFilterTeam)(e.target.value)}
+              onChange={(e) =>
+                handleFilterChange(setFilterTeam)(e.target.value)
+              }
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterTeam
                   ? "border-blue-400 dark:border-blue-500"
@@ -438,7 +450,9 @@ if (!matchFilter(u.role_name, filterRole)) return false;
             {/* Source */}
             <select
               value={filterSource}
-              onChange={(e) => handleFilterChange(setFilterSource)(e.target.value)}
+              onChange={(e) =>
+                handleFilterChange(setFilterSource)(e.target.value)
+              }
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterSource
                   ? "border-blue-400 dark:border-blue-500"
@@ -453,7 +467,9 @@ if (!matchFilter(u.role_name, filterRole)) return false;
             {/* Status */}
             <select
               value={filterStatus}
-              onChange={(e) => handleFilterChange(setFilterStatus)(e.target.value)}
+              onChange={(e) =>
+                handleFilterChange(setFilterStatus)(e.target.value)
+              }
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterStatus
                   ? "border-blue-400 dark:border-blue-500"
@@ -626,7 +642,9 @@ if (!matchFilter(u.role_name, filterRole)) return false;
                   <span>Rows per page:</span>
                   <select
                     value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    onChange={(e) =>
+                      handlePageSizeChange(Number(e.target.value))
+                    }
                     className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {PAGE_SIZE_OPTIONS.map((s) => (
@@ -651,8 +669,18 @@ if (!matchFilter(u.role_name, filterRole)) return false;
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="First page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
+                      />
                     </svg>
                   </button>
 
@@ -663,8 +691,18 @@ if (!matchFilter(u.role_name, filterRole)) return false;
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="Previous page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 19l-7-7 7-7"
+                      />
                     </svg>
                   </button>
 
@@ -689,7 +727,7 @@ if (!matchFilter(u.role_name, filterRole)) return false;
                       >
                         {item}
                       </button>
-                    )
+                    ),
                   )}
 
                   {/* Next */}
@@ -699,8 +737,18 @@ if (!matchFilter(u.role_name, filterRole)) return false;
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="Next page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
 
@@ -711,8 +759,18 @@ if (!matchFilter(u.role_name, filterRole)) return false;
                     className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     title="Last page"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M13 5l7 7-7 7M6 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
                 </div>
