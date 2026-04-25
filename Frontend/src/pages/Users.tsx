@@ -93,6 +93,7 @@ export default function Users() {
   // ✅ Fetch roles & departments — now using dropdown endpoints
 const { data: roles } = useFetchWithAuth<Role[]>("/api/dropdown/roles");
 const { data: departments } = useFetchWithAuth<Department[]>("/api/dropdown/departments");
+const { data: allTeams } = useFetchWithAuth<Team[]>("/api/dropdown/teams");
 
   // ✅ Teams — loaded dynamically by department
   const [teams, setTeams] = useState<Team[]>([]);
@@ -102,6 +103,7 @@ const { data: departments } = useFetchWithAuth<Department[]>("/api/dropdown/depa
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("");
+  const [filterTeam, setFilterTeam] = useState("");
   const [filterSource, setFilterSource] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
@@ -418,12 +420,23 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
         (user.department_name ?? "").toLowerCase().includes(q) ||
         (user.team_name ?? "").toLowerCase().includes(q);
 
-      const matchesRole =
-        !filterRole || String(user.role_id) === filterRole;
+      const matchesRole = !filterRole
+  ? true
+  : filterRole === "UNASSIGNED"
+    ? user.role_id === null
+    : String(user.role_id) === filterRole;
 
-      const matchesDepartment =
-        !filterDepartment ||
-        String(user.department_id) === filterDepartment;
+      const matchesDepartment = !filterDepartment
+  ? true
+  : filterDepartment === "UNASSIGNED"
+    ? user.department_id === null
+    : String(user.department_id) === filterDepartment;
+
+    const matchesTeam = !filterTeam
+  ? true
+  : filterTeam === "UNASSIGNED"
+    ? user.team_id === null
+    : String(user.team_id) === filterTeam;
 
       const matchesSource =
         !filterSource || user.source === filterSource;
@@ -433,14 +446,15 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
         (filterStatus === "active" ? user.is_active : !user.is_active);
 
       return (
-        matchesSearch &&
-        matchesRole &&
-        matchesDepartment &&
-        matchesSource &&
-        matchesStatus
-      );
+  matchesSearch &&
+  matchesRole &&
+  matchesDepartment &&
+  matchesTeam &&
+  matchesSource &&
+  matchesStatus
+);
     });
-  }, [users, searchQuery, filterRole, filterDepartment, filterSource, filterStatus]);
+}, [users, searchQuery, filterRole, filterDepartment, filterTeam, filterSource, filterStatus]);
 
   // ─── PAGINATION LOGIC ────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
@@ -475,6 +489,11 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
     setCurrentPage(1);
   };
 
+  const handleFilterTeamChange = (val: string) => {
+  setFilterTeam(val);
+  setCurrentPage(1);
+};
+
   const handleFilterSourceChange = (val: string) => {
     setFilterSource(val);
     setCurrentPage(1);
@@ -486,16 +505,22 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
   };
 
   const hasActiveFilters =
-    searchQuery || filterRole || filterDepartment || filterSource || filterStatus;
+  searchQuery ||
+  filterRole ||
+  filterDepartment ||
+  filterTeam ||
+  filterSource ||
+  filterStatus;
 
   const handleClearFilters = () => {
-    setSearchQuery("");
-    setFilterRole("");
-    setFilterDepartment("");
-    setFilterSource("");
-    setFilterStatus("");
-    setCurrentPage(1);
-  };
+  setSearchQuery("");
+  setFilterRole("");
+  setFilterDepartment("");
+  setFilterTeam("");
+  setFilterSource("");
+  setFilterStatus("");
+  setCurrentPage(1);
+};
 
   // ─── PAGINATION RANGE ────────────────────────────────────────────────────
   const getPaginationRange = () => {
@@ -570,6 +595,7 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                   {r.role_name}
                 </option>
               ))}
+              <option value="UNASSIGNED">Unassigned</option>
             </select>
 
             {/* Department filter */}
@@ -586,7 +612,27 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                     {d.department_name}
                   </option>
                 ))}
+                <option value="UNASSIGNED">Unassigned</option>
             </select>
+
+{/* Team filter */}
+            <select
+  value={filterTeam}
+  onChange={(e) => handleFilterTeamChange(e.target.value)}
+  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+>
+  <option value="">All teams</option>
+
+  {allTeams
+  ?.filter((t) => t.is_active)
+  .map((t) => (
+    <option key={t.id} value={t.id}>
+      {t.team_name}
+    </option>
+))}
+  <option value="UNASSIGNED">Unassigned</option>
+
+</select>
 
             {/* Source filter */}
             <select
