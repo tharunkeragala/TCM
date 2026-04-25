@@ -144,6 +144,11 @@ export default function UserReport() {
   const filtered = useMemo(() => {
     if (!users) return [];
     const q = search.toLowerCase().trim();
+    const matchFilter = (value: string | null, filter: string) => {
+  if (!filter) return true;
+  if (filter === "UNASSIGNED") return value === null;
+  return value === filter;
+};
     return users.filter((u) => {
       if (
         q &&
@@ -156,9 +161,9 @@ export default function UserReport() {
         !String(u.id).includes(q)
       )
         return false;
-      if (filterRole && u.role_name !== filterRole) return false;
-      if (filterDept && u.department_name !== filterDept) return false;
-      if (filterTeam && u.team_name !== filterTeam) return false;
+      if (!matchFilter(u.department_name, filterDept)) return false;
+if (!matchFilter(u.team_name, filterTeam)) return false;
+if (!matchFilter(u.role_name, filterRole)) return false;
       if (filterSource && u.source !== filterSource) return false;
       if (filterStatus === "active" && !u.is_active) return false;
       if (filterStatus === "inactive" && u.is_active) return false;
@@ -226,14 +231,14 @@ export default function UserReport() {
   const handleExport = () => {
     const rows = filtered.map((u, i) => ({
       "#": i + 1,
-      ID: u.id,
+      // ID: u.id,
       Username: u.username,
       Role: u.role_name ?? "",
-      "Role ID": u.role_id,
+      // "Role ID": u.role_id,
       Department: u.department_name ?? "",
-      "Department ID": u.department_id ?? "",
+      // "Department ID": u.department_id ?? "",
       Team: u.team_name ?? "",
-      "Team ID": u.team_id ?? "",
+      // "Team ID": u.team_id ?? "",
       Source: u.source,
       Status: u.is_active ? "Active" : "Inactive",
       "Created At": u.created_at ?? "",
@@ -408,6 +413,7 @@ export default function UserReport() {
                   {d}
                 </option>
               ))}
+              <option value="UNASSIGNED">Unassigned</option>
             </select>
 
             {/* Team */}
@@ -426,6 +432,7 @@ export default function UserReport() {
                   {t}
                 </option>
               ))}
+              <option value="UNASSIGNED">Unassigned</option>
             </select>
 
             {/* Source */}
@@ -539,11 +546,19 @@ export default function UserReport() {
                         </td>
 
                         <td className="px-5 py-3 whitespace-nowrap">
-                          {user.department_name ?? <Dash />}
+                          {user.department_name ?? (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                              Unassigned
+                            </span>
+                          )}
                         </td>
 
                         <td className="px-5 py-3 whitespace-nowrap">
-                          {user.team_name ?? <Dash />}
+                          {user.team_name ?? (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+                              Unassigned
+                            </span>
+                          )}
                         </td>
 
                         <td className="px-5 py-3">
