@@ -46,7 +46,9 @@ type UserType = "MANUAL" | "AD";
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) {
     return (
-      <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
+      <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+        —
+      </span>
     );
   }
 
@@ -64,13 +66,17 @@ const formatDate = (dateStr: string | null) => {
   hours = hours % 12 || 12;
 
   const formattedDate = `${day}/${month}/${year}`;
-  const formattedTime = `${String(hours).padStart(2, "0")}.${minutes}.${seconds} ${ampm}`;
+  const formattedTime = `${String(hours).padStart(2, "0")}:${minutes}:${seconds} ${ampm}`;
 
   return (
-    <span className="text-xs text-gray-600 dark:text-gray-400">
-      {formattedDate}{" "}
-      <span className="text-gray-400 dark:text-gray-500">{formattedTime}</span>
-    </span>
+    <div className="flex flex-col text-xs leading-tight">
+      <span className="text-gray-700 dark:text-gray-200">
+        {formattedDate}
+      </span>
+      <span className="text-gray-400 dark:text-gray-500">
+        {formattedTime}
+      </span>
+    </div>
   );
 };
 
@@ -736,11 +742,11 @@ const fetchTeamsByDepartment = async (departmentId: string) => {
                           </button>
                         </td>
 
-                        <td className="px-5 py-3 whitespace-nowrap">
+                        <td className="px-5 py-3">
                           {formatDate(user.created_at)}
                         </td>
 
-                        <td className="px-5 py-3 whitespace-nowrap">
+                        <td className="px-5 py-3">
                           {formatDate(user.updated_at)}
                         </td>
 

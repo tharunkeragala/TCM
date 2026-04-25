@@ -26,15 +26,17 @@ interface User {
   team_name: string | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ✅ Format date helper
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) {
     return (
-      <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
+      <span className="text-gray-400 dark:text-gray-500 italic text-xs">
+        —
+      </span>
     );
   }
 
-  const d = new Date(dateStr); // ✅ no replace needed
+  const d = new Date(dateStr);
 
   const day = String(d.getUTCDate()).padStart(2, "0");
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -48,29 +50,17 @@ const formatDate = (dateStr: string | null) => {
   hours = hours % 12 || 12;
 
   const formattedDate = `${day}/${month}/${year}`;
-  const formattedTime = `${String(hours).padStart(2, "0")}.${minutes}.${seconds} ${ampm}`;
+  const formattedTime = `${String(hours).padStart(2, "0")}:${minutes}:${seconds} ${ampm}`;
 
   return (
-    <span className="text-xs text-gray-600 dark:text-gray-400">
-      {formattedDate}{" "}
+    <div className="flex flex-col text-xs leading-tight">
+      <span className="text-gray-700 dark:text-gray-200">{formattedDate}</span>
       <span className="text-gray-400 dark:text-gray-500">{formattedTime}</span>
-    </span>
+    </div>
   );
 };
 
-const formatDateStr = (dateStr: string | null): string => {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return (
-    d.toLocaleDateString(undefined, {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }) +
-    " " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  );
-};
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const Dash = () => (
   <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
@@ -92,6 +82,10 @@ export default function UserReport() {
   const [filterSource, setFilterSource] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  // ── Pagination state ──────────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // ── Derived dropdown options ───────────────────────────────────────────────
   const roles = useMemo(
     () =>
@@ -99,10 +93,10 @@ export default function UserReport() {
         ...new Set(
           (users ?? [])
             .map((u) => u.role_name)
-            .filter((v): v is string => Boolean(v)),
+            .filter((v): v is string => Boolean(v))
         ),
       ].sort(),
-    [users],
+    [users]
   );
   const departments = useMemo(
     () =>
@@ -110,10 +104,10 @@ export default function UserReport() {
         ...new Set(
           (users ?? [])
             .map((u) => u.department_name)
-            .filter((v): v is string => Boolean(v)),
+            .filter((v): v is string => Boolean(v))
         ),
       ].sort(),
-    [users],
+    [users]
   );
   const teams = useMemo(
     () =>
@@ -121,10 +115,10 @@ export default function UserReport() {
         ...new Set(
           (users ?? [])
             .map((u) => u.team_name)
-            .filter((v): v is string => Boolean(v)),
+            .filter((v): v is string => Boolean(v))
         ),
       ].sort(),
-    [users],
+    [users]
   );
 
   const activeFilterCount = [
@@ -143,6 +137,7 @@ export default function UserReport() {
     setFilterTeam("");
     setFilterSource("");
     setFilterStatus("");
+    setCurrentPage(1);
   };
 
   // ── Filtered data ─────────────────────────────────────────────────────────
@@ -169,15 +164,51 @@ export default function UserReport() {
       if (filterStatus === "inactive" && u.is_active) return false;
       return true;
     });
-  }, [
-    users,
-    search,
-    filterRole,
-    filterDept,
-    filterTeam,
-    filterSource,
-    filterStatus,
-  ]);
+  }, [users, search, filterRole, filterDept, filterTeam, filterSource, filterStatus]);
+
+  // ── Pagination logic ──────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedUsers = filtered.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  // Reset to page 1 whenever filters change
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (setter: (v: string) => void) => (val: string) => {
+    setter(val);
+    setCurrentPage(1);
+  };
+
+  // ── Pagination range ──────────────────────────────────────────────────────
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, safePage - delta);
+    const right = Math.min(totalPages - 1, safePage + delta);
+
+    range.push(1);
+    if (left > 2) range.push("...");
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) range.push("...");
+    if (totalPages > 1) range.push(totalPages);
+
+    return range;
+  };
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -191,7 +222,7 @@ export default function UserReport() {
     };
   }, [users]);
 
-  // ── Excel export ──────────────────────────────────────────────────────────
+  // ── Excel export (exports all filtered, not just current page) ────────────
   const handleExport = () => {
     const rows = filtered.map((u, i) => ({
       "#": i + 1,
@@ -205,12 +236,10 @@ export default function UserReport() {
       "Team ID": u.team_id ?? "",
       Source: u.source,
       Status: u.is_active ? "Active" : "Inactive",
-      "Created At": formatDateStr(u.created_at),
+      "Created At": u.created_at ?? "",
       "Created By": u.created_by_username ?? "",
-      // "Created By ID": u.created_by ?? "",
-      "Updated At": formatDateStr(u.updated_at),
+      "Updated At": u.updated_at ?? "",
       "Updated By": u.updated_by_username ?? "",
-      // "Updated By ID": u.updated_by ?? "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -228,10 +257,8 @@ export default function UserReport() {
       { wch: 10 },
       { wch: 22 },
       { wch: 16 },
-      { wch: 13 },
       { wch: 22 },
       { wch: 16 },
-      { wch: 13 },
     ];
 
     const wb = XLSX.utils.book_new();
@@ -302,13 +329,13 @@ export default function UserReport() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search by username, role, department, team, created/updated by…"
                 className="w-full pl-8 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {search && (
                 <button
-                  onClick={() => setSearch("")}
+                  onClick={() => handleSearchChange("")}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 >
                   <FaTimes className="text-xs" />
@@ -350,7 +377,7 @@ export default function UserReport() {
             {/* Role */}
             <select
               value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
+              onChange={(e) => handleFilterChange(setFilterRole)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterRole
                   ? "border-blue-400 dark:border-blue-500"
@@ -368,7 +395,7 @@ export default function UserReport() {
             {/* Department */}
             <select
               value={filterDept}
-              onChange={(e) => setFilterDept(e.target.value)}
+              onChange={(e) => handleFilterChange(setFilterDept)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterDept
                   ? "border-blue-400 dark:border-blue-500"
@@ -386,7 +413,7 @@ export default function UserReport() {
             {/* Team */}
             <select
               value={filterTeam}
-              onChange={(e) => setFilterTeam(e.target.value)}
+              onChange={(e) => handleFilterChange(setFilterTeam)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterTeam
                   ? "border-blue-400 dark:border-blue-500"
@@ -404,7 +431,7 @@ export default function UserReport() {
             {/* Source */}
             <select
               value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value)}
+              onChange={(e) => handleFilterChange(setFilterSource)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterSource
                   ? "border-blue-400 dark:border-blue-500"
@@ -419,7 +446,7 @@ export default function UserReport() {
             {/* Status */}
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => handleFilterChange(setFilterStatus)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                 filterStatus
                   ? "border-blue-400 dark:border-blue-500"
@@ -472,154 +499,211 @@ export default function UserReport() {
 
         {/* ── Table ─────────────────────────────────────────────────────── */}
         {!loading && !error && (
-          <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
-                <tr>
-                  <th className="px-5 py-3 whitespace-nowrap">#</th>
-                  {/* <th className="px-5 py-3 whitespace-nowrap">ID</th> */}
-                  <th className="px-5 py-3 whitespace-nowrap">Username</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Role</th>
-                  {/* <th className="px-5 py-3 whitespace-nowrap">Role ID</th> */}
-                  <th className="px-5 py-3 whitespace-nowrap">Department</th>
-                  {/* <th className="px-5 py-3 whitespace-nowrap">Dept ID</th> */}
-                  <th className="px-5 py-3 whitespace-nowrap">Team</th>
-                  {/* <th className="px-5 py-3 whitespace-nowrap">Team ID</th> */}
-                  <th className="px-5 py-3 whitespace-nowrap">Source</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Status</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Created At</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Created By</th>
-                  {/* <th className="px-5 py-3 whitespace-nowrap">Created By ID</th> */}
-                  <th className="px-5 py-3 whitespace-nowrap">Updated At</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Updated By</th>
-                  {/* <th className="px-5 py-3 whitespace-nowrap">Updated By ID</th> */}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
-                {filtered.length > 0 ? (
-                  filtered.map((user, index) => (
-                    <tr
-                      key={user.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
-                    >
-                      {/* # */}
-                      <td className="px-5 py-3 text-gray-400 dark:text-gray-500 text-xs">
-                        {index + 1}
-                      </td>
-
-                      {/* ID */}
-                      {/* <td className="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {user.id}
-                      </td> */}
-
-                      {/* Username */}
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                        {user.username}
-                      </td>
-
-                      {/* Role name */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {user.role_name ?? <Dash />}
-                      </td>
-
-                      {/* Role ID */}
-                      {/* <td className="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {user.role_id}
-                      </td> */}
-
-                      {/* Department name */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {user.department_name ?? <Dash />}
-                      </td>
-
-                      {/* Department ID */}
-                      {/* <td className="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {user.department_id ?? <Dash />}
-                      </td> */}
-
-                      {/* Team name */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {user.team_name ?? <Dash />}
-                      </td>
-
-                      {/* Team ID */}
-                      {/* <td className="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {user.team_id ?? <Dash />}
-                      </td> */}
-
-                      {/* Source */}
-                      <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-md font-medium ${
-                            user.source === "AD"
-                              ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
-                              : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                          }`}
-                        >
-                          {user.source}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.is_active
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                          }`}
-                        >
-                          {user.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-
-                      {/* Created At */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {formatDate(user.created_at)}
-                      </td>
-
-                      {/* Created By username */}
-                      <td className="px-5 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {user.created_by_username ?? <Dash />}
-                      </td>
-
-                      {/* Created By ID */}
-                      {/* <td className="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {user.created_by ?? <Dash />}
-                      </td> */}
-
-                      {/* Updated At */}
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        {formatDate(user.updated_at)}
-                      </td>
-
-                      {/* Updated By username */}
-                      <td className="px-5 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {user.updated_by_username ?? <Dash />}
-                      </td>
-
-                      {/* Updated By ID */}
-                      {/* <td className="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {user.updated_by ?? <Dash />}
-                      </td> */}
-                    </tr>
-                  ))
-                ) : (
+          <>
+            <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                   <tr>
-                    <td
-                      colSpan={17}
-                      className="text-center py-8 text-gray-500 dark:text-gray-400"
-                    >
-                      {activeFilterCount > 0
-                        ? "No users match the current filters."
-                        : "No users found."}
-                    </td>
+                    <th className="px-5 py-3 whitespace-nowrap">#</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Username</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Role</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Department</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Team</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Source</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Status</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Created At</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Created By</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Updated At</th>
+                    <th className="px-5 py-3 whitespace-nowrap">Updated By</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
+                  {paginatedUsers.length > 0 ? (
+                    paginatedUsers.map((user, index) => (
+                      <tr
+                        key={user.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
+                      >
+                        {/* # — reflects global position, not just current page */}
+                        <td className="px-5 py-3 text-gray-400 dark:text-gray-500 text-xs">
+                          {(safePage - 1) * pageSize + index + 1}
+                        </td>
+
+                        <td className="px-5 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                          {user.username}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {user.role_name ?? <Dash />}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {user.department_name ?? <Dash />}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {user.team_name ?? <Dash />}
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-md font-medium ${
+                              user.source === "AD"
+                                ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                            }`}
+                          >
+                            {user.source}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <span
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.is_active
+                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                            }`}
+                          >
+                            {user.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {formatDate(user.created_at)}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                          {user.created_by_username ?? <Dash />}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          {formatDate(user.updated_at)}
+                        </td>
+
+                        <td className="px-5 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                          {user.updated_by_username ?? <Dash />}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={11}
+                        className="text-center py-8 text-gray-500 dark:text-gray-400"
+                      >
+                        {activeFilterCount > 0
+                          ? "No users match the current filters."
+                          : "No users found."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Pagination ── */}
+            {filtered.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                {/* Left: page size + info */}
+                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <span>Rows per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <span>
+                    {(safePage - 1) * pageSize + 1}–
+                    {Math.min(safePage * pageSize, filtered.length)} of{" "}
+                    {filtered.length}
+                  </span>
+                </div>
+
+                {/* Right: page controls */}
+                <div className="flex items-center gap-1">
+                  {/* First */}
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={safePage === 1}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="First page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Prev */}
+                  <button
+                    onClick={() => handlePageChange(safePage - 1)}
+                    disabled={safePage === 1}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Previous page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Page numbers */}
+                  {getPaginationRange().map((item, i) =>
+                    item === "..." ? (
+                      <span
+                        key={`ellipsis-${i}`}
+                        className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => handlePageChange(item as number)}
+                        className={`min-w-[32px] px-2 py-1 rounded-md text-sm font-medium transition ${
+                          safePage === item
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                  {/* Next */}
+                  <button
+                    onClick={() => handlePageChange(safePage + 1)}
+                    disabled={safePage === totalPages}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Next page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  {/* Last */}
+                  <button
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={safePage === totalPages}
+                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Last page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
