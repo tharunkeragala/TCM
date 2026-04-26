@@ -10,6 +10,8 @@ interface Department {
   id: number;
   department_name: string;
   is_active: boolean;
+  department_head_id?: number;
+  department_head_name?: string;
 }
 
 export default function Departments() {
@@ -19,12 +21,15 @@ export default function Departments() {
     error,
   } = useFetchWithAuth<Department[]>("/api/departments");
 
+  const { data: users } = useFetchWithAuth<any[]>("/api/users");
+
   const [showModal, setShowModal] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
 
   const [formData, setFormData] = useState({
     department_name: "",
     is_active: true,
+    department_head_id: "" as number | "",
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -64,7 +69,15 @@ export default function Departments() {
 
       const method = editingDept ? API.put : API.post;
 
-      const res = await method(url, formData, {
+      const payload = {
+        ...formData,
+        department_head_id:
+          formData.department_head_id === ""
+            ? null
+            : formData.department_head_id,
+      };
+
+      const res = await method(url, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -95,6 +108,7 @@ export default function Departments() {
     setFormData({
       department_name: dept.department_name,
       is_active: dept.is_active,
+      department_head_id: dept.department_head_id ?? "",
     });
     setShowModal(true);
   };
@@ -174,7 +188,7 @@ export default function Departments() {
       await API.put(
         `/api/departments/toggle/${dept.id}`,
         { is_active: !dept.is_active },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       window.location.reload();
@@ -186,7 +200,11 @@ export default function Departments() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingDept(null);
-    setFormData({ department_name: "", is_active: true });
+    setFormData({
+      department_name: "",
+      is_active: true,
+      department_head_id: "",
+    });
     setFormAlert(null);
   };
 
@@ -228,6 +246,7 @@ export default function Departments() {
                 <tr>
                   <th className="px-5 py-3">#</th>
                   <th className="px-5 py-3">Department Name</th>
+                  <th className="px-5 py-3">Head</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3">Active</th>
                   <th className="px-5 py-3">Actions</th>
@@ -244,6 +263,15 @@ export default function Departments() {
                       <td className="px-5 py-3">{index + 1}</td>
 
                       <td className="px-5 py-3">{dept.department_name}</td>
+
+                      {/* Department Head */}
+                      <td className="px-5 py-3">
+                        {dept.department_head_name || (
+                          <span className="text-gray-400 text-xs">
+                            Not assigned
+                          </span>
+                        )}
+                      </td>
 
                       {/* Status Badge */}
                       <td className="px-5 py-3">
@@ -270,9 +298,7 @@ export default function Departments() {
                         >
                           <span
                             className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                              dept.is_active
-                                ? "translate-x-6"
-                                : "translate-x-1"
+                              dept.is_active ? "translate-x-6" : "translate-x-1"
                             }`}
                           />
                         </button>
@@ -293,7 +319,7 @@ export default function Departments() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="text-center py-5 text-gray-500">
+                    <td colSpan={6} className="text-center py-5 text-gray-500">
                       No departments found
                     </td>
                   </tr>
@@ -345,6 +371,33 @@ export default function Departments() {
               />
             </div>
 
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Department Head
+              </label>
+
+              <select
+                value={formData.department_head_id}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    department_head_id: e.target.value
+                      ? Number(e.target.value)
+                      : "",
+                  })
+                }
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+              >
+                <option value="">-- Select Head --</option>
+
+                {users?.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.username || user.full_name || user.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="mb-6 flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Active
@@ -388,8 +441,8 @@ export default function Departments() {
                     ? "Updating..."
                     : "Creating..."
                   : editingDept
-                  ? "Update"
-                  : "Create"}
+                    ? "Update"
+                    : "Create"}
               </button>
             </div>
           </div>
@@ -461,13 +514,12 @@ export default function Departments() {
                     </p>
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                       Proceeding will detach{" "}
-                      {assignedUserCount > 1 ? "these users" : "this user"}{" "}
-                      from the department. You will need to reassign them to
-                      another department afterwards.
+                      {assignedUserCount > 1 ? "these users" : "this user"} from
+                      the department. You will need to reassign them to another
+                      department afterwards.
                     </p>
                   </div>
                 )}
-                
               </div>
             </div>
 

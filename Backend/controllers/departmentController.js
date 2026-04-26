@@ -7,9 +7,16 @@ exports.getDepartments = async (req, res) => {
     const pool = await poolPromise;
 
     const result = await pool.request().query(`
-      SELECT id, department_name, is_active
-      FROM test_case_manager.dbo.departments
-      ORDER BY id ASC
+      SELECT 
+  d.id,
+  d.department_name,
+  d.is_active,
+  d.department_head_id,
+  u.username AS department_head_name
+FROM test_case_manager.dbo.departments d
+LEFT JOIN test_case_manager.dbo.users u 
+  ON d.department_head_id = u.id
+ORDER BY d.id ASC
     `);
 
     res.status(200).json({
@@ -32,9 +39,7 @@ exports.getAssignedUserCount = async (req, res) => {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("department_id", sql.Int, id)
+    const result = await pool.request().input("department_id", sql.Int, id)
       .query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
@@ -60,7 +65,7 @@ exports.getAssignedUserCount = async (req, res) => {
 // ✅ CREATE
 exports.createDepartment = async (req, res) => {
   try {
-    const { department_name, is_active } = req.body;
+    const { department_name, is_active, department_head_id } = req.body;
 
     if (!department_name) {
       return res.status(400).json({
@@ -71,10 +76,10 @@ exports.createDepartment = async (req, res) => {
 
     const pool = await poolPromise;
 
+    // ✅ CHECK EXISTING FIRST
     const existing = await pool
       .request()
-      .input("department_name", sql.VarChar, department_name)
-      .query(`
+      .input("department_name", sql.VarChar, department_name).query(`
         SELECT id FROM test_case_manager.dbo.departments
         WHERE department_name = @department_name
       `);
@@ -86,21 +91,19 @@ exports.createDepartment = async (req, res) => {
       });
     }
 
+    // ✅ INSERT ONLY ONCE
     await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
       .input("is_active", sql.Bit, is_active ?? true)
-      .query(`
-        INSERT INTO test_case_manager.dbo.departments (department_name, is_active)
-        VALUES (@department_name, @is_active)
-      `);
-
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Department ${department_name} created`)
-      .query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('CREATE', 'DEPARTMENT', @description)
+      .input(
+        "department_head_id",
+        sql.Int,
+        department_head_id ? Number(department_head_id) : null,
+      ).query(`
+        INSERT INTO test_case_manager.dbo.departments 
+        (department_name, is_active, department_head_id)
+        VALUES (@department_name, @is_active, @department_head_id)
       `);
 
     res.status(201).json({
@@ -121,15 +124,15 @@ exports.createDepartment = async (req, res) => {
 exports.updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { department_name, is_active } = req.body;
+    const { department_name, is_active, department_head_id } = req.body;
 
     const pool = await poolPromise;
 
+    // ✅ CHECK DUPLICATE NAME
     const existing = await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
-      .input("id", sql.Int, id)
-      .query(`
+      .input("id", sql.Int, id).query(`
         SELECT id FROM test_case_manager.dbo.departments
         WHERE department_name = @department_name AND id != @id
       `);
@@ -141,24 +144,22 @@ exports.updateDepartment = async (req, res) => {
       });
     }
 
+    // ✅ SINGLE UPDATE
     await pool
       .request()
       .input("id", sql.Int, id)
       .input("department_name", sql.VarChar, department_name)
       .input("is_active", sql.Bit, is_active)
-      .query(`
+      .input(
+        "department_head_id",
+        sql.Int,
+        department_head_id ? Number(department_head_id) : null,
+      ).query(`
         UPDATE test_case_manager.dbo.departments
         SET department_name = @department_name,
-            is_active = @is_active
+            is_active = @is_active,
+            department_head_id = @department_head_id
         WHERE id = @id
-      `);
-
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Department ID ${id} updated`)
-      .query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('UPDATE', 'DEPARTMENT', @description)
       `);
 
     res.json({
@@ -183,8 +184,7 @@ exports.deleteDepartment = async (req, res) => {
 
     const assignedUsersResult = await pool
       .request()
-      .input("department_id", sql.Int, id)
-      .query(`
+      .input("department_id", sql.Int, id).query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
         WHERE department_id = @department_id
@@ -193,10 +193,7 @@ exports.deleteDepartment = async (req, res) => {
     const userCount = assignedUsersResult.recordset[0]?.user_count ?? 0;
 
     if (userCount > 0) {
-      await pool
-        .request()
-        .input("department_id", sql.Int, id)
-        .query(`
+      await pool.request().input("department_id", sql.Int, id).query(`
           UPDATE test_case_manager.dbo.users
           SET department_id = NULL
           WHERE department_id = @department_id
@@ -204,25 +201,24 @@ exports.deleteDepartment = async (req, res) => {
 
       await pool
         .request()
-        .input("description", sql.VarChar, `${userCount} user(s) detached from Department ID ${id} before deletion`)
-        .query(`
+        .input(
+          "description",
+          sql.VarChar,
+          `${userCount} user(s) detached from Department ID ${id} before deletion`,
+        ).query(`
           INSERT INTO audit_logs (action, module, description)
           VALUES ('DETACH', 'DEPARTMENT', @description)
         `);
     }
 
-    await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`
+    await pool.request().input("id", sql.Int, id).query(`
         DELETE FROM test_case_manager.dbo.departments
         WHERE id = @id
       `);
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Department ID ${id} deleted`)
-      .query(`
+      .input("description", sql.VarChar, `Department ID ${id} deleted`).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('DELETE', 'DEPARTMENT', @description)
       `);
@@ -254,8 +250,7 @@ exports.toggleDepartment = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("is_active", sql.Bit, is_active)
-      .query(`
+      .input("is_active", sql.Bit, is_active).query(`
         UPDATE test_case_manager.dbo.departments
         SET is_active = @is_active
         WHERE id = @id
@@ -263,8 +258,11 @@ exports.toggleDepartment = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Department ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `Department ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('STATUS_CHANGE', 'DEPARTMENT', @description)
       `);
