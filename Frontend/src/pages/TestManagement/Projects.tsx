@@ -1011,7 +1011,12 @@ function SuiteAccordion({
       <div className="ml-6 border-l-2 border-gray-200 dark:border-gray-700 pl-4 mt-1">
         {/* Suite header */}
         <div
-          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group transition-colors duration-100"
+          className={`flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer group transition-colors duration-150
+    ${
+      open
+        ? "bg-blue-50 dark:bg-gray-800"
+        : "hover:bg-gray-100 dark:hover:bg-gray-800"
+    }`}
           onClick={() => setOpen((v) => !v)}
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -1243,10 +1248,16 @@ function ProjectAccordion({
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden mb-2">
         {/* Project Header */}
         <div
-          className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors duration-150 group"
+          className={`flex items-center justify-between px-5 py-3.5 cursor-pointer 
+  transition-colors duration-150 group
+  ${
+    open
+      ? "bg-blue-100 dark:bg-gray-800"
+      : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
+  }`}
           onClick={() => setOpen((v) => !v)}
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 ">
             <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">
               {open ? (
                 <FaChevronDown className="w-3.5 h-3.5" />

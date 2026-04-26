@@ -743,7 +743,13 @@ function SuiteAccordion({
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden mb-2">
         {/* Suite header */}
         <div
-          className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors duration-150 group"
+          className={`flex items-center justify-between px-5 py-3.5 cursor-pointer 
+  transition-colors duration-150 group
+  ${
+    open
+      ? "bg-blue-100 dark:bg-gray-800"
+      : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
+  }`}
           onClick={() => setOpen((v) => !v)}
         >
           <div className="flex items-center gap-3 min-w-0">
