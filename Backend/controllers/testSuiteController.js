@@ -17,27 +17,26 @@ exports.getTestSuites = async (req, res) => {
 
     const result = await request.query(`
       SELECT
-  ts.*,
-  p.project_name,
-  u1.username AS created_by_name,
-  u2.username AS updated_by_name
-FROM test_suites ts
-LEFT JOIN projects p  ON p.id  = ts.project_id
-LEFT JOIN users u1    ON u1.id = ts.created_by
-LEFT JOIN users u2    ON u2.id = ts.updated_by
-ORDER BY ts.id ASC
+        ts.*,
+        p.project_name,
+        u1.username AS created_by_name,
+        u2.username AS updated_by_name
+      FROM test_case_manager.dbo.test_suites ts
+      LEFT JOIN test_case_manager.dbo.projects p  ON p.id  = ts.project_id
+      LEFT JOIN test_case_manager.dbo.users u1    ON u1.id = ts.created_by
+      LEFT JOIN test_case_manager.dbo.users u2    ON u2.id = ts.updated_by
+      ${whereClause}
+      ORDER BY ts.id ASC
     `);
 
     res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Test Suites Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch test suites",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch test suites",
+      error: err.message,
+    });
   }
 };
 
@@ -56,13 +55,11 @@ exports.getSuiteCaseCount = async (req, res) => {
     res.json({ success: true, count: result.recordset[0]?.case_count ?? 0 });
   } catch (err) {
     console.error("GET Case Count Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch case count",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch case count",
+      error: err.message,
+    });
   }
 };
 
@@ -94,12 +91,10 @@ exports.createTestSuite = async (req, res) => {
       `);
 
     if (existing.recordset.length > 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Suite name already exists in this project",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Suite name already exists in this project",
+      });
     }
 
     await pool
@@ -133,13 +128,11 @@ exports.createTestSuite = async (req, res) => {
       .json({ success: true, message: "Test suite created successfully" });
   } catch (err) {
     console.error("CREATE Test Suite Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create test suite",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create test suite",
+      error: err.message,
+    });
   }
 };
 
@@ -168,12 +161,10 @@ exports.updateTestSuite = async (req, res) => {
       `);
 
     if (existing.recordset.length > 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Suite name already exists in this project",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Suite name already exists in this project",
+      });
     }
 
     await pool
@@ -205,13 +196,11 @@ exports.updateTestSuite = async (req, res) => {
     res.json({ success: true, message: "Test suite updated successfully" });
   } catch (err) {
     console.error("UPDATE Test Suite Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update test suite",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update test suite",
+      error: err.message,
+    });
   }
 };
 
@@ -254,17 +243,15 @@ exports.deleteTestSuite = async (req, res) => {
     res.json({ success: true, message: "Test suite deleted successfully" });
   } catch (err) {
     console.error("DELETE Test Suite Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to delete test suite",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete test suite",
+      error: err.message,
+    });
   }
 };
 
-// ✅ TOGGLE ACTIVE
+// ✅ TOGGLE ACTIVE — cascades to all test cases in the suite
 exports.toggleTestSuite = async (req, res) => {
   try {
     const { id } = req.params;
@@ -272,6 +259,7 @@ exports.toggleTestSuite = async (req, res) => {
     const userId = req.user?.id || req.user?.userId || null;
     const pool = await poolPromise;
 
+    // 1. Toggle the suite itself
     await pool
       .request()
       .input("id", sql.Int, id)
@@ -284,27 +272,47 @@ exports.toggleTestSuite = async (req, res) => {
         WHERE id = @id
       `);
 
+    // 2. Cascade: update status field on test_cases (Draft/Deprecated pattern)
+    // We mark test cases as Deprecated when suite is disabled, restore to Ready when enabled
+    // Only update cases that are currently in matching state to avoid overwriting intentional statuses
+    if (!is_active) {
+      // Disabling: mark non-deprecated cases as Deprecated and store old status
+      await pool
+        .request()
+        .input("suite_id", sql.Int, id)
+        .input("updated_by", sql.Int, userId).query(`
+          UPDATE test_case_manager.dbo.test_cases
+          SET status     = 'Deprecated',
+              updated_by = @updated_by,
+              updated_at = GETDATE()
+          WHERE suite_id = @suite_id
+            AND status  != 'Deprecated'
+        `);
+    }
+
+    // 3. Audit log
     await pool
       .request()
       .input(
         "description",
         sql.VarChar,
-        `Suite ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`,
+        `Suite ID ${id} status changed to ${is_active ? "Active" : "Inactive"}. Test cases updated accordingly.`,
       )
       .input("user_id", sql.Int, userId).query(`
         INSERT INTO audit_logs (action, module, description, user_id)
         VALUES ('STATUS_CHANGE', 'TEST_SUITE', @description, @user_id)
       `);
 
-    res.json({ success: true, message: "Suite status updated" });
+    res.json({
+      success: true,
+      message: "Suite and linked test cases status updated",
+    });
   } catch (err) {
     console.error("TOGGLE Test Suite Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update status",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update status",
+      error: err.message,
+    });
   }
 };

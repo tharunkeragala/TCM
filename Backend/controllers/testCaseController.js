@@ -34,7 +34,11 @@ exports.getTestCases = async (req, res) => {
     res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Test Cases Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch test cases", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch test cases",
+      error: err.message,
+    });
   }
 };
 
@@ -44,10 +48,7 @@ exports.getTestCaseById = async (req, res) => {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const caseResult = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`
+    const caseResult = await pool.request().input("id", sql.Int, id).query(`
         SELECT
           tc.*,
           ts.suite_name,
@@ -63,14 +64,14 @@ exports.getTestCaseById = async (req, res) => {
       `);
 
     if (!caseResult.recordset.length) {
-      return res.status(404).json({ success: false, message: "Test case not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Test case not found" });
     }
 
     const testCase = caseResult.recordset[0];
 
-    const stepsResult = await pool
-      .request()
-      .input("test_case_id", sql.Int, id)
+    const stepsResult = await pool.request().input("test_case_id", sql.Int, id)
       .query(`
         SELECT *
         FROM test_case_manager.dbo.test_steps
@@ -84,7 +85,11 @@ exports.getTestCaseById = async (req, res) => {
     });
   } catch (err) {
     console.error("GET Test Case By ID Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch test case", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch test case",
+      error: err.message,
+    });
   }
 };
 
@@ -94,9 +99,7 @@ exports.getTestCaseStepCount = async (req, res) => {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("test_case_id", sql.Int, id)
+    const result = await pool.request().input("test_case_id", sql.Int, id)
       .query(`
         SELECT COUNT(*) AS step_count
         FROM test_case_manager.dbo.test_steps
@@ -106,21 +109,30 @@ exports.getTestCaseStepCount = async (req, res) => {
     res.json({ success: true, count: result.recordset[0]?.step_count ?? 0 });
   } catch (err) {
     console.error("GET Step Count Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch step count", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch step count",
+      error: err.message,
+    });
   }
 };
 
 // ✅ CREATE (with steps)
 exports.createTestCase = async (req, res) => {
   try {
-    const { suite_id, title, preconditions, priority, status, steps } = req.body;
+    const { suite_id, title, preconditions, priority, status, steps } =
+      req.body;
     const userId = req.user?.id || null;
 
     if (!title?.trim()) {
-      return res.status(400).json({ success: false, message: "Title is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Title is required" });
     }
     if (!suite_id) {
-      return res.status(400).json({ success: false, message: "Suite is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Suite is required" });
     }
 
     const pool = await poolPromise;
@@ -134,8 +146,7 @@ exports.createTestCase = async (req, res) => {
       .input("priority", sql.VarChar, priority || "Medium")
       .input("status", sql.VarChar, status || "Draft")
       .input("created_by", sql.Int, userId)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input("updated_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.test_cases
           (suite_id, title, preconditions, priority, status, created_by, updated_by)
         OUTPUT INSERTED.id
@@ -155,8 +166,7 @@ exports.createTestCase = async (req, res) => {
           .input("action", sql.VarChar, step.action)
           .input("expected_result", sql.VarChar, step.expected_result || null)
           .input("created_by", sql.Int, userId)
-          .input("updated_by", sql.Int, userId)
-          .query(`
+          .input("updated_by", sql.Int, userId).query(`
             INSERT INTO test_case_manager.dbo.test_steps
               (test_case_id, step_number, action, expected_result, created_by, updated_by)
             VALUES
@@ -167,17 +177,28 @@ exports.createTestCase = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Test case "${title}" created under suite ID ${suite_id}`)
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `Test case "${title}" created under suite ID ${suite_id}`,
+      )
+      .input("user_id", sql.Int, userId).query(`
         INSERT INTO audit_logs (action, module, description, user_id)
         VALUES ('CREATE', 'TEST_CASE', @description, @user_id)
       `);
 
-    res.status(201).json({ success: true, message: "Test case created successfully", id: testCaseId });
+    res.status(201).json({
+      success: true,
+      message: "Test case created successfully",
+      id: testCaseId,
+    });
   } catch (err) {
     console.error("CREATE Test Case Error:", err);
-    res.status(500).json({ success: false, message: "Failed to create test case", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create test case",
+      error: err.message,
+    });
   }
 };
 
@@ -185,11 +206,14 @@ exports.createTestCase = async (req, res) => {
 exports.updateTestCase = async (req, res) => {
   try {
     const { id } = req.params;
-    const { suite_id, title, preconditions, priority, status, steps } = req.body;
+    const { suite_id, title, preconditions, priority, status, steps } =
+      req.body;
     const userId = req.user?.id || null;
 
     if (!title?.trim()) {
-      return res.status(400).json({ success: false, message: "Title is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Title is required" });
     }
 
     const pool = await poolPromise;
@@ -202,8 +226,7 @@ exports.updateTestCase = async (req, res) => {
       .input("preconditions", sql.VarChar, preconditions || null)
       .input("priority", sql.VarChar, priority)
       .input("status", sql.VarChar, status)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.test_cases
         SET suite_id      = @suite_id,
             title         = @title,
@@ -216,10 +239,7 @@ exports.updateTestCase = async (req, res) => {
       `);
 
     // Delete existing steps and re-insert
-    await pool
-      .request()
-      .input("test_case_id", sql.Int, id)
-      .query(`
+    await pool.request().input("test_case_id", sql.Int, id).query(`
         DELETE FROM test_case_manager.dbo.test_steps
         WHERE test_case_id = @test_case_id
       `);
@@ -233,8 +253,7 @@ exports.updateTestCase = async (req, res) => {
           .input("action", sql.VarChar, step.action)
           .input("expected_result", sql.VarChar, step.expected_result || null)
           .input("created_by", sql.Int, userId)
-          .input("updated_by", sql.Int, userId)
-          .query(`
+          .input("updated_by", sql.Int, userId).query(`
             INSERT INTO test_case_manager.dbo.test_steps
               (test_case_id, step_number, action, expected_result, created_by, updated_by)
             VALUES
@@ -246,8 +265,7 @@ exports.updateTestCase = async (req, res) => {
     await pool
       .request()
       .input("description", sql.VarChar, `Test case ID ${id} updated`)
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input("user_id", sql.Int, userId).query(`
         INSERT INTO audit_logs (action, module, description, user_id)
         VALUES ('UPDATE', 'TEST_CASE', @description, @user_id)
       `);
@@ -255,7 +273,11 @@ exports.updateTestCase = async (req, res) => {
     res.json({ success: true, message: "Test case updated successfully" });
   } catch (err) {
     console.error("UPDATE Test Case Error:", err);
-    res.status(500).json({ success: false, message: "Failed to update test case", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update test case",
+      error: err.message,
+    });
   }
 };
 
@@ -266,10 +288,7 @@ exports.deleteTestCase = async (req, res) => {
     const userId = req.user?.id || null;
     const pool = await poolPromise;
 
-    await pool
-      .request()
-      .input("test_case_id", sql.Int, id)
-      .query(`
+    await pool.request().input("test_case_id", sql.Int, id).query(`
         DELETE FROM test_case_manager.dbo.test_steps
         WHERE test_case_id = @test_case_id
       `);
@@ -282,8 +301,7 @@ exports.deleteTestCase = async (req, res) => {
     await pool
       .request()
       .input("description", sql.VarChar, `Test case ID ${id} deleted`)
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input("user_id", sql.Int, userId).query(`
         INSERT INTO audit_logs (action, module, description, user_id)
         VALUES ('DELETE', 'TEST_CASE', @description, @user_id)
       `);
@@ -291,6 +309,10 @@ exports.deleteTestCase = async (req, res) => {
     res.json({ success: true, message: "Test case deleted successfully" });
   } catch (err) {
     console.error("DELETE Test Case Error:", err);
-    res.status(500).json({ success: false, message: "Failed to delete test case", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete test case",
+      error: err.message,
+    });
   }
 };
