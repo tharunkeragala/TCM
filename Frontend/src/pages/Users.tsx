@@ -562,9 +562,9 @@ export default function Users() {
         </div>
 
         {/* ── Search & Filters ── */}
-        <div className="mb-4 space-y-3">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           {/* Search bar */}
-          <div className="relative">
+          <div className="relative w-full md:max-w-md">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none"
               fill="none"
