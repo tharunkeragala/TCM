@@ -8,12 +8,38 @@ exports.getTestSuites = async (req, res) => {
     const pool = await poolPromise;
 
     const request = pool.request();
-    let whereClause = "";
+
+    // 1. Get logged-in user's department from DB (reliable way)
+    const userResult = await pool.request()
+      .input("user_id", req.user.id)
+      .query(`
+        SELECT department_id 
+        FROM users 
+        WHERE id = @user_id
+      `);
+
+    const userDeptId = userResult.recordset[0]?.department_id;
+
+    // 2. Build conditions dynamically
+    let conditions = [];
 
     if (project_id) {
       request.input("project_id", sql.Int, project_id);
-      whereClause = "WHERE ts.project_id = @project_id";
+      conditions.push("ts.project_id = @project_id");
     }
+
+    // department filter
+    request.input("department_id", userDeptId);
+    conditions.push(`
+      (
+        u1.department_id = @department_id
+        OR u1.department_id IS NULL
+      )
+    `);
+
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
     const result = await request.query(`
       SELECT
@@ -22,14 +48,21 @@ exports.getTestSuites = async (req, res) => {
         u1.username AS created_by_name,
         u2.username AS updated_by_name
       FROM test_case_manager.dbo.test_suites ts
-      LEFT JOIN test_case_manager.dbo.projects p  ON p.id  = ts.project_id
-      LEFT JOIN test_case_manager.dbo.users u1    ON u1.id = ts.created_by
-      LEFT JOIN test_case_manager.dbo.users u2    ON u2.id = ts.updated_by
+      LEFT JOIN test_case_manager.dbo.projects p  
+        ON p.id = ts.project_id
+      LEFT JOIN test_case_manager.dbo.users u1    
+        ON u1.id = ts.created_by
+      LEFT JOIN test_case_manager.dbo.users u2    
+        ON u2.id = ts.updated_by
       ${whereClause}
       ORDER BY ts.id ASC
     `);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    res.status(200).json({
+      success: true,
+      data: result.recordset
+    });
+
   } catch (err) {
     console.error("GET Test Suites Error:", err);
     res.status(500).json({

@@ -6,27 +6,48 @@ exports.getProjects = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    const result = await pool.request().query(`
-      SELECT 
-        p.*,
-        u1.username AS created_by_name,
-        u2.username AS updated_by_name
-      FROM test_case_manager.dbo.projects p
-      LEFT JOIN test_case_manager.dbo.users u1 ON u1.id = p.created_by
-      LEFT JOIN test_case_manager.dbo.users u2 ON u2.id = p.updated_by
-      ORDER BY p.id ASC
-    `);
+    // 1. Get logged-in user's department from DB
+    const userResult = await pool.request()
+      .input("user_id", req.user.id)
+      .query(`
+        SELECT department_id 
+        FROM users 
+        WHERE id = @user_id
+      `);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    const userDeptId = userResult.recordset[0]?.department_id;
+
+    // 2. Main query with safe filtering
+    const result = await pool.request()
+      .input("department_id", userDeptId)
+      .query(`
+        SELECT 
+          p.*,
+          u1.username AS created_by_name,
+          u2.username AS updated_by_name
+        FROM test_case_manager.dbo.projects p
+        LEFT JOIN test_case_manager.dbo.users u1 
+          ON u1.id = p.created_by
+        LEFT JOIN test_case_manager.dbo.users u2 
+          ON u2.id = p.updated_by
+        WHERE 
+          u1.department_id = @department_id
+          OR u1.department_id IS NULL
+        ORDER BY p.id ASC
+      `);
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset
+    });
+
   } catch (err) {
     console.error("GET Projects Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch projects",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch projects",
+      error: err.message,
+    });
   }
 };
 

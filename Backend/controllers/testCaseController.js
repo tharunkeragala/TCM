@@ -8,30 +8,64 @@ exports.getTestCases = async (req, res) => {
     const pool = await poolPromise;
 
     const request = pool.request();
-    let whereClause = "";
+
+    // 1. Get logged-in user's department (reliable)
+    const userResult = await pool.request()
+      .input("user_id", req.user.id)
+      .query(`
+        SELECT department_id 
+        FROM users 
+        WHERE id = @user_id
+      `);
+
+    const userDeptId = userResult.recordset[0]?.department_id;
+
+    // 2. Build conditions dynamically
+    let conditions = [];
 
     if (suite_id) {
       request.input("suite_id", sql.Int, suite_id);
-      whereClause = "WHERE tc.suite_id = @suite_id";
+      conditions.push("tc.suite_id = @suite_id");
     }
 
-    const result = await request.query(`
-  SELECT 
-    tc.*, 
-    ts.suite_name, 
-    p.project_name,
-    u1.username AS created_by_name,
-    u2.username AS updated_by_name
-  FROM test_case_manager.dbo.test_cases tc
-  LEFT JOIN test_case_manager.dbo.test_suites ts ON ts.id = tc.suite_id
-  LEFT JOIN test_case_manager.dbo.projects p ON p.id = ts.project_id
-  LEFT JOIN test_case_manager.dbo.users u1 ON u1.id = tc.created_by
-  LEFT JOIN test_case_manager.dbo.users u2 ON u2.id = tc.updated_by
-  ${whereClause}
-  ORDER BY tc.id ASC
-`);
+    // department filter
+    request.input("department_id", userDeptId);
+    conditions.push(`
+      (
+        u1.department_id = @department_id
+        OR u1.department_id IS NULL
+      )
+    `);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
+
+    const result = await request.query(`
+      SELECT 
+        tc.*, 
+        ts.suite_name, 
+        p.project_name,
+        u1.username AS created_by_name,
+        u2.username AS updated_by_name
+      FROM test_case_manager.dbo.test_cases tc
+      LEFT JOIN test_case_manager.dbo.test_suites ts 
+        ON ts.id = tc.suite_id
+      LEFT JOIN test_case_manager.dbo.projects p 
+        ON p.id = ts.project_id
+      LEFT JOIN test_case_manager.dbo.users u1 
+        ON u1.id = tc.created_by
+      LEFT JOIN test_case_manager.dbo.users u2 
+        ON u2.id = tc.updated_by
+      ${whereClause}
+      ORDER BY tc.id ASC
+    `);
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset
+    });
+
   } catch (err) {
     console.error("GET Test Cases Error:", err);
     res.status(500).json({
