@@ -5,6 +5,19 @@ const sql = require("mssql");
 // HELPERS
 // ─────────────────────────────────────────────
 
+async function getUsername(pool, userId) {
+  const result = await pool
+    .request()
+    .input("id", sql.Int, userId)
+    .query(`
+      SELECT username
+      FROM test_case_manager.dbo.users
+      WHERE id = @id
+    `);
+
+  return result.recordset[0]?.username || `User ${userId}`;
+}
+
 // Insert a system comment (status change, ETA change, assignment)
 async function insertSystemComment(pool, taskId, message) {
   await pool
@@ -421,7 +434,13 @@ exports.updateTask = async (req, res) => {
       }
     }
 
-    await insertSystemComment(pool, id, `Task details updated by user ID ${userId}`);
+const username = req.user?.username || `User ${userId}`;
+
+await insertSystemComment(
+  pool,
+  id,
+  `Task details updated by ${username}`
+);
 
     await pool
       .request()
@@ -473,10 +492,13 @@ exports.updateTaskStatus = async (req, res) => {
         WHERE id = @id
       `);
 
-    await insertSystemComment(
-      pool, id,
-      `Status changed from "${oldStatus}" to "${status}" by user ID ${userId}`
-    );
+    const username = await getUsername(pool, userId);
+
+await insertSystemComment(
+  pool,
+  id,
+  `Status changed from "${oldStatus}" to "${status}" by ${username}`
+);
 
     // Notify all assignees + owner
     const participants = await pool
@@ -565,10 +587,15 @@ exports.extendETA = async (req, res) => {
         WHERE id = @id
       `);
 
-    await insertSystemComment(
-      pool, id,
-      `ETA extended from "${oldETA ? oldETA.toISOString().split("T")[0] : "not set"}" to "${new_eta}". Reason: ${reason}`
-    );
+    const username = await getUsername(pool, userId);
+
+await insertSystemComment(
+  pool,
+  id,
+  `ETA extended by ${username} from "${
+    oldETA ? oldETA.toISOString().split("T")[0] : "not set"
+  }" to "${new_eta}". Reason: ${reason}`
+);
 
     // Notify participants
     const participants = await pool

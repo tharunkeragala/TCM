@@ -28,6 +28,7 @@ import API from "../../services/api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { formatDateTime } from "../../utils/dateUtils";
+import type { JSX } from "react";
 
 // ─── Date Utilities ───────────────────────────────────────────────────────────
 function formatDate(value: string | null | undefined): string {
@@ -129,7 +130,8 @@ interface Task {
 
 const STATUS_CONFIG: Record<string, { color: string; icon: JSX.Element }> = {
   Pending: {
-    color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+    color:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
     icon: <FaClock className="w-3 h-3" />,
   },
   "In Progress": {
@@ -137,11 +139,13 @@ const STATUS_CONFIG: Record<string, { color: string; icon: JSX.Element }> = {
     icon: <FaSpinner className="w-3 h-3" />,
   },
   "On Hold": {
-    color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+    color:
+      "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
     icon: <FaPauseCircle className="w-3 h-3" />,
   },
   Completed: {
-    color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+    color:
+      "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
     icon: <FaCheckCircle className="w-3 h-3" />,
   },
   Cancelled: {
@@ -161,7 +165,9 @@ const PRIORITY_CONFIG: Record<string, string> = {
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Pending"];
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${cfg.color}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${cfg.color}`}
+    >
       {cfg.icon}
       {status}
     </span>
@@ -170,7 +176,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function PriorityBadge({ priority }: { priority: string }) {
   return (
-    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${PRIORITY_CONFIG[priority] || ""}`}>
+    <span
+      className={`px-2 py-1 text-xs font-semibold rounded-full ${PRIORITY_CONFIG[priority] || ""}`}
+    >
       {priority}
     </span>
   );
@@ -194,7 +202,8 @@ function TagList({ tags }: { tags: string | null }) {
 }
 
 function isOverdue(due_date: string | null, status: string) {
-  if (!due_date || status === "Completed" || status === "Cancelled") return false;
+  if (!due_date || status === "Completed" || status === "Cancelled")
+    return false;
   return new Date(due_date) < new Date();
 }
 
@@ -353,14 +362,20 @@ function ReminderBadge({
               min={1}
               value={reminderData.remind_before}
               onChange={(e) =>
-                setReminderData({ ...reminderData, remind_before: e.target.value })
+                setReminderData({
+                  ...reminderData,
+                  remind_before: e.target.value,
+                })
               }
               className="w-16 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <select
               value={reminderData.remind_unit}
               onChange={(e) =>
-                setReminderData({ ...reminderData, remind_unit: e.target.value })
+                setReminderData({
+                  ...reminderData,
+                  remind_unit: e.target.value,
+                })
               }
               className="flex-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -375,7 +390,10 @@ function ReminderBadge({
               type="checkbox"
               checked={reminderData.is_recurring}
               onChange={(e) =>
-                setReminderData({ ...reminderData, is_recurring: e.target.checked })
+                setReminderData({
+                  ...reminderData,
+                  is_recurring: e.target.checked,
+                })
               }
               className="rounded border-gray-300"
             />
@@ -439,96 +457,106 @@ function TaskAccordionRow({
 
   return (
     <div
-      className={`rounded-xl border transition-all duration-200 ${
-        overdue
-          ? "border-red-300 dark:border-red-700"
-          : "border-gray-200 dark:border-gray-700"
-      } bg-white dark:bg-gray-900 shadow-sm hover:shadow-md`}
-    >
-      {/* Header row */}
-      <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
-        onClick={handleExpand}
-      >
-        <button className="text-gray-400 dark:text-gray-500 flex-shrink-0">
-          {expanded ? (
-            <FaChevronUp className="w-3 h-3" />
-          ) : (
-            <FaChevronDown className="w-3 h-3" />
-          )}
-        </button>
+  className={`rounded-xl border transition-all duration-200 ${
+    overdue
+      ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-gray-900 hover:border-red-400 dark:hover:border-red-600"
+      : expanded
+        ? "border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-gray-800"
+        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800"
+  } shadow-sm hover:shadow-md`}
+>
+  {/* Header row */}
+  <div
+    className={`flex items-center gap-4 px-5 py-4 cursor-pointer select-none rounded-t-xl transition-colors duration-200 ${
+      expanded
+        ? "bg-blue-100 dark:bg-blue-900/30"
+        : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
+    }`}
+    onClick={handleExpand}
+  >
+    <button className="text-gray-500 dark:text-gray-400 flex-shrink-0">
+      {expanded ? (
+        <FaChevronUp className="w-4 h-4" />
+      ) : (
+        <FaChevronDown className="w-4 h-4" />
+      )}
+    </button>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {task.title}
-            </span>
-            {overdue && (
-              <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
-                <FaExclamationCircle className="w-3 h-3" />
-                Overdue
-              </span>
-            )}
-          </div>
-          {task.tags && <TagList tags={task.tags} />}
-        </div>
-
-        <div className="hidden md:flex items-center gap-3 flex-shrink-0">
-          {task.project_name && (
-            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full">
-              {task.project_name}
-            </span>
-          )}
-          <PriorityBadge priority={task.priority} />
-          <StatusBadge status={task.status} />
-          {task.due_date && (
-            <span className={`flex items-center gap-1 text-xs ${overdue ? "text-red-500" : "text-gray-500 dark:text-gray-400"}`}>
-              <FaCalendarAlt className="w-3 h-3" />
-              {formatDate(task.due_date)}
-            </span>
-          )}
-          {task.assignees && (
-            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-              <FaUser className="w-3 h-3" />
-              {task.assignees}
-            </span>
-          )}
-          {(task.comment_count ?? 0) > 0 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              💬 {task.comment_count}
-            </span>
-          )}
-        </div>
-
-        <div
-          className="flex items-center gap-3 flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <FaEye
-            className="cursor-pointer text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 w-3.5 h-3.5"
-            onClick={() => onView(task)}
-          />
-          <FaEdit
-            className="cursor-pointer text-blue-500 hover:text-blue-700 w-3.5 h-3.5"
-            onClick={() => onEdit(task)}
-          />
-          <FaTrash
-            className="cursor-pointer text-red-500 hover:text-red-700 w-3.5 h-3.5"
-            onClick={() => onDelete(task)}
-          />
-        </div>
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+          {task.title}
+        </span>
+        {overdue && (
+          <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-semibold">
+            <FaExclamationCircle className="w-4 h-4" />
+            Overdue
+          </span>
+        )}
       </div>
+      {task.tags && <TagList tags={task.tags} />}
+    </div>
 
-      {expanded && (
-        <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-4">
-          {loadingDetail ? (
-            <div className="text-sm text-gray-400 dark:text-gray-500 py-2">Loading...</div>
-          ) : detail ? (
-            <AccordionDetail detail={detail} />
-          ) : null}
-        </div>
+    <div className="hidden md:flex items-center gap-4 flex-shrink-0">
+      {task.project_name && (
+        <span className="text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
+          {task.project_name}
+        </span>
+      )}
+      <PriorityBadge priority={task.priority} />
+      <StatusBadge status={task.status} />
+      {task.due_date && (
+        <span
+          className={`flex items-center gap-1.5 text-xs font-medium ${overdue ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-400"}`}
+        >
+          <FaCalendarAlt className="w-4 h-4" />
+          {formatDate(task.due_date)}
+        </span>
+      )}
+      {task.assignees && (
+        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+          <FaUser className="w-4 h-4" />
+          {task.assignees}
+        </span>
+      )}
+      {(task.comment_count ?? 0) > 0 && (
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          💬 {task.comment_count}
+        </span>
       )}
     </div>
+
+    <div
+      className="flex items-center gap-4 flex-shrink-0"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <FaEye
+        className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 w-4 h-4 transition-colors"
+        onClick={() => onView(task)}
+      />
+      <FaEdit
+        className="cursor-pointer text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 w-4 h-4 transition-colors"
+        onClick={() => onEdit(task)}
+      />
+      <FaTrash
+        className="cursor-pointer text-red-500 hover:text-red-700 dark:hover:text-red-400 w-4 h-4 transition-colors"
+        onClick={() => onDelete(task)}
+      />
+    </div>
+  </div>
+
+  {expanded && (
+    <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-5">
+      {loadingDetail ? (
+        <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+          Loading...
+        </div>
+      ) : detail ? (
+        <AccordionDetail detail={detail} />
+      ) : null}
+    </div>
+  )}
+</div>
   );
 }
 
@@ -536,44 +564,84 @@ function AccordionDetail({ detail }: { detail: Task }) {
   return (
     <div className="space-y-4">
       {detail.description && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
+        <div className="border-l-2 border-blue-400 dark:border-gray-700 pl-3">
+          <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide mb-2">
             Description
           </p>
-          <p className="text-sm text-gray-700 dark:text-gray-300">{detail.description}</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            {detail.description}
+          </p>
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {detail.assignments && detail.assignments.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
-              Participants
+      {detail.comments &&
+        detail.comments.filter((c) => !c.is_system).length > 0 && (
+          <div className="border-l-2 border-blue-400 dark:border-gray-700 pl-3">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide mb-2">
+              Latest Comments
             </p>
-            <div className="flex space-x-4">
-              {detail.assignments
-                .filter((a) => a.role !== "Owner")
-                .map((a) => (
-                  <div key={a.id} className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300">
-                      {a.username?.[0]?.toUpperCase()}
+            <div className="space-y-2">
+              {detail.comments
+                .filter((c) => !c.is_system)
+                .slice(0, 3)
+                .map((c) => (
+                  <div key={c.id} className="flex gap-2">
+                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-400 flex-shrink-0">
+                      {c.created_by_name?.[0]?.toUpperCase() || "?"}
                     </div>
-                    <span className="text-xs text-gray-700 dark:text-gray-300">{a.username}</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">({a.role})</span>
+                    <div>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {c.created_by_name}
+                      </span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
+                        {formatDateTime(c.created_at)}
+                      </span>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                        {c.comment}
+                      </p>
+                    </div>
                   </div>
                 ))}
             </div>
           </div>
         )}
 
+      <div className="flex gap-4 pt-4">
+        {detail.assignments && detail.assignments.length > 0 && (
+          <div className="border-l-2 border-blue-400 dark:border-gray-700 pl-3">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide mb-2">
+              Participants
+            </p>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+              {detail.assignments
+                .filter((a) => a.role !== "Owner")
+                .map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 min-w-0">
+  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300 flex-shrink-0">
+    {a.username?.[0]?.toUpperCase()}
+  </div>
+  <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+    {a.username}
+  </span>
+  <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+    ({a.role})
+  </span>
+</div>
+                ))}
+            </div>
+          </div>
+        )}
+
         {detail.eta_history && detail.eta_history.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
+          <div className="border-l-2 border-blue-400 dark:border-gray-700 pl-3">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide mb-2">
               ETA History
             </p>
             <div className="space-y-1">
               {detail.eta_history.map((e) => (
-                <div key={e.id} className="text-xs text-gray-600 dark:text-gray-400">
+                <div
+                  key={e.id}
+                  className="text-xs text-gray-600 dark:text-gray-400"
+                >
                   <span className="line-through text-gray-400">
                     {e.old_eta ? formatDate(e.old_eta) : "—"}
                   </span>
@@ -589,17 +657,22 @@ function AccordionDetail({ detail }: { detail: Task }) {
         )}
 
         {detail.progress && detail.progress.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
+          <div className="border-l-2 border-blue-400 dark:border-gray-700 pl-3">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide mb-2">
               Recent Progress
             </p>
             <div className="space-y-1">
               {detail.progress.slice(0, 3).map((p) => (
-                <div key={p.id} className="text-xs text-gray-600 dark:text-gray-400">
-                  <span className="text-gray-400 dark:text-gray-500">
-                    {formatDateTime(p.created_at)} —{" "}
-                  </span>
-                  {p.comment}
+                <div
+                  key={p.id}
+                  className="text-xs text-gray-600 dark:text-gray-400"
+                >
+                  <div className="flex flex-col">
+  <span>{p.comment}</span>
+  <span className="text-gray-400 dark:text-gray-500">
+    {formatDateTime(p.created_at)}
+  </span>
+</div>
                 </div>
               ))}
             </div>
@@ -607,55 +680,32 @@ function AccordionDetail({ detail }: { detail: Task }) {
         )}
       </div>
 
-      {detail.comments && detail.comments.filter((c) => !c.is_system).length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
-            Latest Comments
-          </p>
-          <div className="space-y-2">
-            {detail.comments
-              .filter((c) => !c.is_system)
-              .slice(0, 3)
-              .map((c) => (
-                <div key={c.id} className="flex gap-2">
-                  <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-400 flex-shrink-0">
-                    {c.created_by_name?.[0]?.toUpperCase() || "?"}
+      {detail.comments &&
+        detail.comments.filter((c) => c.is_system).length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide mb-2">
+              Activity Log
+            </p>
+            <div className="space-y-1 border-l-2 border-blue-400 dark:border-gray-700 pl-3">
+              {detail.comments
+                .filter((c) => c.is_system)
+                .slice(0, 5)
+                .map((c) => (
+                  <div
+                    key={c.id}
+                    className="text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    <div className="flex flex-col">
+  <span>{c.comment}</span>
+  <span className="text-gray-400 dark:text-gray-600">
+    {formatDateTime(c.created_at)}
+  </span>
+</div>
                   </div>
-                  <div>
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                      {c.created_by_name}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
-                      {formatDateTime(c.created_at)}
-                    </span>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{c.comment}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+            </div>
           </div>
-        </div>
-      )}
-
-      {detail.comments && detail.comments.filter((c) => c.is_system).length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
-            Activity Log
-          </p>
-          <div className="space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
-            {detail.comments
-              .filter((c) => c.is_system)
-              .slice(0, 5)
-              .map((c) => (
-                <div key={c.id} className="text-xs text-gray-500 dark:text-gray-400">
-                  <span className="text-gray-400 dark:text-gray-600">
-                    {formatDateTime(c.created_at)} —{" "}
-                  </span>
-                  {c.comment}
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
@@ -678,7 +728,8 @@ function UserMultiSelect({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -686,7 +737,9 @@ function UserMultiSelect({
 
   const toggle = (id: number) => {
     onChange(
-      selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id],
+      selected.includes(id)
+        ? selected.filter((x) => x !== id)
+        : [...selected, id],
     );
   };
 
@@ -724,7 +777,9 @@ function UserMultiSelect({
                 className="rounded border-gray-300"
               />
               <div>
-                <p className="text-sm text-gray-900 dark:text-white">{u.username}</p>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {u.username}
+                </p>
                 {u.email && <p className="text-xs text-gray-400">{u.email}</p>}
               </div>
             </label>
@@ -738,7 +793,11 @@ function UserMultiSelect({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Tasks() {
-  const { data: tasks, loading, error } = useFetchWithAuth<Task[]>("/api/tasks");
+  const {
+    data: tasks,
+    loading,
+    error,
+  } = useFetchWithAuth<Task[]>("/api/tasks");
   const { data: projects } = useFetchWithAuth<Project[]>("/api/projects");
   const { data: allSuites } = useFetchWithAuth<TestSuite[]>("/api/test-suites");
   const { data: users } = useFetchWithAuth<User[]>("/api/dropdown/users");
@@ -753,7 +812,10 @@ export default function Tasks() {
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [formAlert, setFormAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [formAlert, setFormAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -771,7 +833,10 @@ export default function Tasks() {
   // Delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
-  const [deleteAlert, setDeleteAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [deleteAlert, setDeleteAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [deletingInProgress, setDeletingInProgress] = useState(false);
 
   // View modal
@@ -787,17 +852,25 @@ export default function Tasks() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [statusSubmitting, setStatusSubmitting] = useState(false);
-  const [statusAlert, setStatusAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [statusAlert, setStatusAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ETA extension
   const [showETAModal, setShowETAModal] = useState(false);
   const [etaTask, setEtaTask] = useState<Task | null>(null);
   const [etaData, setEtaData] = useState({ new_eta: "", reason: "" });
   const [etaSubmitting, setEtaSubmitting] = useState(false);
-  const [etaAlert, setEtaAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [etaAlert, setEtaAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const filteredSuites = allSuites?.filter((s) =>
-    selectedProjectFilter ? String(s.project_id) === selectedProjectFilter : true,
+    selectedProjectFilter
+      ? String(s.project_id) === selectedProjectFilter
+      : true,
   );
 
   const displayedTasks = (tasks || []).filter((t) => {
@@ -959,7 +1032,10 @@ export default function Tasks() {
       await API.delete(`/api/tasks/delete/${deletingTask.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setDeleteAlert({ type: "success", message: "Task deleted successfully." });
+      setDeleteAlert({
+        type: "success",
+        message: "Task deleted successfully.",
+      });
       setTimeout(() => {
         setShowDeleteModal(false);
         setDeletingTask(null);
@@ -1052,8 +1128,12 @@ export default function Tasks() {
             <FaBell className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Reminder</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{reminderToast}</p>
+            <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">
+              Reminder
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {reminderToast}
+            </p>
           </div>
           <button
             onClick={() => setReminderToast(null)}
@@ -1084,7 +1164,13 @@ export default function Tasks() {
               className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Statuses</option>
-              {["Pending", "In Progress", "On Hold", "Completed", "Cancelled"].map((s) => (
+              {[
+                "Pending",
+                "In Progress",
+                "On Hold",
+                "Completed",
+                "Cancelled",
+              ].map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
@@ -1124,7 +1210,9 @@ export default function Tasks() {
 
         {error && <Alert variant="error" title="Error" message={error} />}
         {loading && !error && (
-          <div className="text-gray-500 dark:text-gray-400 text-sm">Loading tasks...</div>
+          <div className="text-gray-500 dark:text-gray-400 text-sm">
+            Loading tasks...
+          </div>
         )}
         {!loading && !error && (
           <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -1164,7 +1252,11 @@ export default function Tasks() {
                 {editingTask ? "Edit Task" : "Create Task"}
               </h2>
               <button
-                onClick={() => { setShowModal(false); resetForm(); setEditingTask(null); }}
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                  setEditingTask(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -1188,7 +1280,9 @@ export default function Tasks() {
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
                 placeholder="e.g. Fix login bug on mobile"
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -1200,7 +1294,9 @@ export default function Tasks() {
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 placeholder="Task details..."
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
@@ -1214,10 +1310,17 @@ export default function Tasks() {
                 </label>
                 <select
                   value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as Task["priority"] })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      priority: e.target.value as Task["priority"],
+                    })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {["Low", "Medium", "High"].map((p) => <option key={p}>{p}</option>)}
+                  {["Low", "Medium", "High"].map((p) => (
+                    <option key={p}>{p}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -1227,10 +1330,20 @@ export default function Tasks() {
                 <DatePicker
                   selected={
                     formData.start_date
-                      ? (() => { const [y, m, d] = formData.start_date.split("-").map(Number); return new Date(y, m - 1, d); })()
+                      ? (() => {
+                          const [y, m, d] = formData.start_date
+                            .split("-")
+                            .map(Number);
+                          return new Date(y, m - 1, d);
+                        })()
                       : null
                   }
-                  onChange={(date: Date | null) => setFormData({ ...formData, start_date: toLocalDateString(date) })}
+                  onChange={(date: Date | null) =>
+                    setFormData({
+                      ...formData,
+                      start_date: toLocalDateString(date),
+                    })
+                  }
                   minDate={new Date()}
                   dateFormat="dd/MM/yyyy"
                   placeholderText="Select start date"
@@ -1244,10 +1357,20 @@ export default function Tasks() {
                 <DatePicker
                   selected={
                     formData.due_date
-                      ? (() => { const [y, m, d] = formData.due_date.split("-").map(Number); return new Date(y, m - 1, d); })()
+                      ? (() => {
+                          const [y, m, d] = formData.due_date
+                            .split("-")
+                            .map(Number);
+                          return new Date(y, m - 1, d);
+                        })()
                       : null
                   }
-                  onChange={(date: Date | null) => setFormData({ ...formData, due_date: toLocalDateString(date) })}
+                  onChange={(date: Date | null) =>
+                    setFormData({
+                      ...formData,
+                      due_date: toLocalDateString(date),
+                    })
+                  }
                   minDate={new Date()}
                   dateFormat="dd/MM/yyyy"
                   placeholderText="Select a date"
@@ -1265,13 +1388,19 @@ export default function Tasks() {
                   value={selectedProjectFilter}
                   onChange={(e) => {
                     setSelectedProjectFilter(e.target.value);
-                    setFormData((prev) => ({ ...prev, project_id: e.target.value, suite_id: "" }));
+                    setFormData((prev) => ({
+                      ...prev,
+                      project_id: e.target.value,
+                      suite_id: "",
+                    }));
                   }}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">-- None --</option>
                   {projects?.map((p) => (
-                    <option key={p.id} value={p.id}>{p.project_name}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.project_name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1281,12 +1410,16 @@ export default function Tasks() {
                 </label>
                 <select
                   value={formData.suite_id}
-                  onChange={(e) => setFormData({ ...formData, suite_id: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, suite_id: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">-- None --</option>
                   {filteredSuites?.map((s) => (
-                    <option key={s.id} value={s.id}>{s.suite_name}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.suite_name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1304,12 +1437,16 @@ export default function Tasks() {
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Tags{" "}
-                <span className="text-xs text-gray-400 font-normal">(comma-separated)</span>
+                <span className="text-xs text-gray-400 font-normal">
+                  (comma-separated)
+                </span>
               </label>
               <input
                 type="text"
                 value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, tags: e.target.value })
+                }
                 placeholder="e.g. regression, smoke, auth"
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -1318,7 +1455,11 @@ export default function Tasks() {
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowModal(false); resetForm(); setEditingTask(null); }}
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                  setEditingTask(null);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
               >
                 Cancel
@@ -1329,8 +1470,12 @@ export default function Tasks() {
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
               >
                 {submitting
-                  ? editingTask ? "Updating..." : "Creating..."
-                  : editingTask ? "Update" : "Create"}
+                  ? editingTask
+                    ? "Updating..."
+                    : "Creating..."
+                  : editingTask
+                    ? "Update"
+                    : "Create"}
               </button>
             </div>
           </div>
@@ -1343,7 +1488,6 @@ export default function Tasks() {
       {showViewModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
-
             {/* Header */}
             <div className="flex items-start justify-between gap-3 mb-5">
               <div className="flex-1 min-w-0">
@@ -1398,7 +1542,10 @@ export default function Tasks() {
                   </>
                 )}
                 <button
-                  onClick={() => { setShowViewModal(false); setViewingTask(null); }}
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setViewingTask(null);
+                  }}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
                 >
                   &times;
@@ -1430,9 +1577,15 @@ export default function Tasks() {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Change Status</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Change Status
+              </h2>
               <button
-                onClick={() => { setShowStatusModal(false); setStatusTask(null); setStatusAlert(null); }}
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setStatusTask(null);
+                  setStatusAlert(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -1449,7 +1602,9 @@ export default function Tasks() {
             )}
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Task:{" "}
-              <span className="font-medium text-gray-900 dark:text-white">{statusTask.title}</span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                {statusTask.title}
+              </span>
             </p>
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1460,14 +1615,24 @@ export default function Tasks() {
                 onChange={(e) => setNewStatus(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {["Pending", "In Progress", "On Hold", "Completed", "Cancelled"].map((s) => (
+                {[
+                  "Pending",
+                  "In Progress",
+                  "On Hold",
+                  "Completed",
+                  "Cancelled",
+                ].map((s) => (
                   <option key={s}>{s}</option>
                 ))}
               </select>
             </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowStatusModal(false); setStatusTask(null); setStatusAlert(null); }}
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setStatusTask(null);
+                  setStatusAlert(null);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
               >
                 Cancel
@@ -1491,9 +1656,16 @@ export default function Tasks() {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Extend ETA</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Extend ETA
+              </h2>
               <button
-                onClick={() => { setShowETAModal(false); setEtaTask(null); setEtaData({ new_eta: "", reason: "" }); setEtaAlert(null); }}
+                onClick={() => {
+                  setShowETAModal(false);
+                  setEtaTask(null);
+                  setEtaData({ new_eta: "", reason: "" });
+                  setEtaAlert(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -1510,7 +1682,9 @@ export default function Tasks() {
             )}
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
               Task:{" "}
-              <span className="font-medium text-gray-900 dark:text-white">{etaTask.title}</span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                {etaTask.title}
+              </span>
             </p>
             {etaTask.due_date && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
@@ -1524,10 +1698,17 @@ export default function Tasks() {
               <DatePicker
                 selected={
                   etaData.new_eta
-                    ? (() => { const [y, m, d] = etaData.new_eta.split("-").map(Number); return new Date(y, m - 1, d); })()
+                    ? (() => {
+                        const [y, m, d] = etaData.new_eta
+                          .split("-")
+                          .map(Number);
+                        return new Date(y, m - 1, d);
+                      })()
                     : null
                 }
-                onChange={(date: Date | null) => setEtaData({ ...etaData, new_eta: toLocalDateString(date) })}
+                onChange={(date: Date | null) =>
+                  setEtaData({ ...etaData, new_eta: toLocalDateString(date) })
+                }
                 minDate={new Date()}
                 dateFormat="dd/MM/yyyy"
                 placeholderText="Select ETA"
@@ -1540,7 +1721,9 @@ export default function Tasks() {
               </label>
               <textarea
                 value={etaData.reason}
-                onChange={(e) => setEtaData({ ...etaData, reason: e.target.value })}
+                onChange={(e) =>
+                  setEtaData({ ...etaData, reason: e.target.value })
+                }
                 placeholder="Why is the ETA being extended?"
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
@@ -1548,7 +1731,12 @@ export default function Tasks() {
             </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowETAModal(false); setEtaTask(null); setEtaData({ new_eta: "", reason: "" }); setEtaAlert(null); }}
+                onClick={() => {
+                  setShowETAModal(false);
+                  setEtaTask(null);
+                  setEtaData({ new_eta: "", reason: "" });
+                  setEtaAlert(null);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
               >
                 Cancel
@@ -1572,9 +1760,15 @@ export default function Tasks() {
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Task</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Delete Task
+              </h2>
               <button
-                onClick={() => { setShowDeleteModal(false); setDeletingTask(null); setDeleteAlert(null); }}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletingTask(null);
+                  setDeleteAlert(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
               >
                 &times;
@@ -1591,21 +1785,38 @@ export default function Tasks() {
             )}
             <div className="flex items-start gap-3 mb-6">
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <svg
+                  className="w-5 h-5 text-red-600 dark:text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  />
                 </svg>
               </div>
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   Are you sure you want to delete task{" "}
-                  <span className="font-semibold text-gray-900 dark:text-white">"{deletingTask.title}"</span>?
-                  All comments, progress logs, assignments and attachments will be permanently removed.
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    "{deletingTask.title}"
+                  </span>
+                  ? All comments, progress logs, assignments and attachments
+                  will be permanently removed.
                 </p>
               </div>
             </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowDeleteModal(false); setDeletingTask(null); setDeleteAlert(null); }}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletingTask(null);
+                  setDeleteAlert(null);
+                }}
                 disabled={deletingInProgress}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
               >
@@ -1644,10 +1855,38 @@ function TaskDetailView({
   const [progressText, setProgressText] = useState("");
   const [commentText, setCommentText] = useState("");
   const [mentions, setMentions] = useState<number[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleMentionClick = (userId: number, username: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const mention = `@${username.split(" ")[0]} `;
+    const newText =
+      commentText.substring(0, start) + mention + commentText.substring(end);
+    setCommentText(newText);
+    setMentions((prev) =>
+      prev.includes(userId)
+        ? prev.filter((x) => x !== userId)
+        : [...prev, userId],
+    );
+    setTimeout(() => {
+      textarea.focus();
+      const cursor = start + mention.length;
+      textarea.setSelectionRange(cursor, cursor);
+    }, 0);
+  };
   const [submittingP, setSubmittingP] = useState(false);
   const [submittingC, setSubmittingC] = useState(false);
-  const [progressAlert, setProgressAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [commentAlert, setCommentAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [progressAlert, setProgressAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [commentAlert, setCommentAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Reminder state
   const [showReminderForm, setShowReminderForm] = useState(false);
@@ -1657,7 +1896,10 @@ function TaskDetailView({
     is_recurring: false,
   });
   const [submittingR, setSubmittingR] = useState(false);
-  const [reminderAlert, setReminderAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [reminderAlert, setReminderAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [existingReminder, setExistingReminder] = useState<{
     id: number;
     remind_before: number;
@@ -1706,7 +1948,10 @@ function TaskDetailView({
       setProgressAlert({ type: "success", message: "Progress added." });
       onProgressAdded();
     } catch (err: any) {
-      setProgressAlert({ type: "error", message: err.response?.data?.message || "Failed." });
+      setProgressAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed.",
+      });
     } finally {
       setSubmittingP(false);
     }
@@ -1729,7 +1974,10 @@ function TaskDetailView({
       setCommentAlert({ type: "success", message: "Comment added." });
       onCommentAdded();
     } catch (err: any) {
-      setCommentAlert({ type: "error", message: err.response?.data?.message || "Failed." });
+      setCommentAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed.",
+      });
     } finally {
       setSubmittingC(false);
     }
@@ -1756,7 +2004,10 @@ function TaskDetailView({
       });
       if (res.data.success) setExistingReminder(res.data.reminder);
     } catch (err: any) {
-      setReminderAlert({ type: "error", message: err.response?.data?.message || "Failed." });
+      setReminderAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed.",
+      });
     } finally {
       setSubmittingR(false);
     }
@@ -1930,11 +2181,11 @@ function TaskDetailView({
           <div className="max-h-40 overflow-y-auto space-y-2 border-l-2 border-blue-200 dark:border-blue-800 pl-4">
             {task.progress.map((p) => (
               <div key={p.id}>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  {p.created_by_name} — {formatDateTime(p.created_at)}
-                </p>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   {p.comment}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  {p.created_by_name} — {formatDateTime(p.created_at)}
                 </p>
               </div>
             ))}
@@ -1962,6 +2213,7 @@ function TaskDetailView({
         )}
         <div className="space-y-2 mb-3">
           <textarea
+            ref={textareaRef}
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             placeholder="Add a comment... (use @name to mention)"
@@ -1973,13 +2225,7 @@ function TaskDetailView({
               {users.map((u) => (
                 <button
                   key={u.id}
-                  onClick={() =>
-                    setMentions((prev) =>
-                      prev.includes(u.id)
-                        ? prev.filter((x) => x !== u.id)
-                        : [...prev, u.id],
-                    )
-                  }
+                  onClick={() => handleMentionClick(u.id, u.username)}
                   className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                     mentions.includes(u.id)
                       ? "bg-indigo-600 text-white border-indigo-600"
@@ -2022,6 +2268,9 @@ function TaskDetailView({
                     {c.created_by_name?.[0]?.toUpperCase() || "?"}
                   </div>
                   <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {c.comment}
+                    </p>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
                         {c.created_by_name}
@@ -2030,9 +2279,6 @@ function TaskDetailView({
                         {formatDateTime(c.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {c.comment}
-                    </p>
                   </div>
                 </div>
               ),

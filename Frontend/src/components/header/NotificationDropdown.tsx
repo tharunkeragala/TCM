@@ -22,15 +22,28 @@ export default function NotificationDropdown() {
   return (
     <div className="relative">
       <button
-        className="relative flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full dropdown-toggle hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+        className="relative flex items-center justify-center transition-colors border rounded-full dropdown-toggle h-11 w-11"
+style={{
+  background: "rgba(255,255,255,0.04)",
+  borderColor: "rgba(255,255,255,0.09)",
+  color: "rgba(148,172,215,0.65)",
+}}
+onMouseEnter={(e) => {
+  (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.09)";
+  (e.currentTarget as HTMLButtonElement).style.color = "rgba(190,215,255,0.85)";
+}}
+onMouseLeave={(e) => {
+  (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)";
+  (e.currentTarget as HTMLButtonElement).style.color = "rgba(148,172,215,0.65)";
+}}
         onClick={handleClick}
       >
         <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-            !notifying ? "hidden" : "flex"
-          }`}
+          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full ${!notifying ? "hidden" : "flex"}`}
+style={{ background: "#5b9cf6", boxShadow: "0 0 0 1.5px rgb(8,14,28)" }}
         >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
+          <span className="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping"
+style={{ background: "#5b9cf6" }}></span>
         </span>
         <svg
           className="fill-current"
