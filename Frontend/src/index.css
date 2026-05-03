@@ -790,3 +790,71 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+/* Custom scrollbar for the entire UI */
+::-webkit-scrollbar {
+  width: 5px; /* Width of the scrollbar */
+  height: 8px; /* Height of the scrollbar (for horizontal scrolling) */
+}
+
+/* Track (background) of the scrollbar */
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Light background for light mode */
+  border-radius: 10px;
+}
+
+/* Handle (thumb) of the scrollbar */
+::-webkit-scrollbar-thumb {
+  background: #4a90e2; /* Blue color for the thumb */
+  border-radius: 10px;
+  transition: background-color 0.3s ease;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #357ab7; /* Darker blue on hover */
+}
+
+/* Scrollbar corner */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode scrollbar */
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: #2c2c2c; /* Dark background */
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #3a5bbd; /* Lighter blue for dark mode */
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2B448D; /* Darker shade on hover */
+  }
+}
+
+/* Custom scrollbar for light mode */
+@media (prefers-color-scheme: light) {
+  ::-webkit-scrollbar-track {
+    background: #e0e0e0; /* Gray/ash color for the track */
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #4a90e2; /* Blue color for the thumb */
+    border-radius: 10px;
+    transition: background-color 0.3s ease;
+  }
+
+  /* Handle on hover */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #357ab7; /* Darker blue on hover */
+  }
+
+  /* Scrollbar corner */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

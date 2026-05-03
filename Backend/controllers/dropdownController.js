@@ -79,3 +79,32 @@ exports.getTeamsByDepartment = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch teams", error: err.message });
   }
 };
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+exports.getUsersDropdown = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    const result = await pool.request().query(`
+      SELECT 
+        id,
+        username
+      FROM test_case_manager.dbo.users
+      WHERE is_active = 1
+      ORDER BY username ASC
+    `);
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+    console.error("GET Users Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: err.message
+    });
+  }
+};

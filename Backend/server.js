@@ -7,6 +7,14 @@ require("./config/db");
 const app = express();
 const publicPath = path.join(__dirname, "public");
 
+const cron = require("node-cron");
+const { processReminders } = require("./controllers/reminderProcessor");
+
+// Run every hour
+cron.schedule("0 * * * *", () => {
+  processReminders();
+});
+
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
@@ -21,6 +29,9 @@ app.use("/api/auth", authRoutes);
 // User Managements
 const userRoutes = require("./routes/userRoutes");
 app.use("/api/users", userRoutes);
+
+// Task Management
+app.use("/api/tasks", require("./routes/taskRoutes"));
 
 // Department
 const departmentRoutes = require("./routes/departmentRoutes");

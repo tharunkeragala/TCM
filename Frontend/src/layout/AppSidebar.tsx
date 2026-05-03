@@ -42,6 +42,11 @@ const navItems: NavItem[] = [
       // { name: "Teams", path: "/teams", pro: false },
     ],
   },
+  {
+    icon: <ListIcon />,
+    name: "Tasks",
+    path: "/tasks",
+  },
 
   {
     icon: <CalenderIcon />,

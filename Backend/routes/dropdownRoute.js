@@ -7,5 +7,6 @@ router.get("/roles",                        verifyToken, dropdownController.getR
 router.get("/departments",                  verifyToken, dropdownController.getDepartmentsDropdown);
 router.get("/teams",                        verifyToken, dropdownController.getTeamsDropdown);
 router.get("/teams/department/:id",         verifyToken, dropdownController.getTeamsByDepartment);
+router.get("/users",                        verifyToken, dropdownController.getUsersDropdown);
 
 module.exports = router;

@@ -21,7 +21,8 @@ export default function Departments() {
     error,
   } = useFetchWithAuth<Department[]>("/api/departments");
 
-  const { data: users } = useFetchWithAuth<any[]>("/api/users");
+    const { data: users } = useFetchWithAuth<any[]>("/api/dropdown/users");
+  
 
   const [showModal, setShowModal] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
