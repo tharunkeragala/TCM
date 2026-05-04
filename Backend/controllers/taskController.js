@@ -57,17 +57,67 @@ exports.getTasks = async (req, res) => {
     const userId = req.user?.id || null;
     const pool   = await poolPromise;
 
+    // 🔹 Step 1: Check role (same as dashboard)
+    const roleResult = await pool
+      .request()
+      .input("user_id", sql.Int, userId)
+      .query(`
+        SELECT d.id AS dept_id
+        FROM test_case_manager.dbo.departments d
+        WHERE d.department_head_id = @user_id
+      `);
+
+    const isDeptHead = roleResult.recordset.length > 0;
+    const deptId     = isDeptHead ? roleResult.recordset[0].dept_id : null;
+
     const request = pool.request();
     let where = "WHERE 1=1";
 
+    // 🔹 Step 2: Apply role-based visibility
+    if (isDeptHead) {
+      request.input("dept_id", sql.Int, deptId);
+      request.input("user_id", sql.Int, userId);
+
+      where += `
+        AND (
+          t.created_by IN (
+            SELECT u.id
+            FROM test_case_manager.dbo.users u
+            WHERE u.department_id = @dept_id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM test_case_manager.dbo.task_assignments ta
+            WHERE ta.task_id = t.id AND ta.user_id = @user_id
+          )
+        )
+      `;
+    } else {
+      request.input("user_id", sql.Int, userId);
+
+      where += `
+        AND (
+          t.created_by = @user_id
+          OR EXISTS (
+            SELECT 1
+            FROM test_case_manager.dbo.task_assignments ta
+            WHERE ta.task_id = t.id AND ta.user_id = @user_id
+          )
+        )
+      `;
+    }
+
+    // 🔹 Step 3: Apply additional filters
     if (status) {
       request.input("status", sql.VarChar, status);
       where += " AND t.status = @status";
     }
+
     if (priority) {
       request.input("priority", sql.VarChar, priority);
       where += " AND t.priority = @priority";
     }
+
     if (assigned_to_me === "true" && userId) {
       request.input("me", sql.Int, userId);
       where += ` AND EXISTS (
@@ -75,11 +125,13 @@ exports.getTasks = async (req, res) => {
         WHERE ta.task_id = t.id AND ta.user_id = @me
       )`;
     }
+
     if (search) {
       request.input("search", sql.NVarChar, `%${search}%`);
       where += " AND (t.title LIKE @search OR t.description LIKE @search)";
     }
 
+    // 🔹 Step 4: Final query
     const result = await request.query(`
       SELECT
         t.*,
@@ -99,18 +151,27 @@ exports.getTasks = async (req, res) => {
           WHERE tc.task_id = t.id AND tc.is_system = 0
         ) AS comment_count
       FROM test_case_manager.dbo.tasks t
-      LEFT JOIN test_case_manager.dbo.users u1      ON u1.id = t.created_by
-      LEFT JOIN test_case_manager.dbo.users u2      ON u2.id = t.updated_by
-      LEFT JOIN test_case_manager.dbo.projects p    ON p.id  = t.project_id
+      LEFT JOIN test_case_manager.dbo.users u1       ON u1.id = t.created_by
+      LEFT JOIN test_case_manager.dbo.users u2       ON u2.id = t.updated_by
+      LEFT JOIN test_case_manager.dbo.projects p     ON p.id  = t.project_id
       LEFT JOIN test_case_manager.dbo.test_suites ts ON ts.id = t.suite_id
       ${where}
       ORDER BY t.created_at DESC
     `);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    res.status(200).json({
+      success: true,
+      is_dept_head: isDeptHead,
+      data: result.recordset
+    });
+
   } catch (err) {
     console.error("GET Tasks Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch tasks", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch tasks",
+      error: err.message
+    });
   }
 };
 
@@ -976,5 +1037,107 @@ exports.markNotificationsRead = async (req, res) => {
   } catch (err) {
     console.error("MARK Notifications Error:", err);
     res.status(500).json({ success: false, message: "Failed to mark notifications", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET TASK DASHBOARD STATS
+// Returns counts scoped to the logged-in user:
+//   - tasks they created
+//   - tasks assigned to them
+//   - if dept head: all tasks created by users in same department
+// ─────────────────────────────────────────────
+exports.getTaskDashboardStats = async (req, res) => {
+  try {
+    const userId = req.user?.id || null;
+    const pool   = await poolPromise;
+
+    // Check if the user is a department head
+    const roleResult = await pool
+      .request()
+      .input("user_id", sql.Int, userId)
+      .query(`
+        SELECT d.id AS dept_id, d.department_name AS dept_name
+        FROM test_case_manager.dbo.departments d
+        WHERE d.department_head_id = @user_id
+      `);
+
+    const isDeptHead = roleResult.recordset.length > 0;
+    const deptId     = isDeptHead ? roleResult.recordset[0].dept_id : null;
+
+    let statsQuery;
+
+    if (isDeptHead) {
+      statsQuery = await pool
+        .request()
+        .input("user_id", sql.Int, userId)
+        .input("dept_id", sql.Int, deptId)
+        .query(`
+          SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN t.status = 'Pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress,
+            SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN t.status = 'On Hold' THEN 1 ELSE 0 END) AS on_hold,
+            SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
+          FROM test_case_manager.dbo.tasks t
+          WHERE
+            t.created_by IN (
+              SELECT u.id
+              FROM test_case_manager.dbo.users u
+              WHERE u.department_id = @dept_id
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM test_case_manager.dbo.task_assignments ta
+              WHERE ta.task_id = t.id AND ta.user_id = @user_id
+            )
+        `);
+    } else {
+      statsQuery = await pool
+        .request()
+        .input("user_id", sql.Int, userId)
+        .query(`
+          SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN t.status = 'Pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress,
+            SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN t.status = 'On Hold' THEN 1 ELSE 0 END) AS on_hold,
+            SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
+          FROM test_case_manager.dbo.tasks t
+          WHERE
+            t.created_by = @user_id
+            OR EXISTS (
+              SELECT 1
+              FROM test_case_manager.dbo.task_assignments ta
+              WHERE ta.task_id = t.id AND ta.user_id = @user_id
+            )
+        `);
+    }
+
+    const stats = statsQuery.recordset[0];
+
+    res.status(200).json({
+      success: true,
+      is_dept_head: isDeptHead,
+      dept_name: isDeptHead ? roleResult.recordset[0].dept_name : null,
+      data: {
+        total:       stats.total       || 0,
+        pending:     stats.pending     || 0,
+        in_progress: stats.in_progress || 0,
+        completed:   stats.completed   || 0,
+        on_hold:     stats.on_hold     || 0,
+        cancelled:   stats.cancelled   || 0,
+      },
+    });
+
+  } catch (err) {
+    console.error("GET Dashboard Stats Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch dashboard stats",
+      error: err.message,
+    });
   }
 };

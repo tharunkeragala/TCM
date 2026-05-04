@@ -803,7 +803,9 @@ export default function Tasks() {
   const { data: users } = useFetchWithAuth<User[]>("/api/dropdown/users");
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterStatus, setFilterStatus] = useState(
+  () => new URLSearchParams(window.location.search).get("status") ?? ""
+);
   const [filterPriority, setFilterPriority] = useState("");
   const [filterAssignedMe, setFilterAssignedMe] = useState(false);
   const [search, setSearch] = useState("");
