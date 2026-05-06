@@ -207,7 +207,7 @@ function isOverdue(due_date: string | null, status: string) {
   return new Date(due_date) < new Date();
 }
 
-// ─── Reminder Badge (compact, sits in the View modal top bar) ────────────────
+// ─── Reminder Badge ───────────────────────────────────────────────────────────
 
 function ReminderBadge({
   taskId,
@@ -233,7 +233,6 @@ function ReminderBadge({
   const [submitting, setSubmitting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close popover on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node))
@@ -243,7 +242,6 @@ function ReminderBadge({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Fetch on mount
   useEffect(() => {
     const fetchReminder = async () => {
       setLoading(true);
@@ -280,7 +278,6 @@ function ReminderBadge({
       await API.post(`/api/tasks/${taskId}/reminders`, reminderData, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Re-fetch updated reminder
       const res = await API.get(`/api/tasks/${taskId}/latestreminders`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -300,7 +297,6 @@ function ReminderBadge({
 
   return (
     <div ref={ref} className="relative">
-      {/* Badge button */}
       <button
         onClick={() => setShowPopover(!showPopover)}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
@@ -327,10 +323,8 @@ function ReminderBadge({
         )}
       </button>
 
-      {/* Popover */}
       {showPopover && (
         <div className="absolute right-0 top-full mt-2 z-50 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-3 space-y-3">
-          {/* Current reminder info */}
           {reminder && (
             <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-2.5 py-2">
               <FaBell className="w-3 h-3 text-blue-500 flex-shrink-0" />
@@ -347,15 +341,11 @@ function ReminderBadge({
               </div>
             </div>
           )}
-
-          {/* Warning if updating */}
           {reminder && (
             <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg px-2 py-1.5">
               ⚠️ Saving will replace the current reminder.
             </p>
           )}
-
-          {/* Form */}
           <div className="flex gap-2">
             <input
               type="number"
@@ -384,7 +374,6 @@ function ReminderBadge({
               <option value="months">Months</option>
             </select>
           </div>
-
           <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
             <input
               type="checkbox"
@@ -399,7 +388,6 @@ function ReminderBadge({
             />
             Recurring
           </label>
-
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => setShowPopover(false)}
@@ -413,6 +401,273 @@ function ReminderBadge({
               className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg"
             >
               {submitting ? "..." : reminder ? "Update" : "Set"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Status Change Badge (inline popover, like ReminderBadge) ─────────────────
+
+function StatusChangeBadge({
+  task,
+  onToast,
+  onStatusChanged,
+}: {
+  task: Task;
+  onToast: (msg: string) => void;
+  onStatusChanged: () => void;
+}) {
+  const [showPopover, setShowPopover] = useState(false);
+  const [newStatus, setNewStatus] = useState(task.status);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setShowPopover(false);
+        setError(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSave = async () => {
+    if (newStatus === task.status) {
+      setShowPopover(false);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      await API.put(
+        `/api/tasks/status/${task.id}`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setShowPopover(false);
+      onToast(`Status updated to "${newStatus}"`);
+      onStatusChanged();
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to update status.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cfg = STATUS_CONFIG[task.status] || STATUS_CONFIG["Pending"];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setShowPopover(!showPopover)}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40`}
+      >
+        {cfg.icon}
+        <span>Change Status</span>
+        <FaChevronDown className="w-2.5 h-2.5 ml-0.5" />
+      </button>
+
+      {showPopover && (
+        <div className="absolute right-0 top-full mt-2 z-50 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-3 space-y-3">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Change Status
+          </p>
+
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2.5 py-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">Current:</span>
+            <StatusBadge status={task.status} />
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-lg px-2 py-1.5">
+              {error}
+            </p>
+          )}
+
+          <select
+            value={newStatus}
+            onChange={(e) => setNewStatus(e.target.value as Task["status"])}
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {["Pending", "In Progress", "On Hold", "Completed", "Cancelled"].map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => { setShowPopover(false); setError(null); }}
+              className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={submitting}
+              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg"
+            >
+              {submitting ? "..." : "Update"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Extend ETA Badge (inline popover, like ReminderBadge) ────────────────────
+
+function ExtendETABadge({
+  task,
+  onToast,
+  onETAChanged,
+}: {
+  task: Task;
+  onToast: (msg: string) => void;
+  onETAChanged: () => void;
+}) {
+  const [showPopover, setShowPopover] = useState(false);
+  const [etaData, setEtaData] = useState({ new_eta: "", reason: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setShowPopover(false);
+        setError(null);
+        setEtaData({ new_eta: "", reason: "" });
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSave = async () => {
+    if (!etaData.new_eta) {
+      setError("New ETA is required.");
+      return;
+    }
+    if (!etaData.reason.trim()) {
+      setError("Reason is required.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      await API.put(`/api/tasks/eta/${task.id}`, etaData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setShowPopover(false);
+      setEtaData({ new_eta: "", reason: "" });
+      onToast(`ETA extended to ${formatDate(etaData.new_eta)}`);
+      onETAChanged();
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to extend ETA.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setShowPopover(!showPopover)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40"
+      >
+        <FaCalendarAlt className="w-3 h-3" />
+        <span>Extend ETA</span>
+        <FaChevronDown className="w-2.5 h-2.5 ml-0.5" />
+      </button>
+
+      {showPopover && (
+        <div className="absolute right-0 top-full mt-2 z-50 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-3 space-y-3">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Extend ETA
+          </p>
+
+          {task.due_date && (
+            <div className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg px-2.5 py-2">
+              <FaCalendarAlt className="w-3 h-3 text-orange-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Current ETA</p>
+                <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                  {formatDate(task.due_date)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-lg px-2 py-1.5">
+              {error}
+            </p>
+          )}
+
+          <div>
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              New ETA <span className="text-red-500">*</span>
+            </p>
+            <DatePicker
+              selected={
+                etaData.new_eta
+                  ? (() => {
+                      const [y, m, d] = etaData.new_eta.split("-").map(Number);
+                      return new Date(y, m - 1, d);
+                    })()
+                  : null
+              }
+              onChange={(date: Date | null) =>
+                setEtaData({ ...etaData, new_eta: toLocalDateString(date) })
+              }
+              minDate={new Date()}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="Select ETA"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Reason <span className="text-red-500">*</span>
+            </p>
+            <textarea
+              value={etaData.reason}
+              onChange={(e) => setEtaData({ ...etaData, reason: e.target.value })}
+              placeholder="Why is the ETA being extended?"
+              rows={2}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => {
+                setShowPopover(false);
+                setError(null);
+                setEtaData({ new_eta: "", reason: "" });
+              }}
+              className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={submitting}
+              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-60 rounded-lg"
+            >
+              {submitting ? "..." : "Extend"}
             </button>
           </div>
         </div>
@@ -457,106 +712,105 @@ function TaskAccordionRow({
 
   return (
     <div
-  className={`rounded-xl border transition-all duration-200 ${
-    overdue
-      ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-gray-900 hover:border-red-400 dark:hover:border-red-600"
-      : expanded
-        ? "border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-gray-800"
-        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800"
-  } shadow-sm hover:shadow-md`}
->
-  {/* Header row */}
-  <div
-    className={`flex items-center gap-4 px-5 py-4 cursor-pointer select-none rounded-t-xl transition-colors duration-200 ${
-      expanded
-        ? "bg-blue-100 dark:bg-blue-900/30"
-        : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
-    }`}
-    onClick={handleExpand}
-  >
-    <button className="text-gray-500 dark:text-gray-400 flex-shrink-0">
-      {expanded ? (
-        <FaChevronUp className="w-4 h-4" />
-      ) : (
-        <FaChevronDown className="w-4 h-4" />
-      )}
-    </button>
-
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-          {task.title}
-        </span>
-        {overdue && (
-          <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-semibold">
-            <FaExclamationCircle className="w-4 h-4" />
-            Overdue
-          </span>
-        )}
-      </div>
-      {task.tags && <TagList tags={task.tags} />}
-    </div>
-
-    <div className="hidden md:flex items-center gap-4 flex-shrink-0">
-      {task.project_name && (
-        <span className="text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
-          {task.project_name}
-        </span>
-      )}
-      <PriorityBadge priority={task.priority} />
-      <StatusBadge status={task.status} />
-      {task.due_date && (
-        <span
-          className={`flex items-center gap-1.5 text-xs font-medium ${overdue ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-400"}`}
-        >
-          <FaCalendarAlt className="w-4 h-4" />
-          {formatDate(task.due_date)}
-        </span>
-      )}
-      {task.assignees && (
-        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-          <FaUser className="w-4 h-4" />
-          {task.assignees}
-        </span>
-      )}
-      {(task.comment_count ?? 0) > 0 && (
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          💬 {task.comment_count}
-        </span>
-      )}
-    </div>
-
-    <div
-      className="flex items-center gap-4 flex-shrink-0"
-      onClick={(e) => e.stopPropagation()}
+      className={`rounded-xl border transition-all duration-200 ${
+        overdue
+          ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-gray-900 hover:border-red-400 dark:hover:border-red-600"
+          : expanded
+            ? "border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-gray-800"
+            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800"
+      } shadow-sm hover:shadow-md`}
     >
-      <FaEye
-        className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 w-4 h-4 transition-colors"
-        onClick={() => onView(task)}
-      />
-      <FaEdit
-        className="cursor-pointer text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 w-4 h-4 transition-colors"
-        onClick={() => onEdit(task)}
-      />
-      <FaTrash
-        className="cursor-pointer text-red-500 hover:text-red-700 dark:hover:text-red-400 w-4 h-4 transition-colors"
-        onClick={() => onDelete(task)}
-      />
-    </div>
-  </div>
+      <div
+        className={`flex items-center gap-4 px-5 py-4 cursor-pointer select-none rounded-t-xl transition-colors duration-200 ${
+          expanded
+            ? "bg-blue-100 dark:bg-blue-900/30"
+            : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
+        }`}
+        onClick={handleExpand}
+      >
+        <button className="text-gray-500 dark:text-gray-400 flex-shrink-0">
+          {expanded ? (
+            <FaChevronUp className="w-4 h-4" />
+          ) : (
+            <FaChevronDown className="w-4 h-4" />
+          )}
+        </button>
 
-  {expanded && (
-    <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-5">
-      {loadingDetail ? (
-        <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
-          Loading...
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              {task.title}
+            </span>
+            {overdue && (
+              <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-semibold">
+                <FaExclamationCircle className="w-4 h-4" />
+                Overdue
+              </span>
+            )}
+          </div>
+          {task.tags && <TagList tags={task.tags} />}
         </div>
-      ) : detail ? (
-        <AccordionDetail detail={detail} />
-      ) : null}
+
+        <div className="hidden md:flex items-center gap-4 flex-shrink-0">
+          {task.project_name && (
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
+              {task.project_name}
+            </span>
+          )}
+          <PriorityBadge priority={task.priority} />
+          <StatusBadge status={task.status} />
+          {task.due_date && (
+            <span
+              className={`flex items-center gap-1.5 text-xs font-medium ${overdue ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-400"}`}
+            >
+              <FaCalendarAlt className="w-4 h-4" />
+              {formatDate(task.due_date)}
+            </span>
+          )}
+          {task.assignees && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+              <FaUser className="w-4 h-4" />
+              {task.assignees}
+            </span>
+          )}
+          {(task.comment_count ?? 0) > 0 && (
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              💬 {task.comment_count}
+            </span>
+          )}
+        </div>
+
+        <div
+          className="flex items-center gap-4 flex-shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <FaEye
+            className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 w-4 h-4 transition-colors"
+            onClick={() => onView(task)}
+          />
+          <FaEdit
+            className="cursor-pointer text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 w-4 h-4 transition-colors"
+            onClick={() => onEdit(task)}
+          />
+          <FaTrash
+            className="cursor-pointer text-red-500 hover:text-red-700 dark:hover:text-red-400 w-4 h-4 transition-colors"
+            onClick={() => onDelete(task)}
+          />
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-5">
+          {loadingDetail ? (
+            <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+              Loading...
+            </div>
+          ) : detail ? (
+            <AccordionDetail detail={detail} />
+          ) : null}
+        </div>
+      )}
     </div>
-  )}
-</div>
   );
 }
 
@@ -616,16 +870,16 @@ function AccordionDetail({ detail }: { detail: Task }) {
                 .filter((a) => a.role !== "Owner")
                 .map((a) => (
                   <div key={a.id} className="flex items-center gap-2 min-w-0">
-  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300 flex-shrink-0">
-    {a.username?.[0]?.toUpperCase()}
-  </div>
-  <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
-    {a.username}
-  </span>
-  <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
-    ({a.role})
-  </span>
-</div>
+                    <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300 flex-shrink-0">
+                      {a.username?.[0]?.toUpperCase()}
+                    </div>
+                    <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                      {a.username}
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+                      ({a.role})
+                    </span>
+                  </div>
                 ))}
             </div>
           </div>
@@ -668,11 +922,11 @@ function AccordionDetail({ detail }: { detail: Task }) {
                   className="text-xs text-gray-600 dark:text-gray-400"
                 >
                   <div className="flex flex-col">
-  <span>{p.comment}</span>
-  <span className="text-gray-400 dark:text-gray-500">
-    {formatDateTime(p.created_at)}
-  </span>
-</div>
+                    <span>{p.comment}</span>
+                    <span className="text-gray-400 dark:text-gray-500">
+                      {formatDateTime(p.created_at)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -696,11 +950,11 @@ function AccordionDetail({ detail }: { detail: Task }) {
                     className="text-xs text-gray-500 dark:text-gray-400"
                   >
                     <div className="flex flex-col">
-  <span>{c.comment}</span>
-  <span className="text-gray-400 dark:text-gray-600">
-    {formatDateTime(c.created_at)}
-  </span>
-</div>
+                      <span>{c.comment}</span>
+                      <span className="text-gray-400 dark:text-gray-600">
+                        {formatDateTime(c.created_at)}
+                      </span>
+                    </div>
                   </div>
                 ))}
             </div>
@@ -804,8 +1058,8 @@ export default function Tasks() {
 
   // Filters
   const [filterStatus, setFilterStatus] = useState(
-  () => new URLSearchParams(window.location.search).get("status") ?? ""
-);
+    () => new URLSearchParams(window.location.search).get("status") ?? ""
+  );
   const [filterPriority, setFilterPriority] = useState("");
   const [filterAssignedMe, setFilterAssignedMe] = useState(false);
   const [search, setSearch] = useState("");
@@ -849,26 +1103,6 @@ export default function Tasks() {
   // Reminder toast
   const [reminderToast, setReminderToast] = useState<string | null>(null);
 
-  // Status change
-  const [statusTask, setStatusTask] = useState<Task | null>(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [statusSubmitting, setStatusSubmitting] = useState(false);
-  const [statusAlert, setStatusAlert] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  // ETA extension
-  const [showETAModal, setShowETAModal] = useState(false);
-  const [etaTask, setEtaTask] = useState<Task | null>(null);
-  const [etaData, setEtaData] = useState({ new_eta: "", reason: "" });
-  const [etaSubmitting, setEtaSubmitting] = useState(false);
-  const [etaAlert, setEtaAlert] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
   const filteredSuites = allSuites?.filter((s) =>
     selectedProjectFilter
       ? String(s.project_id) === selectedProjectFilter
@@ -886,6 +1120,18 @@ export default function Tasks() {
       return false;
     return true;
   });
+
+  // ── ESC key closes the View modal ────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showViewModal) {
+        setShowViewModal(false);
+        setViewingTask(null);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showViewModal]);
 
   // ── Toast helper ─────────────────────────────────────────────────────────────
   const showReminderToast = (msg: string) => {
@@ -1018,6 +1264,19 @@ export default function Tasks() {
     }
   };
 
+  // Refresh the currently viewed task (used after inline status/ETA changes)
+  const refreshViewingTask = async () => {
+    if (!viewingTask) return;
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await API.get(`/api/tasks/${viewingTask.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data.success) setViewingTask(res.data.data);
+    } catch {}
+  };
+
   const handleDeleteClick = (task: Task) => {
     setDeletingTask(task);
     setDeleteAlert(null);
@@ -1053,69 +1312,6 @@ export default function Tasks() {
     }
   };
 
-  const handleStatusChange = async () => {
-    if (!statusTask || !newStatus) return;
-    setStatusSubmitting(true);
-    setStatusAlert(null);
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      await API.put(
-        `/api/tasks/status/${statusTask.id}`,
-        { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      setStatusAlert({ type: "success", message: "Status updated!" });
-      setTimeout(() => {
-        setShowStatusModal(false);
-        setStatusTask(null);
-        window.location.reload();
-      }, 1000);
-    } catch (err: any) {
-      setStatusAlert({
-        type: "error",
-        message: err.response?.data?.message || "Failed to update status.",
-      });
-    } finally {
-      setStatusSubmitting(false);
-    }
-  };
-
-  const handleExtendETA = async () => {
-    if (!etaTask) return;
-    if (!etaData.new_eta) {
-      setEtaAlert({ type: "error", message: "New ETA is required." });
-      return;
-    }
-    if (!etaData.reason.trim()) {
-      setEtaAlert({ type: "error", message: "Reason is required." });
-      return;
-    }
-    setEtaSubmitting(true);
-    setEtaAlert(null);
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      await API.put(`/api/tasks/eta/${etaTask.id}`, etaData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setEtaAlert({ type: "success", message: "ETA extended!" });
-      setTimeout(() => {
-        setShowETAModal(false);
-        setEtaTask(null);
-        setEtaData({ new_eta: "", reason: "" });
-        window.location.reload();
-      }, 1000);
-    } catch (err: any) {
-      setEtaAlert({
-        type: "error",
-        message: err.response?.data?.message || "Failed to extend ETA.",
-      });
-    } finally {
-      setEtaSubmitting(false);
-    }
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -1131,7 +1327,7 @@ export default function Tasks() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">
-              Reminder
+              Notice
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {reminderToast}
@@ -1485,272 +1681,87 @@ export default function Tasks() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          VIEW / DETAIL MODAL
+          VIEW / DETAIL MODAL  — fixed header + scrollable body
       ══════════════════════════════════════════════════════════════════════ */}
       {showViewModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-5">
-              <div className="flex-1 min-w-0">
-                {viewingTask && (
-                  <>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                        {viewingTask.title}
-                      </h2>
-                      {isOverdue(viewingTask.due_date, viewingTask.status) && (
-                        <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
-                          <FaExclamationCircle className="w-3 h-3" />
-                          Overdue
-                        </span>
-                      )}
-                    </div>
-                    {viewingTask.tags && <TagList tags={viewingTask.tags} />}
-                  </>
-                )}
-              </div>
+          {/* Modal container: flex-col so header stays fixed and body scrolls */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]">
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {viewingTask && (
-                  <>
-                    {/* Compact Reminder Badge */}
-                    <ReminderBadge
-                      taskId={viewingTask.id}
-                      onToast={showReminderToast}
-                    />
+            {/* ── Sticky Header ─────────────────────────────────────────────── */}
+            <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  {viewingTask && (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                          {viewingTask.title}
+                        </h2>
+                        {isOverdue(viewingTask.due_date, viewingTask.status) && (
+                          <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
+                            <FaExclamationCircle className="w-3 h-3" />
+                            Overdue
+                          </span>
+                        )}
+                      </div>
+                      {viewingTask.tags && <TagList tags={viewingTask.tags} />}
+                    </>
+                  )}
+                </div>
 
-                    <button
-                      onClick={() => {
-                        setShowViewModal(false);
-                        setStatusTask(viewingTask);
-                        setNewStatus(viewingTask.status);
-                        setShowStatusModal(true);
-                      }}
-                      className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
-                    >
-                      Change Status
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowViewModal(false);
-                        setEtaTask(viewingTask);
-                        setShowETAModal(true);
-                      }}
-                      className="px-3 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg"
-                    >
-                      Extend ETA
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setViewingTask(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
-                >
-                  &times;
-                </button>
+                {/* Action badges + close */}
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                  {viewingTask && (
+                    <>
+                      <ReminderBadge
+                        taskId={viewingTask.id}
+                        onToast={showReminderToast}
+                      />
+                      <StatusChangeBadge
+                        task={viewingTask}
+                        onToast={showReminderToast}
+                        onStatusChanged={refreshViewingTask}
+                      />
+                      <ExtendETABadge
+                        task={viewingTask}
+                        onToast={showReminderToast}
+                        onETAChanged={refreshViewingTask}
+                      />
+                    </>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowViewModal(false);
+                      setViewingTask(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold leading-none ml-1"
+                    title="Close (Esc)"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
             </div>
+            
 
-            {viewLoading && (
-              <div className="text-sm text-gray-400 py-4">Loading...</div>
-            )}
+            {/* ── Scrollable Body ───────────────────────────────────────────── */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {viewLoading && (
+                <div className="text-sm text-gray-400 py-4">Loading...</div>
+              )}
 
-            {!viewLoading && viewingTask && (
-              <TaskDetailView
-                task={viewingTask}
-                users={users || []}
-                onProgressAdded={() => handleView(viewingTask)}
-                onCommentAdded={() => handleView(viewingTask)}
-                onReminderSaved={showReminderToast}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          STATUS CHANGE MODAL
-      ══════════════════════════════════════════════════════════════════════ */}
-      {showStatusModal && statusTask && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Change Status
-              </h2>
-              <button
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setStatusTask(null);
-                  setStatusAlert(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
-              >
-                &times;
-              </button>
-            </div>
-            {statusAlert && (
-              <div className="mb-4">
-                <Alert
-                  variant={statusAlert.type}
-                  title={statusAlert.type === "success" ? "Success" : "Error"}
-                  message={statusAlert.message}
+              {!viewLoading && viewingTask && (
+                <TaskDetailView
+                  task={viewingTask}
+                  users={users || []}
+                  onProgressAdded={() => handleView(viewingTask)}
+                  onCommentAdded={() => handleView(viewingTask)}
+                  onReminderSaved={showReminderToast}
                 />
-              </div>
-            )}
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Task:{" "}
-              <span className="font-medium text-gray-900 dark:text-white">
-                {statusTask.title}
-              </span>
-            </p>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                New Status
-              </label>
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {[
-                  "Pending",
-                  "In Progress",
-                  "On Hold",
-                  "Completed",
-                  "Cancelled",
-                ].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+              )}
             </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setStatusTask(null);
-                  setStatusAlert(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleStatusChange}
-                disabled={statusSubmitting}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg"
-              >
-                {statusSubmitting ? "Saving..." : "Update Status"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          ETA EXTENSION MODAL
-      ══════════════════════════════════════════════════════════════════════ */}
-      {showETAModal && etaTask && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Extend ETA
-              </h2>
-              <button
-                onClick={() => {
-                  setShowETAModal(false);
-                  setEtaTask(null);
-                  setEtaData({ new_eta: "", reason: "" });
-                  setEtaAlert(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
-              >
-                &times;
-              </button>
-            </div>
-            {etaAlert && (
-              <div className="mb-4">
-                <Alert
-                  variant={etaAlert.type}
-                  title={etaAlert.type === "success" ? "Success" : "Error"}
-                  message={etaAlert.message}
-                />
-              </div>
-            )}
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              Task:{" "}
-              <span className="font-medium text-gray-900 dark:text-white">
-                {etaTask.title}
-              </span>
-            </p>
-            {etaTask.due_date && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                Current ETA: {formatDate(etaTask.due_date)}
-              </p>
-            )}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                New ETA <span className="text-red-500">*</span>
-              </label>
-              <DatePicker
-                selected={
-                  etaData.new_eta
-                    ? (() => {
-                        const [y, m, d] = etaData.new_eta
-                          .split("-")
-                          .map(Number);
-                        return new Date(y, m - 1, d);
-                      })()
-                    : null
-                }
-                onChange={(date: Date | null) =>
-                  setEtaData({ ...etaData, new_eta: toLocalDateString(date) })
-                }
-                minDate={new Date()}
-                dateFormat="dd/MM/yyyy"
-                placeholderText="Select ETA"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Reason <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={etaData.reason}
-                onChange={(e) =>
-                  setEtaData({ ...etaData, reason: e.target.value })
-                }
-                placeholder="Why is the ETA being extended?"
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowETAModal(false);
-                  setEtaTask(null);
-                  setEtaData({ new_eta: "", reason: "" });
-                  setEtaAlert(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleExtendETA}
-                disabled={etaSubmitting}
-                className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-60 rounded-lg"
-              >
-                {etaSubmitting ? "Saving..." : "Extend ETA"}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -1890,50 +1901,6 @@ function TaskDetailView({
     message: string;
   } | null>(null);
 
-  // Reminder state
-  const [showReminderForm, setShowReminderForm] = useState(false);
-  const [reminderData, setReminderData] = useState({
-    remind_before: "7",
-    remind_unit: "days",
-    is_recurring: false,
-  });
-  const [submittingR, setSubmittingR] = useState(false);
-  const [reminderAlert, setReminderAlert] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-  const [existingReminder, setExistingReminder] = useState<{
-    id: number;
-    remind_before: number;
-    remind_unit: string;
-    is_recurring: boolean;
-    remind_at: string;
-    is_sent: boolean;
-  } | null>(null);
-  const [reminderLoading, setReminderLoading] = useState(true);
-
-  // Fetch latest active reminder on mount
-  useEffect(() => {
-    const fetchReminder = async () => {
-      setReminderLoading(true);
-      try {
-        const token =
-          localStorage.getItem("token") || sessionStorage.getItem("token");
-        const res = await API.get(`/api/tasks/${task.id}/latestreminders`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.data.success) {
-          setExistingReminder(res.data.reminder);
-        }
-      } catch {
-        setExistingReminder(null);
-      } finally {
-        setReminderLoading(false);
-      }
-    };
-    fetchReminder();
-  }, [task.id]);
-
   const handleAddProgress = async () => {
     if (!progressText.trim()) return;
     setSubmittingP(true);
@@ -1982,36 +1949,6 @@ function TaskDetailView({
       });
     } finally {
       setSubmittingC(false);
-    }
-  };
-
-  const handleSetReminder = async () => {
-    setSubmittingR(true);
-    setReminderAlert(null);
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      await API.post(`/api/tasks/${task.id}/reminders`, reminderData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const msg = existingReminder
-        ? `Updated to ${reminderData.remind_before} ${reminderData.remind_unit} before due date`
-        : `Set for ${reminderData.remind_before} ${reminderData.remind_unit} before due date`;
-      setReminderAlert({ type: "success", message: "Reminder saved!" });
-      setShowReminderForm(false);
-      onReminderSaved(msg);
-      // Re-fetch to refresh the card
-      const res = await API.get(`/api/tasks/${task.id}/latestreminders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data.success) setExistingReminder(res.data.reminder);
-    } catch (err: any) {
-      setReminderAlert({
-        type: "error",
-        message: err.response?.data?.message || "Failed.",
-      });
-    } finally {
-      setSubmittingR(false);
     }
   };
 
