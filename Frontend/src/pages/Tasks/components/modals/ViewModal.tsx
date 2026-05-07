@@ -37,7 +37,6 @@ export default function ViewModal({
   return (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]">
-
         {/* Sticky header */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-start justify-between gap-3">
@@ -45,9 +44,22 @@ export default function ViewModal({
               {viewingTask && (
                 <>
                   <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="
+      px-2 py-0.5
+      text-xs font-bold
+      rounded-md
+      bg-blue-100 text-blue-700
+      dark:bg-blue-900/40 dark:text-blue-300
+      whitespace-nowrap
+    "
+                    >
+                      {viewingTask.task_code}
+                    </span>
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
                       {viewingTask.title}
                     </h2>
+
                     {isOverdue(viewingTask.due_date, viewingTask.status) && (
                       <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
                         <FaExclamationCircle className="w-3 h-3" />
@@ -63,7 +75,10 @@ export default function ViewModal({
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
               {viewingTask && (
                 <>
-                  <ReminderBadge taskId={viewingTask.id} onToast={onReminderSaved} />
+                  <ReminderBadge
+                    taskId={viewingTask.id}
+                    onToast={onReminderSaved}
+                  />
                   <StatusChangeBadge
                     task={viewingTask}
                     onToast={onReminderSaved}

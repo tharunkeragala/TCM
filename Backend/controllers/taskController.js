@@ -190,6 +190,7 @@ exports.getTaskById = async (req, res) => {
       .query(`
         SELECT
   t.id,
+  t.task_code,
   t.title,
   t.description,
   t.status,
@@ -340,6 +341,18 @@ exports.createTask = async (req, res) => {
       `);
 
     const taskId = taskResult.recordset[0].id;
+    const taskCode = `T${String(taskId).padStart(4, "0")}`;
+
+    // Insert task code after we have the ID
+    await pool
+  .request()
+  .input("id", sql.Int, taskId)
+  .input("task_code", sql.VarChar, taskCode)
+  .query(`
+    UPDATE test_case_manager.dbo.tasks
+    SET task_code = @task_code
+    WHERE id = @id
+  `);
 
     // Insert Owner assignment
     await pool
@@ -353,6 +366,8 @@ exports.createTask = async (req, res) => {
         VALUES
           (@task_id, @user_id, 'Owner', @assigned_by)
       `);
+
+    
 
     // Insert Assignees
     if (Array.isArray(assignees) && assignees.length > 0) {

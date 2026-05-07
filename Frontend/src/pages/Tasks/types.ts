@@ -51,6 +51,7 @@ export interface ETAHistory {
 
 export interface Task {
   id: number;
+  task_code: number;
   title: string;
   description: string;
   status: "Pending" | "In Progress" | "On Hold" | "Completed" | "Cancelled";

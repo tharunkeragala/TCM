@@ -1,7 +1,13 @@
 import { useState } from "react";
 import {
-  FaEdit, FaTrash, FaEye, FaChevronDown, FaChevronUp,
-  FaCalendarAlt, FaUser, FaExclamationCircle,
+  FaEdit,
+  FaTrash,
+  FaEye,
+  FaChevronDown,
+  FaChevronUp,
+  FaCalendarAlt,
+  FaUser,
+  FaExclamationCircle,
 } from "react-icons/fa";
 import API from "../../../services/api";
 import { Task } from "../types";
@@ -18,7 +24,12 @@ interface Props {
   onView: (t: Task) => void;
 }
 
-export default function TaskAccordionRow({ task, onEdit, onDelete, onView }: Props) {
+export default function TaskAccordionRow({
+  task,
+  onEdit,
+  onDelete,
+  onView,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<Task | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -53,22 +64,46 @@ export default function TaskAccordionRow({ task, onEdit, onDelete, onView }: Pro
       {/* Row header */}
       <div
         className={`flex items-center gap-4 px-5 py-4 cursor-pointer select-none rounded-t-xl transition-colors duration-200 ${
-          expanded ? "bg-blue-100 dark:bg-blue-900/30" : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
+          expanded
+            ? "bg-blue-100 dark:bg-blue-900/30"
+            : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
         }`}
         onClick={handleExpand}
       >
         <button className="text-gray-500 dark:text-gray-400 flex-shrink-0">
-          {expanded ? <FaChevronUp className="w-4 h-4" /> : <FaChevronDown className="w-4 h-4" />}
+          {expanded ? (
+            <FaChevronUp className="w-4 h-4" />
+          ) : (
+            <FaChevronDown className="w-4 h-4" />
+          )}
         </button>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {task.id}
-            </span>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {task.title}
-            </span>
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                className="
+      px-2 py-0.5
+      text-xs font-bold
+      rounded-md
+      bg-blue-100 text-blue-700
+      dark:bg-blue-900/40 dark:text-blue-300
+      whitespace-nowrap
+    "
+              >
+                {task.task_code}
+              </span>
+
+              <span
+                className="
+      text-sm font-semibold
+      text-gray-900 dark:text-white
+      truncate
+    "
+              >
+                {task.title}
+              </span>
+            </div>
             {overdue && (
               <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-semibold">
                 <FaExclamationCircle className="w-4 h-4" />
@@ -132,7 +167,9 @@ export default function TaskAccordionRow({ task, onEdit, onDelete, onView }: Pro
       {expanded && (
         <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-5">
           {loadingDetail ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400 py-2">Loading...</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+              Loading...
+            </div>
           ) : detail ? (
             <AccordionDetail detail={detail} />
           ) : null}
