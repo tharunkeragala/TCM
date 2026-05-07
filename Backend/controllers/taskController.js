@@ -71,7 +71,7 @@ exports.getTasks = async (req, res) => {
     const deptId     = isDeptHead ? roleResult.recordset[0].dept_id : null;
 
     const request = pool.request();
-    let where = "WHERE 1=1";
+    let where = "WHERE t.is_archived = 0";
 
     // 🔹 Step 2: Apply role-based visibility
     if (isDeptHead) {
@@ -189,7 +189,20 @@ exports.getTaskById = async (req, res) => {
       .input("id", sql.Int, id)
       .query(`
         SELECT
-          t.*,
+  t.id,
+  t.title,
+  t.description,
+  t.status,
+  t.priority,
+  t.start_date,
+  t.due_date,
+  t.project_id,
+  t.suite_id,
+  t.tags,
+  t.created_by,
+  t.updated_by,
+  t.created_at,
+  t.updated_at,
           u1.username   AS created_by_name,
           u2.username   AS updated_by_name,
           p.project_name,
@@ -200,6 +213,7 @@ exports.getTaskById = async (req, res) => {
         LEFT JOIN test_case_manager.dbo.projects p     ON p.id  = t.project_id
         LEFT JOIN test_case_manager.dbo.test_suites ts ON ts.id = t.suite_id
         WHERE t.id = @id
+AND t.is_archived = 0
       `);
 
     if (!taskResult.recordset.length) {
@@ -820,33 +834,64 @@ exports.deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id || null;
+
     const pool = await poolPromise;
 
-    // Clean up all child records first
-    await pool.request().input("task_id", sql.Int, id).query(`
-      DELETE FROM test_case_manager.dbo.task_comment_mentions
-      WHERE comment_id IN (
-        SELECT id FROM test_case_manager.dbo.task_comments WHERE task_id = @task_id
-      )
-    `);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.task_comments    WHERE task_id = @task_id`);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.task_progress     WHERE task_id = @task_id`);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.task_eta_history  WHERE task_id = @task_id`);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.task_assignments  WHERE task_id = @task_id`);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.task_attachments  WHERE task_id = @task_id`);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.task_reminders    WHERE task_id = @task_id`);
-    await pool.request().input("task_id", sql.Int, id).query(`DELETE FROM test_case_manager.dbo.notifications     WHERE task_id = @task_id`);
-    await pool.request().input("id",      sql.Int, id).query(`DELETE FROM test_case_manager.dbo.tasks             WHERE id      = @id`);
+    // Check task exists
+    const taskResult = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
+        SELECT title
+        FROM test_case_manager.dbo.tasks
+        WHERE id = @id
+          AND is_archived = 0
+      `);
 
+    if (!taskResult.recordset.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    // Soft delete (archive)
     await pool
       .request()
-      .input("description", sql.VarChar, `Task ID ${id} deleted`)
-      .query(`INSERT INTO audit_logs (action, module, description) VALUES ('DELETE','TASK',@description)`);
+      .input("id", sql.Int, id)
+      .input("updated_by", sql.Int, userId)
+      .query(`
+        UPDATE test_case_manager.dbo.tasks
+        SET
+          is_archived = 1,
+          archived_at = GETDATE(),
+          updated_by = @updated_by,
+          updated_at = GETDATE()
+        WHERE id = @id
+      `);
 
-    res.json({ success: true, message: "Task deleted successfully" });
+    // Audit log
+    await pool
+      .request()
+      .input("description", sql.VarChar, `Task ID ${id} archived`)
+      .query(`
+        INSERT INTO audit_logs (action, module, description)
+        VALUES ('ARCHIVE', 'TASK', @description)
+      `);
+
+    res.json({
+      success: true,
+      message: "Task archived successfully",
+    });
+
   } catch (err) {
-    console.error("DELETE Task Error:", err);
-    res.status(500).json({ success: false, message: "Failed to delete task", error: err.message });
+    console.error("ARCHIVE Task Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to archive task",
+      error: err.message,
+    });
   }
 };
 
@@ -1081,7 +1126,8 @@ exports.getTaskDashboardStats = async (req, res) => {
             SUM(CASE WHEN t.status = 'On Hold' THEN 1 ELSE 0 END) AS on_hold,
             SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
           FROM test_case_manager.dbo.tasks t
-          WHERE
+          WHERE t.is_archived = 0
+          AND (
             t.created_by IN (
               SELECT u.id
               FROM test_case_manager.dbo.users u
@@ -1092,6 +1138,7 @@ exports.getTaskDashboardStats = async (req, res) => {
               FROM test_case_manager.dbo.task_assignments ta
               WHERE ta.task_id = t.id AND ta.user_id = @user_id
             )
+          )
         `);
     } else {
       statsQuery = await pool
@@ -1106,13 +1153,15 @@ exports.getTaskDashboardStats = async (req, res) => {
             SUM(CASE WHEN t.status = 'On Hold' THEN 1 ELSE 0 END) AS on_hold,
             SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
           FROM test_case_manager.dbo.tasks t
-          WHERE
+          WHERE t.is_archived = 0
+          AND (
             t.created_by = @user_id
             OR EXISTS (
               SELECT 1
               FROM test_case_manager.dbo.task_assignments ta
               WHERE ta.task_id = t.id AND ta.user_id = @user_id
             )
+          )
         `);
     }
 
@@ -1137,6 +1186,41 @@ exports.getTaskDashboardStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch dashboard stats",
+      error: err.message,
+    });
+  }
+};
+
+// Restore Task Endpoint
+exports.restoreTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const pool = await poolPromise;
+
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
+        UPDATE test_case_manager.dbo.tasks
+        SET
+          is_archived = 0,
+          archived_at = NULL,
+          updated_at = GETDATE()
+        WHERE id = @id
+      `);
+
+    res.json({
+      success: true,
+      message: "Task restored successfully",
+    });
+
+  } catch (err) {
+    console.error("RESTORE Task Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to restore task",
       error: err.message,
     });
   }
