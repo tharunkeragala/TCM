@@ -599,13 +599,17 @@ await insertSystemComment(
         WHERE task_id = @task_id AND user_id != ${userId}
       `);
 
-    for (const p of participants.recordset) {
-      await insertNotification(
-        pool, p.user_id, id,
-        "status_changed",
-        `Task "${taskTitle}" status changed to "${status}"`
-      );
-    }
+    await Promise.all(
+  participants.recordset.map(p =>
+    insertNotification(
+      pool,
+      p.user_id,
+      id,
+      "status_changed",
+      `Task "${taskTitle}" status changed to "${status}"`
+    )
+  )
+);
 
     await pool
       .request()

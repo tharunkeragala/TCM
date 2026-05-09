@@ -53,12 +53,12 @@ export default function TaskAccordionRow({
 
   return (
     <div
-      className={`rounded-xl border transition-all duration-200 ${
+      className={`rounded-xl border overflow-hidden bg-white dark:bg-gray-900 transition-all duration-200 ${
         overdue
           ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-gray-900 hover:border-red-400 dark:hover:border-red-600"
           : expanded
-            ? "border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-gray-800"
-            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800"
+            ? "border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-gray-900"
+            : "border-gray-300 dark:border-gray-600  hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800"
       } shadow-sm hover:shadow-md`}
     >
       {/* Row header */}
@@ -66,7 +66,7 @@ export default function TaskAccordionRow({
         className={`flex items-center gap-4 px-5 py-4 cursor-pointer select-none rounded-t-xl transition-colors duration-200 ${
           expanded
             ? "bg-blue-100 dark:bg-blue-900/30"
-            : "hover:bg-gray-100 dark:hover:bg-gray-800/60"
+            : "hover:bg-gray-100 dark:hover:bg-gray-800"
         }`}
         onClick={handleExpand}
       >
