@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { FaPlus, FaSearch, FaUser, FaBell } from "react-icons/fa";
+
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Alert from "../../components/ui/alert/Alert";
+
 import useFetchWithAuth from "../../hooks/useFetchWithAuth";
 import API from "../../services/api";
 
@@ -14,11 +16,14 @@ import {
   Project,
   TestSuite,
 } from "./types";
+
 import { ALL_STATUSES, ALL_PRIORITIES } from "./constants";
+
 import TaskAccordionRow from "./components/TaskAccordionRow";
 import CreateEditModal from "./components/modals/CreateEditModal";
 import ViewModal from "./components/modals/ViewModal";
 import DeleteModal from "./components/modals/DeleteModal";
+import TablePagination from "../../components/common/TablePagination";
 
 const DEFAULT_FORM: TaskFormData = {
   title: "",
@@ -32,11 +37,7 @@ const DEFAULT_FORM: TaskFormData = {
 };
 
 export default function Tasks() {
-  const {
-    data: tasks,
-    loading,
-    error,
-  } = useFetchWithAuth<Task[]>("/api/tasks");
+  // ── KEEP THESE ────────────────────────────────────────────────────────────
   const { data: projects } = useFetchWithAuth<Project[]>("/api/projects");
   const { data: allSuites } = useFetchWithAuth<TestSuite[]>("/api/test-suites");
   const { data: users } = useFetchWithAuth<User[]>("/api/dropdown/users");
@@ -45,16 +46,35 @@ export default function Tasks() {
   const [filterStatus, setFilterStatus] = useState(
     () => new URLSearchParams(window.location.search).get("status") ?? "",
   );
+
   const [filterPriority, setFilterPriority] = useState("");
   const [filterAssignedMe, setFilterAssignedMe] = useState(false);
   const [search, setSearch] = useState("");
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  const [pagination, setPagination] = useState({
+    total: 0,
+    totalPages: 1,
+    page: 1,
+    limit: 10,
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // ── Create / Edit modal ───────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formAlert, setFormAlert] = useState<AlertState | null>(null);
+
   const [formData, setFormData] = useState<TaskFormData>(DEFAULT_FORM);
+
   const [assignees, setAssignees] = useState<number[]>([]);
   const [watchers, setWatchers] = useState<number[]>([]);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState("");
@@ -63,6 +83,7 @@ export default function Tasks() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const [deleteAlert, setDeleteAlert] = useState<AlertState | null>(null);
+
   const [deletingInProgress, setDeletingInProgress] = useState(false);
 
   // ── View modal ────────────────────────────────────────────────────────────
@@ -73,19 +94,6 @@ export default function Tasks() {
   // ── Toast ─────────────────────────────────────────────────────────────────
   const [reminderToast, setReminderToast] = useState<string | null>(null);
 
-  // ── Derived data ──────────────────────────────────────────────────────────
-  const displayedTasks = (tasks || []).filter((t) => {
-    if (filterStatus && t.status !== filterStatus) return false;
-    if (filterPriority && t.priority !== filterPriority) return false;
-    if (
-      search &&
-      !t.title.toLowerCase().includes(search.toLowerCase()) &&
-      !(t.description || "").toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
-    return true;
-  });
-
   // ── ESC closes view modal ─────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -94,7 +102,9 @@ export default function Tasks() {
         setViewingTask(null);
       }
     };
+
     document.addEventListener("keydown", handler);
+
     return () => document.removeEventListener("keydown", handler);
   }, [showViewModal]);
 
@@ -107,6 +117,66 @@ export default function Tasks() {
   const getToken = () =>
     localStorage.getItem("token") || sessionStorage.getItem("token");
 
+  // ── Backend Task Fetch ────────────────────────────────────────────────────
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+
+      if (filterStatus) {
+        params.append("status", filterStatus);
+      }
+
+      if (filterPriority) {
+        params.append("priority", filterPriority);
+      }
+
+      if (search) {
+        params.append("search", search);
+      }
+
+      if (filterAssignedMe) {
+        params.append("assigned_to_me", "true");
+      }
+
+      const res = await API.get(`/api/tasks?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      setTasks(res.data.data || []);
+
+      setPagination(
+        res.data.pagination || {
+          total: 0,
+          totalPages: 1,
+          page: 1,
+          limit: 10,
+        },
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to load tasks");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Auto Fetch ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetchTasks();
+  }, [page, limit, filterStatus, filterPriority, filterAssignedMe, search]);
+
+  // ── Reset page on filter change ───────────────────────────────────────────
+  useEffect(() => {
+    setPage(1);
+  }, [filterStatus, filterPriority, filterAssignedMe, search, limit]);
+
   const resetForm = () => {
     setFormData(DEFAULT_FORM);
     setAssignees([]);
@@ -118,11 +188,17 @@ export default function Tasks() {
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!formData.title.trim()) {
-      setFormAlert({ type: "error", message: "Title is required." });
+      setFormAlert({
+        type: "error",
+        message: "Title is required.",
+      });
+
       return;
     }
+
     setSubmitting(true);
     setFormAlert(null);
+
     try {
       const payload = {
         ...formData,
@@ -133,23 +209,31 @@ export default function Tasks() {
         assignees,
         watchers,
       };
+
       const url = editingTask
         ? `/api/tasks/update/${editingTask.id}`
         : "/api/tasks/create";
+
       const method = editingTask ? API.put : API.post;
+
       const res = await method(url, payload, {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
       });
+
       if (res.data.success) {
         setFormAlert({
           type: "success",
           message: editingTask ? "Task updated!" : "Task created!",
         });
-        setTimeout(() => {
+
+        setTimeout(async () => {
           setShowModal(false);
           resetForm();
           setEditingTask(null);
-          window.location.reload();
+
+          await fetchTasks();
         }, 1200);
       }
     } catch (err: any) {
@@ -165,12 +249,18 @@ export default function Tasks() {
   const handleEdit = async (task: Task) => {
     try {
       const res = await API.get(`/api/tasks/${task.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
       });
+
       if (res.data.success) {
         const full: Task = res.data.data;
+
         setEditingTask(full);
+
         const suite = allSuites?.find((s) => s.id === full.suite_id);
+
         setSelectedProjectFilter(
           suite
             ? String(suite.project_id)
@@ -178,6 +268,7 @@ export default function Tasks() {
               ? String(full.project_id)
               : "",
         );
+
         setFormData({
           title: full.title,
           description: full.description || "",
@@ -188,11 +279,13 @@ export default function Tasks() {
           suite_id: full.suite_id ? String(full.suite_id) : "",
           tags: full.tags || "",
         });
+
         setAssignees(
           (full.assignments || [])
             .filter((a) => a.role === "Assignee")
             .map((a) => a.user_id),
         );
+
         setShowModal(true);
       }
     } catch {
@@ -204,11 +297,17 @@ export default function Tasks() {
   const handleView = async (task: Task) => {
     setViewLoading(true);
     setShowViewModal(true);
+
     try {
       const res = await API.get(`/api/tasks/${task.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
       });
-      if (res.data.success) setViewingTask(res.data.data);
+
+      if (res.data.success) {
+        setViewingTask(res.data.data);
+      }
     } catch {
       setViewingTask(task);
     } finally {
@@ -218,11 +317,19 @@ export default function Tasks() {
 
   const refreshViewingTask = async () => {
     if (!viewingTask) return;
+
     try {
       const res = await API.get(`/api/tasks/${viewingTask.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
       });
-      if (res.data.success) setViewingTask(res.data.data);
+
+      if (res.data.success) {
+        setViewingTask(res.data.data);
+      }
+
+      await fetchTasks();
     } catch {}
   };
 
@@ -234,20 +341,27 @@ export default function Tasks() {
 
   const handleConfirmDelete = async () => {
     if (!deletingTask) return;
+
     setDeletingInProgress(true);
     setDeleteAlert(null);
+
     try {
       await API.delete(`/api/tasks/delete/${deletingTask.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
       });
+
       setDeleteAlert({
         type: "success",
         message: "Task deleted successfully.",
       });
-      setTimeout(() => {
+
+      setTimeout(async () => {
         setShowDeleteModal(false);
         setDeletingTask(null);
-        window.location.reload();
+
+        await fetchTasks();
       }, 1200);
     } catch (err: any) {
       setDeleteAlert({
@@ -269,6 +383,7 @@ export default function Tasks() {
   return (
     <div>
       <PageMeta title="Tasks" description="Task & Activity Management" />
+
       <PageBreadcrumb pageTitle="Tasks" />
 
       {/* Toast */}
@@ -277,14 +392,17 @@ export default function Tasks() {
           <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0">
             <FaBell className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           </div>
+
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">
               Notice
             </p>
+
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {reminderToast}
             </p>
           </div>
+
           <button
             onClick={() => setReminderToast(null)}
             className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 text-lg leading-none flex-shrink-0"
@@ -300,6 +418,7 @@ export default function Tasks() {
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative">
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+
               <input
                 type="text"
                 placeholder="Search tasks..."
@@ -308,26 +427,31 @@ export default function Tasks() {
                 className="pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
               />
             </div>
+
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Statuses</option>
+
               {ALL_STATUSES.map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
+
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
               className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Priorities</option>
+
               {ALL_PRIORITIES.map((p) => (
                 <option key={p}>{p}</option>
               ))}
             </select>
+
             <button
               onClick={() => setFilterAssignedMe(!filterAssignedMe)}
               className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors ${
@@ -340,6 +464,7 @@ export default function Tasks() {
               Assigned to me
             </button>
           </div>
+
           <button
             onClick={() => {
               setEditingTask(null);
@@ -348,40 +473,59 @@ export default function Tasks() {
             }}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-150 flex items-center gap-2 flex-shrink-0"
           >
-            <FaPlus className="w-3 h-3" /> Create Task
+            <FaPlus className="w-3 h-3" />
+            Create Task
           </button>
         </div>
 
         {error && <Alert variant="error" title="Error" message={error} />}
+
         {loading && !error && (
           <div className="text-gray-500 dark:text-gray-400 text-sm">
             Loading tasks...
           </div>
         )}
+
         {!loading && !error && (
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            Showing {displayedTasks.length} of {(tasks || []).length} tasks
+            Showing {tasks.length} of {pagination.total} tasks
           </div>
         )}
 
         {!loading && !error && (
-          <div className="space-y-2">
-            {displayedTasks.length > 0 ? (
-              displayedTasks.map((task) => (
-                <TaskAccordionRow
-                  key={task.id}
-                  task={task}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  onView={handleView}
-                />
-              ))
-            ) : (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm">
-                No tasks found
-              </div>
-            )}
-          </div>
+          <>
+            <div className="space-y-2">
+              {tasks.length > 0 ? (
+                tasks.map((task) => (
+                  <TaskAccordionRow
+                    key={task.id}
+                    task={task}
+                    onEdit={handleEdit}
+                    onDelete={handleDeleteClick}
+                    onView={handleView}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm">
+                  No tasks found
+                </div>
+              )}
+            </div>
+
+            {/* ── Pagination ───────────────────────────────────────────────────── */}
+            <TablePagination
+              totalItems={pagination.total}
+              currentPage={page}
+              totalPages={pagination.totalPages}
+              pageSize={limit}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setLimit(size);
+                setPage(1);
+              }}
+            />
+          </>
         )}
       </div>
 

@@ -5,6 +5,7 @@ import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Alert from "../components/ui/alert/Alert";
 import useFetchWithAuth from "../hooks/useFetchWithAuth";
+import TablePagination from "../components/common/TablePagination";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface User {
@@ -203,22 +204,6 @@ export default function UserReport() {
   const handleFilterChange = (setter: (v: string) => void) => (val: string) => {
     setter(val);
     setCurrentPage(1);
-  };
-
-  // ── Pagination range ──────────────────────────────────────────────────────
-  const getPaginationRange = () => {
-    const delta = 2;
-    const range: (number | "...")[] = [];
-    const left = Math.max(2, safePage - delta);
-    const right = Math.min(totalPages - 1, safePage + delta);
-
-    range.push(1);
-    if (left > 2) range.push("...");
-    for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) range.push("...");
-    if (totalPages > 1) range.push(totalPages);
-
-    return range;
   };
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -635,147 +620,15 @@ export default function UserReport() {
             </div>
 
             {/* ── Pagination ── */}
-            {filtered.length > 0 && (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                {/* Left: page size + info */}
-                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                  <span>Rows per page:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) =>
-                      handlePageSizeChange(Number(e.target.value))
-                    }
-                    className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  <span>
-                    {(safePage - 1) * pageSize + 1}–
-                    {Math.min(safePage * pageSize, filtered.length)} of{" "}
-                    {filtered.length}
-                  </span>
-                </div>
-
-                {/* Right: page controls */}
-                <div className="flex items-center gap-1">
-                  {/* First */}
-                  <button
-                    onClick={() => handlePageChange(1)}
-                    disabled={safePage === 1}
-                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="First page"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  {/* Prev */}
-                  <button
-                    onClick={() => handlePageChange(safePage - 1)}
-                    disabled={safePage === 1}
-                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="Previous page"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  {/* Page numbers */}
-                  {getPaginationRange().map((item, i) =>
-                    item === "..." ? (
-                      <span
-                        key={`ellipsis-${i}`}
-                        className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
-                      >
-                        …
-                      </span>
-                    ) : (
-                      <button
-                        key={item}
-                        onClick={() => handlePageChange(item as number)}
-                        className={`min-w-[32px] px-2 py-1 rounded-md text-sm font-medium transition ${
-                          safePage === item
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    ),
-                  )}
-
-                  {/* Next */}
-                  <button
-                    onClick={() => handlePageChange(safePage + 1)}
-                    disabled={safePage === totalPages}
-                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="Next page"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </button>
-
-                  {/* Last */}
-                  <button
-                    onClick={() => handlePageChange(totalPages)}
-                    disabled={safePage === totalPages}
-                    className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="Last page"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M13 5l7 7-7 7M6 5l7 7-7 7"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
+            <TablePagination
+              totalItems={filtered.length}
+              currentPage={safePage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </>
         )}
       </div>
