@@ -555,255 +555,246 @@ export default function TasksReport() {
         )}
 
         {/* ── Table ─────────────────────────────────────────────────────── */}
-        {/* ── Table ─────────────────────────────────────────────────────── */}
-{!loading && !error && (
-  <>
-    {/* Table Wrapper */}
-    <div className="w-full min-w-0 max-w-298">
-      {/* Scroll Container */}
-      <div className="w-full overflow-x-auto overflow-y-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg bg-white dark:bg-gray-900">
-        {/* Prevent table shrink */}
-        <div className="min-w-max">
-          <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
-              <tr>
-                <th className="px-4 py-3 whitespace-nowrap">#</th>
+        {!loading && !error && (
+          <>
+            {/* Table Wrapper */}
+            <div className="w-full min-w-0 max-w-298">
+              {/* Scroll Container */}
+              <div className="w-full overflow-x-auto overflow-y-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg bg-white dark:bg-gray-900">
+                {/* Prevent table shrink */}
+                <div className="min-w-max">
+                  <table className="w-full text-sm text-left border-collapse">
+                    <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
+                      <tr>
+                        <th className="px-4 py-3 whitespace-nowrap">#</th>
 
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Code
-                </th>
+                        <th className="px-4 py-3 whitespace-nowrap">Code</th>
 
-                <th
-                  className="px-4 py-3 whitespace-nowrap"
-                  style={{ minWidth: "220px", maxWidth: "300px" }}
-                >
-                  Title
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Status
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Priority
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Project
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Suite
-                </th>
-
-                <th
-                  className="px-4 py-3 whitespace-nowrap"
-                  style={{ minWidth: "180px" }}
-                >
-                  Assignees
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Due Date
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Created By
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Created At
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Updated By
-                </th>
-
-                <th className="px-4 py-3 whitespace-nowrap">
-                  Updated At
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
-              {paginated.length > 0 ? (
-                paginated.map((task, index) => {
-                  const overdue = isOverdue(task.due_date, task.status);
-                  const statusKey = task.status.toLowerCase();
-                  const priorityKey = task.priority.toLowerCase();
-
-                  return (
-                    <tr
-                      key={task.id}
-                      className={`transition duration-150 ${
-                        overdue
-                          ? "bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20"
-                          : "hover:bg-gray-50 dark:hover:bg-gray-800"
-                      }`}
-                    >
-                      {/* Index */}
-                      <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
-                        {(safePage - 1) * pageSize + index + 1}
-                      </td>
-
-                      {/* Code */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                          {task.task_code}
-                        </span>
-                      </td>
-
-                      {/* Title */}
-                      <td
-                        className="px-4 py-3"
-                        style={{
-                          minWidth: "220px",
-                          maxWidth: "300px",
-                        }}
-                      >
-                        <div className="flex items-start gap-1.5">
-                          {overdue && (
-                            <FaExclamationCircle className="text-red-500 dark:text-red-400 w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                          )}
-
-                          <span
-                            className="text-sm font-medium text-gray-900 dark:text-white leading-snug overflow-hidden line-clamp-2"
-                            title={task.title}
-                          >
-                            {task.title}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
-                            STATUS_COLORS[statusKey] ??
-                            "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                          }`}
+                        <th
+                          className="px-4 py-3 whitespace-nowrap"
+                          style={{ minWidth: "220px", maxWidth: "300px" }}
                         >
-                          {task.status}
-                        </span>
-                      </td>
+                          Title
+                        </th>
 
-                      {/* Priority */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
-                            PRIORITY_COLORS[priorityKey] ??
-                            "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                          }`}
+                        <th className="px-4 py-3 whitespace-nowrap">Status</th>
+
+                        <th className="px-4 py-3 whitespace-nowrap">
+                          Priority
+                        </th>
+
+                        <th className="px-4 py-3 whitespace-nowrap">Project</th>
+
+                        <th className="px-4 py-3 whitespace-nowrap">Suite</th>
+
+                        <th
+                          className="px-4 py-3 whitespace-nowrap"
+                          style={{ minWidth: "180px" }}
                         >
-                          {task.priority}
-                        </span>
-                      </td>
+                          Assignees
+                        </th>
 
-                      {/* Project */}
-                      <td className="px-4 py-3 whitespace-nowrap text-xs">
-                        {task.project_name ? (
-                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium">
-                            {task.project_name}
-                          </span>
-                        ) : (
-                          <Dash />
-                        )}
-                      </td>
+                        <th className="px-4 py-3 whitespace-nowrap">
+                          Due Date
+                        </th>
 
-                      {/* Suite */}
-                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {task.suite_name ?? <Dash />}
-                      </td>
+                        <th className="px-4 py-3 whitespace-nowrap">
+                          Created By
+                        </th>
 
-                      {/* Assignees */}
-                      <td
-                        className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400"
-                        style={{
-                          minWidth: "180px",
-                          maxWidth: "220px",
-                        }}
-                      >
-                        <span className="break-words leading-snug">
-                          {task.assignees ?? <Dash />}
-                        </span>
-                      </td>
+                        <th className="px-4 py-3 whitespace-nowrap">
+                          Created At
+                        </th>
 
-                      {/* Due Date */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {task.due_date ? (
-                          <span
-                            className={`text-xs font-medium ${
-                              overdue
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-gray-700 dark:text-gray-200"
-                            }`}
+                        <th className="px-4 py-3 whitespace-nowrap">
+                          Updated By
+                        </th>
+
+                        <th className="px-4 py-3 whitespace-nowrap">
+                          Updated At
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
+                      {paginated.length > 0 ? (
+                        paginated.map((task, index) => {
+                          const overdue = isOverdue(task.due_date, task.status);
+                          const statusKey = task.status.toLowerCase();
+                          const priorityKey = task.priority.toLowerCase();
+
+                          return (
+                            <tr
+                              key={task.id}
+                              className={`transition duration-150 ${
+                                overdue
+                                  ? "bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                  : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                              }`}
+                            >
+                              {/* Index */}
+                              <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
+                                {(safePage - 1) * pageSize + index + 1}
+                              </td>
+
+                              {/* Code */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                  {task.task_code}
+                                </span>
+                              </td>
+
+                              {/* Title */}
+                              <td
+                                className="px-4 py-3"
+                                style={{
+                                  minWidth: "220px",
+                                  maxWidth: "300px",
+                                }}
+                              >
+                                <div className="flex items-start gap-1.5">
+                                  {overdue && (
+                                    <FaExclamationCircle className="text-red-500 dark:text-red-400 w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                  )}
+
+                                  <span
+                                    className="text-sm font-medium text-gray-900 dark:text-white leading-snug overflow-hidden line-clamp-2"
+                                    title={task.title}
+                                  >
+                                    {task.title}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Status */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span
+                                  className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
+                                    STATUS_COLORS[statusKey] ??
+                                    "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {task.status}
+                                </span>
+                              </td>
+
+                              {/* Priority */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span
+                                  className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
+                                    PRIORITY_COLORS[priorityKey] ??
+                                    "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {task.priority}
+                                </span>
+                              </td>
+
+                              {/* Project */}
+                              <td className="px-4 py-3 whitespace-nowrap text-xs">
+                                {task.project_name ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium">
+                                    {task.project_name}
+                                  </span>
+                                ) : (
+                                  <Dash />
+                                )}
+                              </td>
+
+                              {/* Suite */}
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                {task.suite_name ?? <Dash />}
+                              </td>
+
+                              {/* Assignees */}
+                              <td
+                                className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400"
+                                style={{
+                                  minWidth: "180px",
+                                  maxWidth: "220px",
+                                }}
+                              >
+                                <span className="break-words leading-snug">
+                                  {task.assignees ?? <Dash />}
+                                </span>
+                              </td>
+
+                              {/* Due Date */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {task.due_date ? (
+                                  <span
+                                    className={`text-xs font-medium ${
+                                      overdue
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-gray-700 dark:text-gray-200"
+                                    }`}
+                                  >
+                                    {new Date(task.due_date).toLocaleDateString(
+                                      "en-GB",
+                                      {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      },
+                                    )}
+                                  </span>
+                                ) : (
+                                  <Dash />
+                                )}
+                              </td>
+
+                              {/* Created By */}
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                {task.created_by_name ?? <Dash />}
+                              </td>
+
+                              {/* Created At */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {formatDate(task.created_at)}
+                              </td>
+
+                              {/* Updated By */}
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                {task.updated_by_name ?? <Dash />}
+                              </td>
+
+                              {/* Updated At */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {formatDate(task.updated_at)}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={13}
+                            className="text-center py-8 text-gray-500 dark:text-gray-400"
                           >
-                            {new Date(task.due_date).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )}
-                          </span>
-                        ) : (
-                          <Dash />
-                        )}
-                      </td>
+                            {activeFilterCount > 0
+                              ? "No tasks match the current filters."
+                              : "No tasks found."}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
 
-                      {/* Created By */}
-                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {task.created_by_name ?? <Dash />}
-                      </td>
-
-                      {/* Created At */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {formatDate(task.created_at)}
-                      </td>
-
-                      {/* Updated By */}
-                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {task.updated_by_name ?? <Dash />}
-                      </td>
-
-                      {/* Updated At */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {formatDate(task.updated_at)}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td
-                    colSpan={13}
-                    className="text-center py-8 text-gray-500 dark:text-gray-400"
-                  >
-                    {activeFilterCount > 0
-                      ? "No tasks match the current filters."
-                      : "No tasks found."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    {/* Pagination */}
-    <TablePagination
-      totalItems={filtered.length}
-      currentPage={safePage}
-      totalPages={totalPages}
-      pageSize={pageSize}
-      pageSizeOptions={PAGE_SIZE_OPTIONS}
-      onPageChange={handlePageChange}
-      onPageSizeChange={handlePageSizeChange}
-    />
-  </>
-)}
+            {/* Pagination */}
+            <TablePagination
+              totalItems={filtered.length}
+              currentPage={safePage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </>
+        )}
       </div>
     </div>
   );
