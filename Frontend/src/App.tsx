@@ -13,11 +13,12 @@ import Departments from "./pages/Departments";
 import Roles from "./pages/Roles";
 import Unauthorized from "./pages/Unauthorized"; // ✅ add this
 import Teams from "./pages/Teams";
-import UserReport from './pages/UserReport';
+import UserReport from './pages/Reports/UserReport';
 import Projects from "./pages/TestManagement/Projects";
 import TestSuites from "./pages/TestManagement/TestSuites";
 import TestCases from "./pages/TestManagement/TestCases";
 import Tasks from "./pages/Tasks/Tasks";
+import TasksReport from "./pages/Reports/TasksReport";
 
 export default function App() {
   return (
@@ -59,6 +60,7 @@ export default function App() {
             <Route path="/roles" element={<Roles />} />
             <Route path="/teams" element={<Teams />} />
             <Route path="/reports/users" element={<UserReport />} />
+            <Route path="/reports/tasks" element={<TasksReport />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/test-suites" element={<TestSuites />} />
             <Route path="/test-cases" element={<TestCases />} />

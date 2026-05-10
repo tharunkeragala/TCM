@@ -5,5 +5,6 @@ const reportController = require("../controllers/reportController");
 
 
 router.get("/users/list",                   verifyToken, reportController.getUsersList);
+router.get("/tasks/list",                   verifyToken, reportController.getTasksReport);
 
 module.exports = router;
