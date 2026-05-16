@@ -822,7 +822,7 @@ span.flatpickr-weekday,
 
 /* Dark mode scrollbar */
 @media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-track {
+  .dark ::-webkit-scrollbar-track {
     background: #2c2c2c; /* Dark background */
   }
 
