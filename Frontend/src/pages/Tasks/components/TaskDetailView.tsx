@@ -62,7 +62,9 @@ export default function TaskDetailView({
       commentText.substring(0, start) + mention + commentText.substring(end);
     setCommentText(newText);
     setMentions((prev) =>
-      prev.includes(userId) ? prev.filter((x) => x !== userId) : [...prev, userId],
+      prev.includes(userId)
+        ? prev.filter((x) => x !== userId)
+        : [...prev, userId],
     );
     setTimeout(() => {
       textarea.focus();
@@ -151,7 +153,15 @@ export default function TaskDetailView({
         </div>
       </div>
 
-      {/* ── Description ────────────────────────────────────────────────────── */}
+      {/* ── Title & Description ────────────────────────────────────────────────────── */}
+      {task.title && (
+        <div>
+          <p className={SECTION_TITLE}>Title</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-lg leading-relaxed">
+            {task.title}
+          </p>
+        </div>
+      )}
       {task.description && (
         <div>
           <p className={SECTION_TITLE}>Description</p>
@@ -398,7 +408,9 @@ export default function TaskDetailView({
               {task.created_by_name || "—"}
             </span>
           </p>
-          {task.created_at && <p className="mt-0.5">{formatDateTime(task.created_at)}</p>}
+          {task.created_at && (
+            <p className="mt-0.5">{formatDateTime(task.created_at)}</p>
+          )}
         </div>
         <div>
           <p>
@@ -407,7 +419,9 @@ export default function TaskDetailView({
               {task.updated_by_name || "—"}
             </span>
           </p>
-          {task.updated_at && <p className="mt-0.5">{formatDateTime(task.updated_at)}</p>}
+          {task.updated_at && (
+            <p className="mt-0.5">{formatDateTime(task.updated_at)}</p>
+          )}
         </div>
       </div>
     </div>

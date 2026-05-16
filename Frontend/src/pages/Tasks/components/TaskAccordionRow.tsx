@@ -24,7 +24,12 @@ interface Props {
   onView: (t: Task) => void;
 }
 
-export default function TaskAccordionRow({ task, onEdit, onDelete, onView }: Props) {
+export default function TaskAccordionRow({
+  task,
+  onEdit,
+  onDelete,
+  onView,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<Task | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -87,8 +92,10 @@ export default function TaskAccordionRow({ task, onEdit, onDelete, onView }: Pro
             </span>
 
             {/* Title */}
-            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {task.title}
+            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-[180px]">
+              {task.title.length > 30
+                ? `${task.title.slice(0, 30)}...`
+                : task.title}
             </span>
 
             {/* Overdue badge */}

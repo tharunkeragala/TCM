@@ -14,6 +14,16 @@ interface Props {
 export default function AccordionDetail({ detail }: Props) {
   return (
     <div className="space-y-5">
+      {/* Title */}
+      {detail.title && detail.title.length > 30 && (
+        <div className={RAIL}>
+          <p className={SECTION_TITLE}>Title</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+            {detail.title}
+          </p>
+        </div>
+      )}
+
       {/* Description */}
       {detail.description && (
         <div className={RAIL}>
