@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
+import axios from "../../utils/axios";
 import {
   FaSearch,
   FaTimes,
@@ -126,7 +127,7 @@ export default function TasksReport() {
   // ── Pagination state ──────────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
+  const [exporting, setExporting] = useState(false);
   // ── Derived dropdown options ───────────────────────────────────────────────
   const projects = useMemo(
     () =>
@@ -292,8 +293,64 @@ export default function TasksReport() {
   }, [tasks]);
 
   // ── Excel export ──────────────────────────────────────────────────────────
-  const handleExport = () => {
-    const rows = filtered.map((t, i) => ({
+  const handleExport = async () => {
+  try {
+    setExporting(true);
+
+    // Fetch ALL tasks without pagination
+    const response = await axios.get(
+      "/api/reports/tasks/list?download=true",
+      {
+        withCredentials: true,
+      },
+    );
+
+    const allTasks: TaskReport[] = response.data.data || [];
+
+    // Apply SAME frontend filters to full dataset
+    const q = search.toLowerCase().trim();
+
+    const exportFiltered = allTasks.filter((t) => {
+      if (
+        q &&
+        !t.title.toLowerCase().includes(q) &&
+        !t.task_code.toLowerCase().includes(q) &&
+        !(t.project_name ?? "").toLowerCase().includes(q) &&
+        !(t.suite_name ?? "").toLowerCase().includes(q) &&
+        !(t.assignees ?? "").toLowerCase().includes(q) &&
+        !(t.tags ?? "").toLowerCase().includes(q) &&
+        !(t.created_by_name ?? "").toLowerCase().includes(q) &&
+        !String(t.id).includes(q)
+      )
+        return false;
+
+      if (filterStatus && t.status !== filterStatus) return false;
+
+      if (filterPriority && t.priority !== filterPriority) return false;
+
+      if (filterProject && t.project_name !== filterProject) return false;
+
+      if (filterSuite && t.suite_name !== filterSuite) return false;
+
+      if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
+        return false;
+
+      if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
+        return false;
+
+      if (
+        filterAssignee &&
+        !(t.assignees ?? "")
+          .split(",")
+          .map((a) => a.trim())
+          .includes(filterAssignee)
+      )
+        return false;
+
+      return true;
+    });
+
+    const rows = exportFiltered.map((t, i) => ({
       "#": i + 1,
       "Task Code": t.task_code,
       Title: t.title,
@@ -312,6 +369,7 @@ export default function TasksReport() {
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
+
     ws["!cols"] = [
       { wch: 5 },
       { wch: 12 },
@@ -329,8 +387,11 @@ export default function TasksReport() {
       { wch: 16 },
       { wch: 22 },
     ];
+
     const wb = XLSX.utils.book_new();
+
     XLSX.utils.book_append_sheet(wb, ws, "Tasks Report");
+
     const stamp = new Date()
       .toLocaleDateString("en-GB", {
         day: "2-digit",
@@ -338,8 +399,15 @@ export default function TasksReport() {
         year: "numeric",
       })
       .replace(/ /g, "-");
+
     XLSX.writeFile(wb, `Tasks_Report_${stamp}.xlsx`);
-  };
+  } catch (err) {
+    console.error("Excel export failed:", err);
+    alert("Failed to export Excel report");
+  } finally {
+    setExporting(false);
+  }
+};
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -459,17 +527,19 @@ export default function TasksReport() {
                 </button>
               )}
               <button
-                onClick={handleExport}
-                disabled={loading || filtered.length === 0}
+  onClick={handleExport}
+  disabled={loading || exporting || filtered.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition duration-150 whitespace-nowrap"
               >
                 <FaFileExcel />
-                Export Excel
-                {!loading && filtered.length > 0 && (
-                  <span className="bg-green-500 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none">
-                    {filtered.length}
-                  </span>
-                )}
+
+{exporting ? "Exporting..." : "Export Excel"}
+
+{!loading && !exporting && filtered.length > 0 && (
+  <span className="bg-green-500 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none">
+    {filtered.length}
+  </span>
+)}
               </button>
             </div>
           </div>

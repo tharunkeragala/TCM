@@ -14,22 +14,18 @@ const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
   const [isBlurred, setIsBlurred] = useState(false);
   const [isDesktop, setIsDesktop] = useState(
-    typeof window !== "undefined"
-      ? window.innerWidth >= LG_BREAKPOINT
-      : false,
+    typeof window !== "undefined" ? window.innerWidth >= LG_BREAKPOINT : false,
   );
 
-  const { isMobileOpen, toggleSidebar, toggleMobileSidebar, isExpanded } =
+  const { isMobileOpen, toggleSidebar, toggleMobileSidebar, isExpanded, isHovered } =
     useSidebar();
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sidebar width
-  const sidebarWidth = isExpanded
-    ? SIDEBAR_EXPANDED_WIDTH
-    : SIDEBAR_COLLAPSED_WIDTH;
+  // Header left offset tracks the currently visible sidebar width
+  const sidebarWidth =
+    isExpanded || isHovered ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
-  // Toggle sidebar
   const handleToggle = () => {
     if (window.innerWidth >= LG_BREAKPOINT) {
       toggleSidebar();
@@ -38,32 +34,22 @@ const AppHeader: React.FC = () => {
     }
   };
 
-  // Detect screen size
   useEffect(() => {
-    const onResize = () => {
-      setIsDesktop(window.innerWidth >= LG_BREAKPOINT);
-    };
-
+    const onResize = () => setIsDesktop(window.innerWidth >= LG_BREAKPOINT);
     window.addEventListener("resize", onResize);
-
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Blur effect when modal opens
+  // Blur when a modal is open
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsBlurred(document.body.classList.contains("modal-open"));
     });
-
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
     return () => observer.disconnect();
   }, []);
 
-  // Keyboard shortcut
+  // Ctrl/Cmd + K → focus search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -71,13 +57,10 @@ const AppHeader: React.FC = () => {
         inputRef.current?.focus();
       }
     };
-
     document.addEventListener("keydown", handleKeyDown);
-
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Header positioning
   const headerStyle = isDesktop
     ? {
         left: `${sidebarWidth}px`,
@@ -93,132 +76,120 @@ const AppHeader: React.FC = () => {
 
   return (
     <>
-      {/* Fixed Header */}
       <header
         style={headerStyle}
-        className={`fixed top-0 right-0 bg-slate-800 shadow-md z-50 ${
+        className={`fixed top-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 ${
           isBlurred ? "blur-sm pointer-events-none select-none" : ""
         }`}
       >
-        <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-          {/* LEFT SECTION */}
-          <div className="flex items-center gap-3">
-            {/* Sidebar Toggle */}
+        <div className="flex items-center justify-between h-full px-4 lg:px-5">
+          {/* ── LEFT ─────────────────────────────── */}
+          <div className="flex items-center gap-2">
+            {/* Sidebar toggle */}
             <button
-              className="flex items-center justify-center w-9 h-9 text-slate-300 rounded-md hover:bg-slate-700 transition-colors"
               onClick={handleToggle}
               aria-label="Toggle Sidebar"
+              className="flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 dark:text-gray-400
+                         hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
             >
               {isMobileOpen ? (
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
+                /* Close icon */
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path
                     fillRule="evenodd"
                     clipRule="evenodd"
-                    d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
+                    d="M6.22 7.28a1 1 0 0 1 1.42-1.42L12 10.59l4.36-4.73a1 1 0 1 1 1.46 1.37L13.06 12l4.76 4.72a1 1 0 1 1-1.42 1.42L12 13.41l-4.36 4.73a1 1 0 1 1-1.46-1.37L10.94 12 6.22 7.28Z"
                     fill="currentColor"
                   />
                 </svg>
               ) : (
-                <svg
-                  width="16"
-                  height="12"
-                  viewBox="0 0 16 12"
-                  fill="none"
-                >
+                /* Hamburger icon */
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
                   <path
                     fillRule="evenodd"
                     clipRule="evenodd"
-                    d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z"
+                    d="M0 1a1 1 0 0 1 1-1h16a1 1 0 1 1 0 2H1a1 1 0 0 1-1-1Zm0 12a1 1 0 0 1 1-1h16a1 1 0 1 1 0 2H1a1 1 0 0 1-1-1ZM1 6a1 1 0 1 0 0 2h9a1 1 0 1 0 0-2H1Z"
                     fill="currentColor"
                   />
                 </svg>
               )}
             </button>
 
-            {/* Mobile Logo */}
+            {/* Logo (mobile only — desktop logo lives in the sidebar) */}
             <Link to="/" className="lg:hidden">
               <img
-                className="dark:hidden h-8"
-                src="./images/logo/logo.svg"
+                className="dark:hidden h-7"
+                src="/images/logo/logo.svg"
                 alt="Logo"
               />
               <img
-                className="hidden dark:block h-8"
-                src="./images/logo/logo-dark.svg"
+                className="hidden dark:block h-7"
+                src="/images/logo/logo-dark.svg"
                 alt="Logo"
               />
             </Link>
 
-            {/* Search */}
-            <div className="hidden lg:block">
+            {/* Search (desktop) */}
+            <div className="hidden lg:block ml-1">
               <div className="relative">
+                <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                  <svg
+                    className="w-4 h-4 text-gray-400"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      clipRule="evenodd"
+                      d="M3 9a6 6 0 1 1 12 0A6 6 0 0 1 3 9Zm6-8a8 8 0 1 0 4.906 14.32l3.387 3.387a1 1 0 0 0 1.414-1.414l-3.387-3.387A8 8 0 0 0 9 1Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </span>
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Search..."
-                  className="h-10 xl:w-[340px] rounded-md border border-slate-600 bg-slate-700/60 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+                  placeholder="Search…"
+                  className="h-9 w-64 xl:w-80 rounded-lg border border-gray-200 dark:border-gray-700
+                             bg-gray-50 dark:bg-gray-800 pl-9 pr-12
+                             text-sm text-gray-900 dark:text-white placeholder:text-gray-400
+                             focus:border-brand-500 dark:focus:border-brand-500 focus:outline-none
+                             transition-colors duration-150"
                 />
-
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 fill-slate-400"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                >
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M3.04175 9.37363C3.04175 5.87693 5.87711 3.04199 9.37508 3.04199C12.8731 3.04199 15.7084 5.87693 15.7084 9.37363C15.7084 12.8703 12.8731 15.7053 9.37508 15.7053C5.87711 15.7053 3.04175 12.8703 3.04175 9.37363Z"
-                    fill=""
-                  />
-                </svg>
+                <kbd className="absolute inset-y-0 right-3 flex items-center gap-0.5 text-[11px]
+                                text-gray-400 dark:text-gray-500 pointer-events-none">
+                  <span className="font-sans">⌘</span>K
+                </kbd>
               </div>
             </div>
           </div>
 
-          {/* RIGHT SECTION */}
-          <div className="flex items-center gap-3">
+          {/* ── RIGHT ────────────────────────────── */}
+          <div className="flex items-center gap-1.5">
             <ThemeToggleButton />
             <NotificationDropdown />
             <UserDropdown />
 
-            {/* Mobile Menu */}
+            {/* Mobile overflow menu toggle */}
             <button
-              onClick={() =>
-                setApplicationMenuOpen(!isApplicationMenuOpen)
-              }
-              className="lg:hidden flex items-center justify-center w-9 h-9 text-slate-300 rounded-md hover:bg-slate-700"
+              onClick={() => setApplicationMenuOpen(!isApplicationMenuOpen)}
+              aria-label="Application menu"
+              className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg
+                         text-gray-500 dark:text-gray-400
+                         hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
             >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M5.99902 10.4951C6.82745 10.4951 7.49902 11.1667 7.49902 11.9951V12.0051C7.49902 12.8335 6.82745 13.5051 5.99902 13.5051C5.1706 13.5051 4.49902 12.8335 4.49902 12.0051V11.9951C4.49902 11.1667 5.1706 10.4951 5.99902 10.4951Z"
-                  fill="currentColor"
-                />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" />
               </svg>
             </button>
           </div>
         </div>
       </header>
 
-      {/* PAGE SPACER */}
-      <div
-        style={{
-          height: `${HEADER_HEIGHT}px`,
-        }}
-      />
+      {/* Push page content below the fixed header */}
+      <div style={{ height: HEADER_HEIGHT }} />
     </>
   );
 };

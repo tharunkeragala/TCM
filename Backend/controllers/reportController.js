@@ -48,44 +48,120 @@ exports.getUsersList = async (req, res) => {
 exports.getTasksReport = async (req, res) => {
   try {
     const pool = await poolPromise;
-    const result = await pool.request().query(`
+
+    // Query params
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+
+    // Excel download flag
+    const download = req.query.download === "true";
+
+    // Pagination calculation
+    const offset = (page - 1) * limit;
+
+    // Base query
+    let query = `
       SELECT
-        t.id, t.task_code, t.title, t.description,
-        t.status, t.priority, t.start_date, t.due_date,
-        t.project_id, t.suite_id, t.tags,
-        t.created_by, t.updated_by, t.created_at, t.updated_at,
-        u1.username   AS created_by_name,
-        u2.username   AS updated_by_name,
+        t.id,
+        t.task_code,
+        t.title,
+        t.description,
+        t.status,
+        t.priority,
+        t.start_date,
+        t.due_date,
+        t.project_id,
+        t.suite_id,
+        t.tags,
+        t.created_by,
+        t.updated_by,
+        t.created_at,
+        t.updated_at,
+
+        u1.username AS created_by_name,
+        u2.username AS updated_by_name,
+
         p.project_name,
         ts.suite_name,
+
         ISNULL(cc.comment_count, 0) AS comment_count,
-        STRING_AGG(u3.username, ', ') AS assignees
+        ISNULL(a.assignees, '') AS assignees
+
       FROM test_case_manager.dbo.tasks t
-      LEFT JOIN test_case_manager.dbo.users u1        ON u1.id = t.created_by
-      LEFT JOIN test_case_manager.dbo.users u2        ON u2.id = t.updated_by
-      LEFT JOIN test_case_manager.dbo.projects p      ON p.id  = t.project_id
-      LEFT JOIN test_case_manager.dbo.test_suites ts  ON ts.id = t.suite_id
+
+      LEFT JOIN test_case_manager.dbo.users u1
+        ON u1.id = t.created_by
+
+      LEFT JOIN test_case_manager.dbo.users u2
+        ON u2.id = t.updated_by
+
+      LEFT JOIN test_case_manager.dbo.projects p
+        ON p.id = t.project_id
+
+      LEFT JOIN test_case_manager.dbo.test_suites ts
+        ON ts.id = t.suite_id
+
       LEFT JOIN (
-        SELECT task_id, COUNT(*) AS comment_count
+        SELECT
+          task_id,
+          COUNT(*) AS comment_count
         FROM test_case_manager.dbo.task_comments
         GROUP BY task_id
-      ) cc ON cc.task_id = t.id
-      LEFT JOIN test_case_manager.dbo.task_assignments ta ON ta.task_id = t.id
-      LEFT JOIN test_case_manager.dbo.users u3            ON u3.id = ta.user_id
+      ) cc
+        ON cc.task_id = t.id
+
+      LEFT JOIN (
+        SELECT
+          ta.task_id,
+          STRING_AGG(u.username, ', ') AS assignees
+        FROM test_case_manager.dbo.task_assignments ta
+        INNER JOIN test_case_manager.dbo.users u
+          ON u.id = ta.user_id
+        GROUP BY ta.task_id
+      ) a
+        ON a.task_id = t.id
+
       WHERE t.is_archived = 0
-      GROUP BY
-        t.id, t.task_code, t.title, t.description,
-        t.status, t.priority, t.start_date, t.due_date,
-        t.project_id, t.suite_id, t.tags,
-        t.created_by, t.updated_by, t.created_at, t.updated_at,
-        u1.username, u2.username, p.project_name, ts.suite_name,
-        cc.comment_count
+
       ORDER BY t.created_at DESC
+    `;
+
+    // Add pagination ONLY for UI/API
+    if (!download) {
+      query += `
+        OFFSET ${offset} ROWS
+        FETCH NEXT ${limit} ROWS ONLY
+      `;
+    }
+
+    // Execute main query
+    const result = await pool.request().query(query);
+
+    // Total count query
+    const totalResult = await pool.request().query(`
+      SELECT COUNT(*) AS total
+      FROM test_case_manager.dbo.tasks
+      WHERE is_archived = 0
     `);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    const total = totalResult.recordset[0].total;
+
+    res.status(200).json({
+      success: true,
+      page: download ? null : page,
+      limit: download ? null : limit,
+      total,
+      totalPages: download ? null : Math.ceil(total / limit),
+      data: result.recordset
+    });
+
   } catch (err) {
     console.error("GET Tasks Report Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch tasks report", error: err.message });
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch tasks report",
+      error: err.message
+    });
   }
 };

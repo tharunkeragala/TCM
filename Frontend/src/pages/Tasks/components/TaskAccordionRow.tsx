@@ -24,15 +24,11 @@ interface Props {
   onView: (t: Task) => void;
 }
 
-export default function TaskAccordionRow({
-  task,
-  onEdit,
-  onDelete,
-  onView,
-}: Props) {
+export default function TaskAccordionRow({ task, onEdit, onDelete, onView }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<Task | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
   const overdue = isOverdue(task.due_date, task.status);
 
   const handleExpand = async () => {
@@ -48,127 +44,138 @@ export default function TaskAccordionRow({
       } catch {}
       setLoadingDetail(false);
     }
-    setExpanded(!expanded);
+    setExpanded((prev) => !prev);
   };
+
+  // ── Border / bg variants ──────────────────────────────────────────────────
+  const cardCls = overdue
+    ? "border-red-200 dark:border-red-700/50"
+    : expanded
+      ? "border-brand-300 dark:border-brand-700/50"
+      : "border-gray-200 dark:border-gray-700 hover:border-brand-200 dark:hover:border-brand-700/50";
+
+  const headerCls = expanded
+    ? "bg-brand-50 dark:bg-brand-900/10"
+    : overdue
+      ? "bg-red-50 dark:bg-gray-900 hover:bg-red-50/80 dark:hover:bg-gray-800"
+      : "hover:bg-gray-50 dark:hover:bg-gray-800/50";
 
   return (
     <div
-      className={`w-full overflow-hidden rounded-xl border bg-white dark:bg-gray-900 transition-all duration-200 ${
-        overdue
-          ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-gray-900 hover:border-red-400 dark:hover:border-red-600"
-          : expanded
-            ? "border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-gray-900"
-            : "border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800"
-      } shadow-sm hover:shadow-md`}
+      className={`w-full overflow-hidden rounded-xl border bg-white dark:bg-gray-900 shadow-sm transition-all duration-200 ${cardCls}`}
     >
-      {/* Row header */}
+      {/* ── Row header ─────────────────────────────────────────────────────── */}
       <div
-        className={`flex items-center gap-4 px-5 py-4 cursor-pointer select-none rounded-t-xl transition-colors duration-200 min-w-0 overflow-hidden ${
-          expanded
-            ? "bg-blue-100 dark:bg-blue-900/30"
-            : "hover:bg-gray-100 dark:hover:bg-gray-800"
-        }`}
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer select-none transition-colors duration-150 min-w-0 ${headerCls}`}
         onClick={handleExpand}
       >
-        <button className="text-gray-500 dark:text-gray-400 flex-shrink-0">
+        {/* Chevron */}
+        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">
           {expanded ? (
-            <FaChevronUp className="w-4 h-4" />
+            <FaChevronUp className="w-3.5 h-3.5" />
           ) : (
-            <FaChevronDown className="w-4 h-4" />
+            <FaChevronDown className="w-3.5 h-3.5" />
           )}
-        </button>
+        </span>
 
+        {/* Title area */}
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-              <span
-                className="
-                  px-2 py-0.5
-                  text-xs font-bold
-                  rounded-md
-                  bg-blue-100 text-blue-700
-                  dark:bg-blue-900/40 dark:text-blue-300
-                  whitespace-nowrap flex-shrink-0
-                "
-              >
-                {task.task_code}
-              </span>
+            {/* Task code */}
+            <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-brand-100 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400 whitespace-nowrap flex-shrink-0">
+              {task.task_code}
+            </span>
 
-              <span
-                className="
-                  text-sm font-semibold
-                  text-gray-900 dark:text-white
-                  truncate
-                "
-              >
-                {task.title}
-              </span>
-            </div>
+            {/* Title */}
+            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              {task.title}
+            </span>
+
+            {/* Overdue badge */}
             {overdue && (
-              <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-semibold flex-shrink-0">
-                <FaExclamationCircle className="w-4 h-4" />
+              <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium flex-shrink-0">
+                <FaExclamationCircle className="w-3.5 h-3.5" />
                 Overdue
               </span>
             )}
           </div>
+
           {task.tags && <TagList tags={task.tags} />}
         </div>
 
-        <div className="hidden md:flex items-center gap-4 flex-wrap min-w-0">
+        {/* Meta chips (desktop) */}
+        <div className="hidden md:flex items-center gap-3 flex-wrap flex-shrink-0">
           {task.project_name && (
-            <span className="text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2.5 py-1 rounded-full whitespace-nowrap">
+            <span className="text-xs font-medium text-brand-700 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 px-2.5 py-1 rounded-full whitespace-nowrap">
               {task.project_name}
             </span>
           )}
           <PriorityBadge priority={task.priority} />
           <StatusBadge status={task.status} />
+
           {task.due_date && (
             <span
-              className={`flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${overdue ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-400"}`}
+              className={`flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${
+                overdue
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
             >
-              <FaCalendarAlt className="w-4 h-4" />
+              <FaCalendarAlt className="w-3.5 h-3.5" />
               {formatDate(task.due_date)}
             </span>
           )}
+
           {task.assignees && (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
-              <FaUser className="w-4 h-4" />
+            <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              <FaUser className="w-3.5 h-3.5" />
               {task.assignees}
             </span>
           )}
+
           {(task.comment_count ?? 0) > 0 && (
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
               💬 {task.comment_count}
             </span>
           )}
         </div>
 
-        {/* Actions — stop propagation so clicks don't toggle accordion */}
+        {/* Action icons — stop propagation */}
         <div
-          className="flex items-center gap-4 flex-shrink-0"
+          className="flex items-center gap-3 flex-shrink-0 ml-1"
           onClick={(e) => e.stopPropagation()}
         >
-          <FaEye
-            className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 w-4 h-4 transition-colors"
+          <button
             onClick={() => onView(task)}
-          />
-          <FaEdit
-            className="cursor-pointer text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 w-4 h-4 transition-colors"
+            className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            title="View"
+          >
+            <FaEye className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => onEdit(task)}
-          />
-          <FaTrash
-            className="cursor-pointer text-red-500 hover:text-red-700 dark:hover:text-red-400 w-4 h-4 transition-colors"
+            className="text-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+            title="Edit"
+          >
+            <FaEdit className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => onDelete(task)}
-          />
+            className="text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            title="Delete"
+          >
+            <FaTrash className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Expanded body */}
+      {/* ── Expanded body ───────────────────────────────────────────────────── */}
       {expanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-5">
+        <div className="border-t border-gray-200 dark:border-gray-800 px-5 py-4">
           {loadingDetail ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
-              Loading...
+            <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+              <span className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              Loading detail…
             </div>
           ) : detail ? (
             <AccordionDetail detail={detail} />

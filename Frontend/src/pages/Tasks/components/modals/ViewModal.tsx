@@ -1,4 +1,4 @@
-import { FaBell, FaExclamationCircle } from "react-icons/fa";
+import { FaExclamationCircle } from "react-icons/fa";
 import { Task, User } from "../../types";
 import { isOverdue } from "../../utils";
 import TagList from "../TagList";
@@ -38,33 +38,26 @@ export default function ViewModal({
     viewingTask && isOverdue(viewingTask.due_date, viewingTask.status);
 
   return (
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh] overflow-hidden">
-        {/* Header */}
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <div
-          className={`flex-shrink-0 px-6 pt-6 pb-4 border-b transition-colors ${
+          className={`flex-shrink-0 px-6 pt-5 pb-4 border-b transition-colors ${
             overdue
-              ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
-              : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+              ? "bg-red-50 dark:bg-red-500/5 border-red-200 dark:border-red-800/50"
+              : "bg-brand-50 dark:bg-brand-500/5 border-brand-200 dark:border-brand-800/50"
           }`}
         >
           <div className="flex items-start justify-between gap-3">
+            {/* Title block */}
             <div className="flex-1 min-w-0">
               {viewingTask && (
                 <>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className="
-                        px-2 py-0.5
-                        text-xs font-bold
-                        rounded-md
-                        bg-blue-100 text-blue-700
-                        dark:bg-blue-900/40 dark:text-blue-300
-                        whitespace-nowrap
-                      "
-                    >
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-brand-100 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400 whitespace-nowrap">
                       {viewingTask.task_code}
                     </span>
+
                     {viewingTask.tags && <TagList tags={viewingTask.tags} />}
 
                     {overdue && (
@@ -74,20 +67,19 @@ export default function ViewModal({
                       </span>
                     )}
                   </div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate">
                     {viewingTask.title}
                   </h2>
                 </>
               )}
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            {/* Action badges + close */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
               {viewingTask && (
                 <>
-                  <ReminderBadge
-                    taskId={viewingTask.id}
-                    onToast={onReminderSaved}
-                  />
+                  <ReminderBadge taskId={viewingTask.id} onToast={onReminderSaved} />
                   <StatusChangeBadge
                     task={viewingTask}
                     onToast={onReminderSaved}
@@ -103,8 +95,11 @@ export default function ViewModal({
 
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold leading-none ml-1"
                 title="Close (Esc)"
+                className="w-7 h-7 flex items-center justify-center rounded-md ml-1
+                           text-gray-400 hover:text-gray-600 dark:hover:text-gray-200
+                           hover:bg-white/60 dark:hover:bg-gray-800
+                           transition-colors duration-150 text-xl leading-none"
               >
                 &times;
               </button>
@@ -112,20 +107,23 @@ export default function ViewModal({
           </div>
         </div>
 
-        {/* Body */}
+        {/* ── Body ───────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {viewLoading && (
-            <div className="text-sm text-gray-400 py-4">Loading...</div>
-          )}
-
-          {!viewLoading && viewingTask && (
-            <TaskDetailView
-              task={viewingTask}
-              users={users}
-              onProgressAdded={onProgressAdded}
-              onCommentAdded={onCommentAdded}
-              onReminderSaved={onReminderSaved}
-            />
+          {viewLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
+              <span className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              Loading task details…
+            </div>
+          ) : (
+            viewingTask && (
+              <TaskDetailView
+                task={viewingTask}
+                users={users}
+                onProgressAdded={onProgressAdded}
+                onCommentAdded={onCommentAdded}
+                onReminderSaved={onReminderSaved}
+              />
+            )
           )}
         </div>
       </div>
