@@ -19,3 +19,7 @@ API.interceptors.request.use((config) => {
 });
 
 export default API;
+
+
+// console.log("ENV:", import.meta.env);
+// console.log("API URL:", import.meta.env.VITE_API_BASE_URL);

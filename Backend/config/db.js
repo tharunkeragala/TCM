@@ -2,17 +2,17 @@ const sql = require("mssql");
 
 
 // Sirinis PC
-const config = {
-  user: "app_user",
-  password: "password123",
-  server: "DESKTOP-29RLJ8O",
-  database: "test_case_manager",
-  options: {
-    instanceName: "SQLEXPRESS",
-    encrypt: true,
-    trustServerCertificate: true
-  }
-};
+// const config = {
+//   user: "app_user",
+//   password: "password123",
+//   server: "DESKTOP-29RLJ8O",
+//   database: "test_case_manager",
+//   options: {
+//     instanceName: "SQLEXPRESS",
+//     encrypt: true,
+//     trustServerCertificate: true
+//   }
+// };
 
 // Home PC
 // const config = {
@@ -26,6 +26,19 @@ const config = {
 //     trustServerCertificate: true
 //   }
 // };
+
+
+// Ofc PC
+const config = {
+  user: "tharun",
+  password: "tharun",
+  server: "LKSSWDEVS1",
+  database: "test_case_manager",
+  options: {
+    encrypt: true,
+    trustServerCertificate: true,
+  },
+};
 
 const poolPromise = sql.connect(config)
   .then(pool => {

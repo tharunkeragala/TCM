@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   FaEdit,
   FaTrash,
@@ -8,6 +9,8 @@ import {
   FaClipboardList,
   FaEye,
   FaPlus,
+  FaCode,
+  FaPlay,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -45,6 +48,7 @@ interface TestCase {
   created_at?: string;
   updated_at?: string;
   steps?: TestStep[];
+  playwright_script?: string;
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -152,6 +156,16 @@ function TestCaseViewModal({
               <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                 {tc.preconditions}
               </p>
+            </div>
+          )}
+          {tc.playwright_script && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                Playwright Script
+              </p>
+              <pre className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg max-h-56 overflow-auto font-mono whitespace-pre-wrap">
+                {tc.playwright_script}
+              </pre>
             </div>
           )}
           {tc.steps && tc.steps.length > 0 && (
@@ -299,13 +313,27 @@ function SuiteGroup({
                     )}
                   </div>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-4">
-                    <button
-                      onClick={() => onView(tc)}
-                      className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                      title="View"
+                    <Link
+  to={`/test-cases/${tc.id}`}
+  className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+  title="View Full Details"
+>
+  <FaEye className="w-3 h-3" />
+</Link>
+                    <Link
+                      to={`/playwright/editor/${tc.id}`}
+                      className="p-1.5 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-600 transition-colors"
+                      title="Edit Playwright Script"
                     >
-                      <FaEye className="w-3 h-3" />
-                    </button>
+                      <FaCode className="w-3 h-3" />
+                    </Link>
+                    <Link
+                      to={`/playwright/runner/${tc.id}`}
+                      className="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 transition-colors"
+                      title="Run Playwright Test"
+                    >
+                      <FaPlay className="w-3 h-3" />
+                    </Link>
                     <button
                       onClick={() => onEdit(tc)}
                       className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
@@ -349,6 +377,7 @@ export default function TestCases() {
     preconditions: "",
     priority: "Medium" as TestCase["priority"],
     status: "Draft" as TestCase["status"],
+    playwright_script: "",
   });
   const [steps, setSteps] = useState<TestStep[]>([emptyStep()]);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState("");
@@ -470,6 +499,7 @@ export default function TestCases() {
           preconditions: full.preconditions || "",
           priority: full.priority,
           status: full.status,
+          playwright_script: full.playwright_script || "",
         });
         setSteps(
           full.steps && full.steps.length > 0 ? full.steps : [emptyStep()],
@@ -484,6 +514,7 @@ export default function TestCases() {
         preconditions: tc.preconditions || "",
         priority: tc.priority,
         status: tc.status,
+        playwright_script: tc.playwright_script || "",
       });
       setSteps([emptyStep()]);
       setShowModal(true);
@@ -543,6 +574,7 @@ export default function TestCases() {
       preconditions: "",
       priority: "Medium",
       status: "Draft",
+      playwright_script: "",
     });
     setSteps([emptyStep()]);
     setSelectedProjectFilter("");
@@ -555,7 +587,19 @@ export default function TestCases() {
       <PageBreadcrumb pageTitle="Test Cases" />
 
       <div className="mt-4">
-        <div className="flex justify-end mb-4">
+        <div className="flex flex-wrap justify-end gap-2 mb-4">
+          <Link
+            to="/playwright/recorder"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition duration-150"
+          >
+            Record Playwright
+          </Link>
+          <Link
+            to="/playwright/runner"
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition duration-150"
+          >
+            Playwright Runner
+          </Link>
           <button
             onClick={() => {
               setEditingCase(null);
@@ -743,6 +787,32 @@ export default function TestCases() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Playwright Script
+                </label>
+                {editingCase && (
+                  <Link
+                    to={`/playwright/editor/${editingCase.id}`}
+                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    Open Full Editor
+                  </Link>
+                )}
+              </div>
+              <textarea
+                value={formData.playwright_script}
+                onChange={(e) =>
+                  setFormData({ ...formData, playwright_script: e.target.value })
+                }
+                placeholder="Paste or record Playwright script here. Example: await page.goto('https://example.com');"
+                rows={7}
+                spellCheck={false}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              />
             </div>
 
             {/* Test Steps */}

@@ -42,5 +42,11 @@ router.delete(
   checkPermission(MENU, "can_delete"),
   testCaseController.deleteTestCase
 );
+router.get(
+  "/:id/activity",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  testCaseController.getTestCaseActivity
+);
 
 module.exports = router;

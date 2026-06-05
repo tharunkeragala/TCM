@@ -154,7 +154,7 @@ exports.getTestCaseStepCount = async (req, res) => {
 // ✅ CREATE (with steps)
 exports.createTestCase = async (req, res) => {
   try {
-    const { suite_id, title, preconditions, priority, status, steps } =
+    const { suite_id, title, preconditions, priority, status, steps, playwright_script } =
       req.body;
     const userId = req.user?.id || null;
 
@@ -179,13 +179,14 @@ exports.createTestCase = async (req, res) => {
       .input("preconditions", sql.VarChar, preconditions || null)
       .input("priority", sql.VarChar, priority || "Medium")
       .input("status", sql.VarChar, status || "Draft")
+      .input("playwright_script", sql.NVarChar(sql.MAX), playwright_script || null)
       .input("created_by", sql.Int, userId)
       .input("updated_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.test_cases
-          (suite_id, title, preconditions, priority, status, created_by, updated_by)
+          (suite_id, title, preconditions, priority, status, playwright_script, created_by, updated_by)
         OUTPUT INSERTED.id
         VALUES
-          (@suite_id, @title, @preconditions, @priority, @status, @created_by, @updated_by)
+          (@suite_id, @title, @preconditions, @priority, @status, @playwright_script, @created_by, @updated_by)
       `);
 
     const testCaseId = caseResult.recordset[0].id;
@@ -240,7 +241,7 @@ exports.createTestCase = async (req, res) => {
 exports.updateTestCase = async (req, res) => {
   try {
     const { id } = req.params;
-    const { suite_id, title, preconditions, priority, status, steps } =
+    const { suite_id, title, preconditions, priority, status, steps, playwright_script } =
       req.body;
     const userId = req.user?.id || null;
 
@@ -260,6 +261,7 @@ exports.updateTestCase = async (req, res) => {
       .input("preconditions", sql.VarChar, preconditions || null)
       .input("priority", sql.VarChar, priority)
       .input("status", sql.VarChar, status)
+      .input("playwright_script", sql.NVarChar(sql.MAX), playwright_script || null)
       .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.test_cases
         SET suite_id      = @suite_id,
@@ -267,6 +269,7 @@ exports.updateTestCase = async (req, res) => {
             preconditions = @preconditions,
             priority      = @priority,
             status        = @status,
+            playwright_script = @playwright_script,
             updated_by    = @updated_by,
             updated_at    = GETDATE()
         WHERE id = @id
@@ -349,4 +352,28 @@ exports.deleteTestCase = async (req, res) => {
       error: err.message,
     });
   }
+};
+
+
+exports.getTestCaseActivity = async (req, res) => {
+  const { id } = req.params;
+  const pool = await poolPromise;
+
+  const result = await pool.request()
+    .input("id", sql.Int, id)
+    .query(`
+      SELECT
+          al.*,
+          u.username
+      FROM audit_logs al
+      LEFT JOIN users u
+          ON u.id = al.user_id
+      WHERE al.description LIKE '%' + CAST(@id AS VARCHAR) + '%'
+      ORDER BY al.created_at DESC
+    `);
+
+  res.json({
+    success: true,
+    data: result.recordset
+  });
 };

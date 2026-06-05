@@ -62,10 +62,21 @@ export default function ProtectedRoute() {
     return <div className="p-10 text-center">Loading...</div>;
   }
 
-  // 🚫 No access
-  if (!allowedPaths.has(normalize(location.pathname))) {
-    return <Navigate to="/unauthorized" replace />;
-  }
+  const currentPath = normalize(location.pathname);
+
+const hasAccess = Array.from(allowedPaths).some((allowedPath) => {
+  const normalizedAllowed = normalize(allowedPath);
+
+  return (
+    currentPath === normalizedAllowed ||
+    currentPath.startsWith(normalizedAllowed + "/")
+  );
+});
+
+// 🚫 No access
+if (!hasAccess) {
+  return <Navigate to="/unauthorized" replace />;
+}
 
   // ✅ Allowed
   return <Outlet />;

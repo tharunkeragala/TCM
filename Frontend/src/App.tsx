@@ -17,8 +17,10 @@ import UserReport from './pages/Reports/UserReport';
 import Projects from "./pages/TestManagement/Projects";
 import TestSuites from "./pages/TestManagement/TestSuites";
 import TestCases from "./pages/TestManagement/TestCases";
+import { PlaywrightRecorder, PlaywrightEditor, PlaywrightRunner, PlaywrightPreview } from "./pages/TestManagement/Playwright";
 import Tasks from "./pages/Tasks/Tasks";
 import TasksReport from "./pages/Reports/TasksReport";
+import TestCaseDetails from "./pages/TestManagement/TestCaseDetails";
 
 export default function App() {
   return (
@@ -64,6 +66,14 @@ export default function App() {
             <Route path="/projects" element={<Projects />} />
             <Route path="/test-suites" element={<TestSuites />} />
             <Route path="/test-cases" element={<TestCases />} />
+            <Route path="/test-cases/:id" element={<TestCaseDetails />} />
+            <Route path="/playwright/recorder" element={<PlaywrightRecorder />} />
+            <Route path="/playwright/editor" element={<PlaywrightEditor />} />
+            <Route path="/playwright/editor/:testCaseId" element={<PlaywrightEditor />} />
+            <Route path="/playwright/runner" element={<PlaywrightRunner />} />
+            <Route path="/playwright/runner/:testCaseId" element={<PlaywrightRunner />} />
+            <Route path="/playwright/preview" element={<PlaywrightPreview />} />
+            <Route path="/playwright/preview/:runId" element={<PlaywrightPreview />} />
             <Route path="/tasks" element={<Tasks />} />
           </Route>
         </Route>
