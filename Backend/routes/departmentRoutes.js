@@ -10,37 +10,37 @@ router.get(
   "/",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  departmentController.getDepartments
+  departmentController.getDepartments,
 );
 router.get(
   "/:id/assigned-users",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  departmentController.getAssignedUserCount
+  departmentController.getAssignedUserCount,
 );
 router.post(
   "/create",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  departmentController.createDepartment
+  departmentController.createDepartment,
 );
 router.put(
-"/update/:id",
+  "/update/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  departmentController.updateDepartment
+  departmentController.updateDepartment,
 );
 router.delete(
   "/delete/:id",
   verifyToken,
   checkPermission(MENU, "can_delete"),
-  departmentController.deleteDepartment
+  departmentController.deleteDepartment,
 );
 router.put(
-"/toggle/:id",
+  "/toggle/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  departmentController.toggleDepartment
+  departmentController.toggleDepartment,
 );
 
 module.exports = router;

@@ -7,8 +7,7 @@ exports.getProjects = async (req, res) => {
     const pool = await poolPromise;
 
     // 1. Get logged-in user's department from DB
-    const userResult = await pool.request()
-      .input("user_id", req.user.id)
+    const userResult = await pool.request().input("user_id", req.user.id)
       .query(`
         SELECT department_id 
         FROM users 
@@ -18,8 +17,7 @@ exports.getProjects = async (req, res) => {
     const userDeptId = userResult.recordset[0]?.department_id;
 
     // 2. Main query with safe filtering
-    const result = await pool.request()
-      .input("department_id", userDeptId)
+    const result = await pool.request().input("department_id", userDeptId)
       .query(`
         SELECT 
           p.*,
@@ -38,9 +36,8 @@ exports.getProjects = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: result.recordset
+      data: result.recordset,
     });
-
   } catch (err) {
     console.error("GET Projects Error:", err);
     res.status(500).json({
@@ -77,13 +74,11 @@ exports.getProjectById = async (req, res) => {
     res.status(200).json({ success: true, data: result.recordset[0] });
   } catch (err) {
     console.error("GET Project By ID Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch project",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch project",
+      error: err.message,
+    });
   }
 };
 
@@ -102,13 +97,11 @@ exports.getProjectSuiteCount = async (req, res) => {
     res.json({ success: true, count: result.recordset[0]?.suite_count ?? 0 });
   } catch (err) {
     console.error("GET Suite Count Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch suite count",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch suite count",
+      error: err.message,
+    });
   }
 };
 
@@ -165,13 +158,11 @@ exports.createProject = async (req, res) => {
       .json({ success: true, message: "Project created successfully" });
   } catch (err) {
     console.error("CREATE Project Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create project",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create project",
+      error: err.message,
+    });
   }
 };
 
@@ -231,13 +222,11 @@ exports.updateProject = async (req, res) => {
     res.json({ success: true, message: "Project updated successfully" });
   } catch (err) {
     console.error("UPDATE Project Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update project",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update project",
+      error: err.message,
+    });
   }
 };
 
@@ -280,13 +269,11 @@ exports.deleteProject = async (req, res) => {
     res.json({ success: true, message: "Project deleted successfully" });
   } catch (err) {
     console.error("DELETE Project Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to delete project",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete project",
+      error: err.message,
+    });
   }
 };
 
@@ -343,12 +330,10 @@ exports.toggleProject = async (req, res) => {
     });
   } catch (err) {
     console.error("TOGGLE Project Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update status",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update status",
+      error: err.message,
+    });
   }
 };

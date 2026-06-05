@@ -34,8 +34,7 @@ exports.getTeamsByDepartment = async (req, res) => {
 
     const result = await pool
       .request()
-      .input("department_id", sql.Int, department_id)
-      .query(`
+      .input("department_id", sql.Int, department_id).query(`
         SELECT id, team_name, is_active
         FROM test_case_manager.dbo.teams
         WHERE department_id = @department_id
@@ -59,10 +58,7 @@ exports.getAssignedUserCount = async (req, res) => {
 
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("team_id", sql.Int, id)
-      .query(`
+    const result = await pool.request().input("team_id", sql.Int, id).query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
         WHERE team_id = @team_id
@@ -99,8 +95,7 @@ exports.createTeam = async (req, res) => {
     const existing = await pool
       .request()
       .input("team_name", sql.VarChar, team_name)
-      .input("department_id", sql.Int, department_id)
-      .query(`
+      .input("department_id", sql.Int, department_id).query(`
         SELECT id FROM test_case_manager.dbo.teams
         WHERE team_name = @team_name AND department_id = @department_id
       `);
@@ -116,16 +111,18 @@ exports.createTeam = async (req, res) => {
       .request()
       .input("team_name", sql.VarChar, team_name)
       .input("department_id", sql.Int, department_id)
-      .input("is_active", sql.Bit, is_active ?? true)
-      .query(`
+      .input("is_active", sql.Bit, is_active ?? true).query(`
         INSERT INTO test_case_manager.dbo.teams (team_name, department_id, is_active)
         VALUES (@team_name, @department_id, @is_active)
       `);
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Team ${team_name} created under Department ID ${department_id}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `Team ${team_name} created under Department ID ${department_id}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('CREATE', 'TEAM', @description)
       `);
@@ -156,8 +153,7 @@ exports.updateTeam = async (req, res) => {
       .request()
       .input("team_name", sql.VarChar, team_name)
       .input("department_id", sql.Int, department_id)
-      .input("id", sql.Int, id)
-      .query(`
+      .input("id", sql.Int, id).query(`
         SELECT id FROM test_case_manager.dbo.teams
         WHERE team_name = @team_name
         AND department_id = @department_id
@@ -176,8 +172,7 @@ exports.updateTeam = async (req, res) => {
       .input("id", sql.Int, id)
       .input("team_name", sql.VarChar, team_name)
       .input("department_id", sql.Int, department_id)
-      .input("is_active", sql.Bit, is_active)
-      .query(`
+      .input("is_active", sql.Bit, is_active).query(`
         UPDATE test_case_manager.dbo.teams
         SET team_name     = @team_name,
             department_id = @department_id,
@@ -187,8 +182,7 @@ exports.updateTeam = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Team ID ${id} updated`)
-      .query(`
+      .input("description", sql.VarChar, `Team ID ${id} updated`).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('UPDATE', 'TEAM', @description)
       `);
@@ -210,10 +204,7 @@ exports.deleteTeam = async (req, res) => {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("team_id", sql.Int, id)
-      .query(`
+    const result = await pool.request().input("team_id", sql.Int, id).query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
         WHERE team_id = @team_id
@@ -222,10 +213,7 @@ exports.deleteTeam = async (req, res) => {
     const count = result.recordset[0]?.user_count ?? 0;
 
     if (count > 0) {
-      await pool
-        .request()
-        .input("team_id", sql.Int, id)
-        .query(`
+      await pool.request().input("team_id", sql.Int, id).query(`
           UPDATE test_case_manager.dbo.users
           SET team_id = NULL
           WHERE team_id = @team_id
@@ -233,8 +221,11 @@ exports.deleteTeam = async (req, res) => {
 
       await pool
         .request()
-        .input("description", sql.VarChar, `${count} user(s) detached from Team ID ${id}`)
-        .query(`
+        .input(
+          "description",
+          sql.VarChar,
+          `${count} user(s) detached from Team ID ${id}`,
+        ).query(`
           INSERT INTO audit_logs (action, module, description)
           VALUES ('DETACH', 'TEAM', @description)
         `);
@@ -247,8 +238,7 @@ exports.deleteTeam = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Team ID ${id} deleted`)
-      .query(`
+      .input("description", sql.VarChar, `Team ID ${id} deleted`).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('DELETE', 'TEAM', @description)
       `);
@@ -281,8 +271,7 @@ exports.toggleTeam = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("is_active", sql.Bit, is_active)
-      .query(`
+      .input("is_active", sql.Bit, is_active).query(`
         UPDATE test_case_manager.dbo.teams
         SET is_active = @is_active
         WHERE id = @id
@@ -290,8 +279,11 @@ exports.toggleTeam = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Team ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `Team ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('STATUS_CHANGE', 'TEAM', @description)
       `);

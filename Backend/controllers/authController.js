@@ -6,14 +6,13 @@ require("dotenv").config();
 const SECRET = process.env.JWT_SECRET;
 
 exports.login = async (req, res) => {
-    try {
-        const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-        const pool = await poolPromise;
+    const pool = await poolPromise;
 
-        const result = await pool.request()
-            .input("username", sql.VarChar, username)
-            .query(`
+    const result = await pool.request().input("username", sql.VarChar, username)
+      .query(`
                 SELECT TOP 1
                     u.id,
                     u.username,
@@ -32,83 +31,77 @@ exports.login = async (req, res) => {
                   AND u.is_active = 1
             `);
 
-        if (result.recordset.length === 0) {
-            return res.status(401).json({ message: "User not found or inactive" });
-        }
-
-        const user = result.recordset[0];
-
-        const match = await bcrypt.compare(password, user.password);
-
-        if (!match) {
-            return res.status(401).json({ message: "Invalid credentials" });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, role: user.role_name },
-            SECRET,
-            { expiresIn: "8h" }
-        );
-
-        res.json({
-            token,
-            user: {
-                id: user.id,
-                username: user.username,
-                role: user.role_name,
-                email: user.email,
-                department: {
-                    id: user.department_id,
-                    name: user.department_name
-                },
-                team: {
-                    id: user.team_id,
-                    name: user.team_name
-                }
-            }
-        });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Server Error");
+    if (result.recordset.length === 0) {
+      return res.status(401).json({ message: "User not found or inactive" });
     }
+
+    const user = result.recordset[0];
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign({ id: user.id, role: user.role_name }, SECRET, {
+      expiresIn: "8h",
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role_name,
+        email: user.email,
+        department: {
+          id: user.department_id,
+          name: user.department_name,
+        },
+        team: {
+          id: user.team_id,
+          name: user.team_name,
+        },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server Error");
+  }
 };
 
 exports.windowsLogin = async (req, res) => {
-    try {
-        const { windows_username } = req.body;
+  try {
+    const { windows_username } = req.body;
 
-        const pool = await poolPromise;
+    const pool = await poolPromise;
 
-        const result = await pool.request()
-            .input("windows_username", sql.VarChar, windows_username)
-            .query(`
+    const result = await pool
+      .request()
+      .input("windows_username", sql.VarChar, windows_username).query(`
                 SELECT users.*, roles.role_name 
                 FROM users 
                 JOIN roles ON users.role_id = roles.id
                 WHERE windows_username = @windows_username AND is_active = 1
             `);
 
-        if (result.recordset.length === 0) {
-            return res.status(401).json({ message: "Windows user not authorized" });
-        }
-
-        const user = result.recordset[0];
-
-        const token = jwt.sign(
-            { id: user.id, role: user.role_name },
-            SECRET,
-            { expiresIn: "8h" }
-        );
-
-        res.json({
-            token,
-            username: user.username,
-            role: user.role_name
-        });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Server Error");
+    if (result.recordset.length === 0) {
+      return res.status(401).json({ message: "Windows user not authorized" });
     }
+
+    const user = result.recordset[0];
+
+    const token = jwt.sign({ id: user.id, role: user.role_name }, SECRET, {
+      expiresIn: "8h",
+    });
+
+    res.json({
+      token,
+      username: user.username,
+      role: user.role_name,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server Error");
+  }
 };

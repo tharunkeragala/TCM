@@ -79,8 +79,7 @@ exports.createUser = async (req, res) => {
       .input("role_id", sql.Int, role_id)
       .input("department_id", sql.Int, department_id || null)
       .input("team_id", sql.Int, team_id || null)
-      .input("created_by", sql.Int, createdBy)
-      .query(`
+      .input("created_by", sql.Int, createdBy).query(`
         INSERT INTO users 
         (username, password, role_id, department_id, team_id, source, created_by, created_at, updated_at)
         VALUES 
@@ -89,8 +88,11 @@ exports.createUser = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `User ${username} created by ID ${createdBy}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `User ${username} created by ID ${createdBy}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('CREATE', 'USER', @description)
       `);
@@ -142,8 +144,7 @@ exports.addADUser = async (req, res) => {
       .input("role_id", sql.Int, role_id)
       .input("department_id", sql.Int, department_id || null)
       .input("team_id", sql.Int, team_id || null)
-      .input("created_by", sql.Int, createdBy)
-      .query(`
+      .input("created_by", sql.Int, createdBy).query(`
         INSERT INTO users 
         (username, windows_username, role_id, department_id, team_id, source, created_by, created_at, updated_at)
         VALUES 
@@ -152,8 +153,11 @@ exports.addADUser = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `AD User ${windows_username} added by ID ${createdBy}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `AD User ${windows_username} added by ID ${createdBy}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('CREATE', 'USER', @description)
       `);
@@ -199,8 +203,7 @@ exports.updateUser = async (req, res) => {
         .input("team_id", sql.Int, team_id || null)
         .input("is_active", sql.Bit, is_active)
         .input("password", sql.VarChar, hashedPassword)
-        .input("updated_by", sql.Int, updatedBy)
-        .query(`
+        .input("updated_by", sql.Int, updatedBy).query(`
           UPDATE users
           SET role_id       = @role_id,
               department_id = @department_id,
@@ -219,8 +222,7 @@ exports.updateUser = async (req, res) => {
         .input("department_id", sql.Int, department_id || null)
         .input("team_id", sql.Int, team_id || null)
         .input("is_active", sql.Bit, is_active)
-        .input("updated_by", sql.Int, updatedBy)
-        .query(`
+        .input("updated_by", sql.Int, updatedBy).query(`
           UPDATE users
           SET role_id       = @role_id,
               department_id = @department_id,
@@ -234,8 +236,11 @@ exports.updateUser = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `User ID ${id} updated by ID ${updatedBy}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `User ID ${id} updated by ID ${updatedBy}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('UPDATE', 'USER', @description)
       `);
@@ -275,8 +280,11 @@ exports.deleteUser = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `User ${username} deleted by ID ${deletedBy}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `User ${username} deleted by ID ${deletedBy}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('DELETE', 'USER', @description)
       `);
@@ -307,8 +315,7 @@ exports.toggleUser = async (req, res) => {
       .request()
       .input("id", sql.Int, id)
       .input("is_active", sql.Bit, is_active)
-      .input("updated_by", sql.Int, updatedBy)
-      .query(`
+      .input("updated_by", sql.Int, updatedBy).query(`
         UPDATE users
         SET is_active  = @is_active,
             updated_by = @updated_by,
@@ -318,8 +325,11 @@ exports.toggleUser = async (req, res) => {
 
     await pool
       .request()
-      .input("description", sql.VarChar, `User ID ${id} status changed by ID ${updatedBy}`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `User ID ${id} status changed by ID ${updatedBy}`,
+      ).query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('STATUS_CHANGE', 'USER', @description)
       `);

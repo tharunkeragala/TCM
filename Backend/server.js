@@ -84,74 +84,60 @@
 // app.listen(PORT, "0.0.0.0", () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
-
-
-const path = require('path');
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const { WebSocketServer } = require('ws');
-require('dotenv').config();
-require('./config/db');
+const path = require("path");
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const { WebSocketServer } = require("ws");
+require("dotenv").config();
+require("./config/db");
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
-const { attachWebSocketServer } = require('./services/wsHub');
+const { attachWebSocketServer } = require("./services/wsHub");
 attachWebSocketServer(wss);
 
-const publicPath = path.join(__dirname, 'public');
+const cron = require("node-cron");
+const { processReminders } = require("./controllers/reminderProcessor");
 
-const cron = require('node-cron');
-const { processReminders } = require('./controllers/reminderProcessor');
-
-cron.schedule('0 * * * *', () => {
+cron.schedule("0 * * * *", () => {
   processReminders();
 });
 
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
 }
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use('/screenshots', express.static(path.join(__dirname, 'screenshots')));
+app.use(express.json({ limit: "10mb" }));
+app.use("/screenshots", express.static(path.join(__dirname, "screenshots")));
 
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/tasks', require('./routes/taskRoutes'));
-app.use('/api/departments', require('./routes/departmentRoutes'));
-app.use('/api/roles', require('./routes/roleRoutes'));
-app.use('/api/teams', require('./routes/teamRoutes'));
-app.use('/api/projects', require('./routes/projectRoutes'));
-app.use('/api/test-suites', require('./routes/testSuiteRoutes'));
-app.use('/api/test-cases', require('./routes/testCaseRoutes'));
-app.use('/api/playwright', require('./routes/playwrightRoutes'));
-app.use('/api/dropdown', require('./routes/dropdownRoute'));
-app.use('/api/reports', require('./routes/reportRoutes'));
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/tasks", require("./routes/taskRoutes"));
+app.use("/api/departments", require("./routes/departmentRoutes"));
+app.use("/api/roles", require("./routes/roleRoutes"));
+app.use("/api/teams", require("./routes/teamRoutes"));
+app.use("/api/projects", require("./routes/projectRoutes"));
+app.use("/api/test-suites", require("./routes/testSuiteRoutes"));
+app.use("/api/test-cases", require("./routes/testCaseRoutes"));
+app.use("/api/playwright", require("./routes/playwrightRoutes"));
+app.use("/api/dropdown", require("./routes/dropdownRoute"));
+app.use("/api/reports", require("./routes/reportRoutes"));
 
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Test Case Manager API' });
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", service: "Test Case Manager API" });
 });
 
-app.use(express.static(publicPath, { index: false }));
-
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    return next();
-  }
-  res.sendFile(path.join(publicPath, 'index.html'), (err) => {
-    if (err) next(err);
-  });
+// 404 for any unmatched route
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
 });
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
-  console.log('Playwright WebSocket server ready');
+  console.log("Playwright WebSocket server ready");
 });

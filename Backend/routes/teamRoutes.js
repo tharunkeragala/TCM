@@ -11,7 +11,7 @@ router.get(
   "/",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  teamController.getTeams
+  teamController.getTeams,
 );
 
 // ✅ CREATE TEAM
@@ -19,7 +19,7 @@ router.post(
   "/create",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  teamController.createTeam
+  teamController.createTeam,
 );
 
 // ✅ UPDATE TEAM
@@ -27,7 +27,7 @@ router.put(
   "/update/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  teamController.updateTeam
+  teamController.updateTeam,
 );
 
 // ✅ DELETE TEAM
@@ -35,7 +35,7 @@ router.delete(
   "/delete/:id",
   verifyToken,
   checkPermission(MENU, "can_delete"),
-  teamController.deleteTeam
+  teamController.deleteTeam,
 );
 
 // ✅ TOGGLE TEAM STATUS
@@ -43,7 +43,7 @@ router.put(
   "/toggle/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  teamController.toggleTeam
+  teamController.toggleTeam,
 );
 
 // ✅ ASSIGNED USER COUNT
@@ -52,7 +52,7 @@ router.get(
   "/:id/assigned-users",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  teamController.getAssignedUserCount
+  teamController.getAssignedUserCount,
 );
 
 module.exports = router;

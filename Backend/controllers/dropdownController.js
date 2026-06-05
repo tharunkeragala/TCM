@@ -15,7 +15,13 @@ exports.getRolesDropdown = async (req, res) => {
     res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Roles Dropdown Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch roles", error: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch roles",
+        error: err.message,
+      });
   }
 };
 
@@ -34,7 +40,13 @@ exports.getDepartmentsDropdown = async (req, res) => {
     res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Departments Dropdown Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch departments", error: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch departments",
+        error: err.message,
+      });
   }
 };
 
@@ -53,7 +65,13 @@ exports.getTeamsDropdown = async (req, res) => {
     res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Teams Dropdown Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch teams", error: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch teams",
+        error: err.message,
+      });
   }
 };
 
@@ -63,9 +81,7 @@ exports.getTeamsByDepartment = async (req, res) => {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("department_id", sql.Int, id)
+    const result = await pool.request().input("department_id", sql.Int, id)
       .query(`
         SELECT id, team_name, is_active, department_id
         FROM test_case_manager.dbo.teams
@@ -76,7 +92,13 @@ exports.getTeamsByDepartment = async (req, res) => {
     res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Teams By Department Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch teams", error: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch teams",
+        error: err.message,
+      });
   }
 };
 
@@ -96,15 +118,14 @@ exports.getUsersDropdown = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: result.recordset
+      data: result.recordset,
     });
-
   } catch (err) {
     console.error("GET Users Error:", err);
     res.status(500).json({
       success: false,
       message: "Failed to fetch users",
-      error: err.message
+      error: err.message,
     });
   }
 };

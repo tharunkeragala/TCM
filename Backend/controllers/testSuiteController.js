@@ -10,8 +10,7 @@ exports.getTestSuites = async (req, res) => {
     const request = pool.request();
 
     // 1. Get logged-in user's department from DB (reliable way)
-    const userResult = await pool.request()
-      .input("user_id", req.user.id)
+    const userResult = await pool.request().input("user_id", req.user.id)
       .query(`
         SELECT department_id 
         FROM users 
@@ -60,9 +59,8 @@ exports.getTestSuites = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: result.recordset
+      data: result.recordset,
     });
-
   } catch (err) {
     console.error("GET Test Suites Error:", err);
     res.status(500).json({

@@ -10,43 +10,43 @@ router.get(
   "/",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  testCaseController.getTestCases
+  testCaseController.getTestCases,
 );
 router.get(
   "/:id/step-count",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  testCaseController.getTestCaseStepCount
+  testCaseController.getTestCaseStepCount,
 );
 router.get(
   "/:id",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  testCaseController.getTestCaseById
+  testCaseController.getTestCaseById,
 );
 router.post(
   "/create",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  testCaseController.createTestCase
+  testCaseController.createTestCase,
 );
 router.put(
   "/update/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  testCaseController.updateTestCase
+  testCaseController.updateTestCase,
 );
 router.delete(
   "/delete/:id",
   verifyToken,
   checkPermission(MENU, "can_delete"),
-  testCaseController.deleteTestCase
+  testCaseController.deleteTestCase,
 );
 router.get(
   "/:id/activity",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  testCaseController.getTestCaseActivity
+  testCaseController.getTestCaseActivity,
 );
 
 module.exports = router;

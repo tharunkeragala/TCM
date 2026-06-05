@@ -10,37 +10,37 @@ router.get(
   "/",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  testSuiteController.getTestSuites
+  testSuiteController.getTestSuites,
 );
 router.get(
   "/:id/case-count",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  testSuiteController.getSuiteCaseCount
+  testSuiteController.getSuiteCaseCount,
 );
 router.post(
   "/create",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  testSuiteController.createTestSuite
+  testSuiteController.createTestSuite,
 );
 router.put(
   "/update/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  testSuiteController.updateTestSuite
+  testSuiteController.updateTestSuite,
 );
 router.delete(
   "/delete/:id",
   verifyToken,
   checkPermission(MENU, "can_delete"),
-  testSuiteController.deleteTestSuite
+  testSuiteController.deleteTestSuite,
 );
 router.put(
   "/toggle/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  testSuiteController.toggleTestSuite
+  testSuiteController.toggleTestSuite,
 );
 
 module.exports = router;

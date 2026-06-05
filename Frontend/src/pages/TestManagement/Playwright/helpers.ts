@@ -39,14 +39,38 @@ export function formatSelector(selector: unknown) {
   return String(selector);
 }
 
+// export function screenshotUrl(path?: string | null) {
+//   if (!path) return "";
+//   if (path.startsWith("http")) return path;
+//   const baseURL = API.defaults?.baseURL || window.location.origin;
+//   const cleanBase = baseURL.replace(/\/$/, "");
+//   const cleanPath = path.startsWith("/") ? path : `/${path}`;
+//   return `${cleanBase}${cleanPath}`;
+// }
+
+// export function screenshotUrl(path?: string | null) {
+//   if (!path) return "";
+//   if (path.startsWith("http")) return path;
+
+//   const baseURL = API.defaults?.baseURL || window.location.origin;
+//   // Strip trailing slash and /api suffix — screenshots are at root level
+//   const cleanBase = baseURL.replace(/\/$/, "").replace(/\/api$/, "");
+//   const cleanPath = path.startsWith("/") ? path : `/${path}`;
+//   return `${cleanBase}${cleanPath}`;
+// }
+
 export function screenshotUrl(path?: string | null) {
   if (!path) return "";
   if (path.startsWith("http")) return path;
+
   const baseURL = API.defaults?.baseURL || window.location.origin;
-  const cleanBase = baseURL.replace(/\/$/, "");
+  const cleanBase = baseURL.replace(/\/$/, "").replace(/\/api$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${cleanBase}${cleanPath}`;
+  const result = `${cleanBase}${cleanPath}`;
+  console.log("screenshotUrl input:", path, "→ output:", result);
+  return result;
 }
+
 
 export const statusClass: Record<string, string> = {
   running: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",

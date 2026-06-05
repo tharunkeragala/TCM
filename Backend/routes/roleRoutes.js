@@ -13,43 +13,43 @@ router.get(
   "/:roleId/permissions",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  roleController.getRolePermissions
+  roleController.getRolePermissions,
 );
 router.post(
   "/save",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  roleController.saveRolePermissions
+  roleController.saveRolePermissions,
 );
 router.get(
   "/",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  roleController.getRoles
+  roleController.getRoles,
 );
 router.post(
   "/create",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  roleController.createRole
+  roleController.createRole,
 );
 router.put(
   "/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  roleController.updateRole
+  roleController.updateRole,
 );
 router.delete(
   "/:id",
   verifyToken,
   checkPermission(MENU, "can_delete"),
-  roleController.deleteRole
+  roleController.deleteRole,
 );
 router.get(
   "/:id/assigned-users",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  roleController.getAssignedUserCount
+  roleController.getAssignedUserCount,
 );
 
 module.exports = router;

@@ -43,7 +43,6 @@ exports.getUsersList = async (req, res) => {
   }
 };
 
-
 // ─── Tasks ──────────────────────────────────────────────────────
 exports.getTasksReport = async (req, res) => {
   try {
@@ -152,16 +151,15 @@ exports.getTasksReport = async (req, res) => {
       limit: download ? null : limit,
       total,
       totalPages: download ? null : Math.ceil(total / limit),
-      data: result.recordset
+      data: result.recordset,
     });
-
   } catch (err) {
     console.error("GET Tasks Report Error:", err);
 
     res.status(500).json({
       success: false,
       message: "Failed to fetch tasks report",
-      error: err.message
+      error: err.message,
     });
   }
 };

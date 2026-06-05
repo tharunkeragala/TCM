@@ -10,37 +10,37 @@ router.get(
   "/",
   verifyToken,
   checkPermission(MENU, "can_view"),
-  userController.getUsers
+  userController.getUsers,
 );
 router.post(
   "/create",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  userController.createUser
+  userController.createUser,
 );
 router.post(
   "/ad-user",
   verifyToken,
   checkPermission(MENU, "can_create"),
-  userController.addADUser
+  userController.addADUser,
 );
 router.put(
   "/update/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  userController.updateUser
+  userController.updateUser,
 );
 router.delete(
   "/delete/:id",
   verifyToken,
   checkPermission(MENU, "can_delete"),
-  userController.deleteUser
+  userController.deleteUser,
 );
 router.put(
   "/toggle/:id",
   verifyToken,
   checkPermission(MENU, "can_edit"),
-  userController.toggleUser
+  userController.toggleUser,
 );
 
 module.exports = router;

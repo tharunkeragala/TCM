@@ -1,80 +1,80 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { verifyToken } = require('../middleware/auth');
-const checkPermission = require('../middleware/checkPermission');
-const recorderController = require('../controllers/playwrightRecorderController');
-const runController = require('../controllers/playwrightRunController');
+const { verifyToken } = require("../middleware/auth");
+const checkPermission = require("../middleware/checkPermission");
+const recorderController = require("../controllers/playwrightRecorderController");
+const runController = require("../controllers/playwrightRunController");
 
-const MENU = '/test-cases';
-
-router.post(
-  '/recorder/start',
-  verifyToken,
-  checkPermission(MENU, 'can_create'),
-  recorderController.startRecording
-);
+const MENU = "/test-cases";
 
 router.post(
-  '/recorder/stop/:id',
+  "/recorder/start",
   verifyToken,
-  checkPermission(MENU, 'can_create'),
-  recorderController.stopRecording
+  checkPermission(MENU, "can_create"),
+  recorderController.startRecording,
 );
 
 router.post(
-  '/parse-steps',
+  "/recorder/stop/:id",
   verifyToken,
-  checkPermission(MENU, 'can_view'),
-  runController.parseSteps
+  checkPermission(MENU, "can_create"),
+  recorderController.stopRecording,
 );
 
 router.post(
-  '/test-cases/:id/run',
+  "/parse-steps",
   verifyToken,
-  checkPermission(MENU, 'can_edit'),
-  runController.runTestCase
-);
-
-router.get(
-  '/test-cases/:id/runs',
-  verifyToken,
-  checkPermission(MENU, 'can_view'),
-  runController.getRunsByTestCase
-);
-
-router.get(
-  '/runs/:runId',
-  verifyToken,
-  checkPermission(MENU, 'can_view'),
-  runController.getRunById
-);
-
-router.get(
-  '/runs/:runId/steps',
-  verifyToken,
-  checkPermission(MENU, 'can_view'),
-  runController.getRunSteps
+  checkPermission(MENU, "can_view"),
+  runController.parseSteps,
 );
 
 router.post(
-  '/runs/:runId/cancel',
+  "/test-cases/:id/run",
   verifyToken,
-  checkPermission(MENU, 'can_edit'),
-  runController.cancelRun
+  checkPermission(MENU, "can_edit"),
+  runController.runTestCase,
 );
 
 router.get(
-  '/stats',
+  "/test-cases/:id/runs",
   verifyToken,
-  checkPermission(MENU, 'can_view'),
-  runController.getStats
+  checkPermission(MENU, "can_view"),
+  runController.getRunsByTestCase,
 );
 
 router.get(
-  '/:id/runs',
+  "/runs/:runId",
   verifyToken,
-  checkPermission(MENU, 'can_view'),
-  runController.getRunsByTestCase
+  checkPermission(MENU, "can_view"),
+  runController.getRunById,
+);
+
+router.get(
+  "/runs/:runId/steps",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  runController.getRunSteps,
+);
+
+router.post(
+  "/runs/:runId/cancel",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  runController.cancelRun,
+);
+
+router.get(
+  "/stats",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  runController.getStats,
+);
+
+router.get(
+  "/:id/runs",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  runController.getRunsByTestCase,
 );
 
 module.exports = router;

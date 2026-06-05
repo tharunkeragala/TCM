@@ -351,13 +351,11 @@ AND t.is_archived = 0
     });
   } catch (err) {
     console.error("GET Task By ID Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch task",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch task",
+      error: err.message,
+    });
   }
 };
 
@@ -490,22 +488,18 @@ exports.createTask = async (req, res) => {
         VALUES ('CREATE', 'TASK', @description)
       `);
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Task created successfully",
-        id: taskId,
-      });
+    res.status(201).json({
+      success: true,
+      message: "Task created successfully",
+      id: taskId,
+    });
   } catch (err) {
     console.error("CREATE Task Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create task",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create task",
+      error: err.message,
+    });
   }
 };
 
@@ -625,13 +619,11 @@ exports.updateTask = async (req, res) => {
     res.json({ success: true, message: "Task updated successfully" });
   } catch (err) {
     console.error("UPDATE Task Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update task",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update task",
+      error: err.message,
+    });
   }
 };
 
@@ -714,13 +706,11 @@ exports.updateTaskStatus = async (req, res) => {
     res.json({ success: true, message: "Status updated successfully" });
   } catch (err) {
     console.error("UPDATE Task Status Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update status",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update status",
+      error: err.message,
+    });
   }
 };
 
@@ -817,13 +807,11 @@ exports.extendETA = async (req, res) => {
     res.json({ success: true, message: "ETA extended successfully" });
   } catch (err) {
     console.error("EXTEND ETA Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to extend ETA",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to extend ETA",
+      error: err.message,
+    });
   }
 };
 
@@ -858,13 +846,11 @@ exports.addProgress = async (req, res) => {
     res.status(201).json({ success: true, message: "Progress log added" });
   } catch (err) {
     console.error("ADD Progress Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to add progress",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to add progress",
+      error: err.message,
+    });
   }
 };
 
@@ -935,13 +921,11 @@ exports.addComment = async (req, res) => {
       .json({ success: true, message: "Comment added", id: commentId });
   } catch (err) {
     console.error("ADD Comment Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to add comment",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to add comment",
+      error: err.message,
+    });
   }
 };
 
@@ -965,13 +949,11 @@ exports.deleteComment = async (req, res) => {
     res.json({ success: true, message: "Comment deleted" });
   } catch (err) {
     console.error("DELETE Comment Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to delete comment",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete comment",
+      error: err.message,
+    });
   }
 };
 
@@ -1186,13 +1168,11 @@ exports.getNotifications = async (req, res) => {
     });
   } catch (err) {
     console.error("GET Notifications Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch notifications",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch notifications",
+      error: err.message,
+    });
   }
 };
 
@@ -1227,13 +1207,11 @@ exports.markNotificationsRead = async (req, res) => {
     res.json({ success: true, message: "Notifications marked as read" });
   } catch (err) {
     console.error("MARK Notifications Error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to mark notifications",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to mark notifications",
+      error: err.message,
+    });
   }
 };
 

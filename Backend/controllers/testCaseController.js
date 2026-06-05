@@ -10,8 +10,7 @@ exports.getTestCases = async (req, res) => {
     const request = pool.request();
 
     // 1. Get logged-in user's department (reliable)
-    const userResult = await pool.request()
-      .input("user_id", req.user.id)
+    const userResult = await pool.request().input("user_id", req.user.id)
       .query(`
         SELECT department_id 
         FROM users 
@@ -63,9 +62,8 @@ exports.getTestCases = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: result.recordset
+      data: result.recordset,
     });
-
   } catch (err) {
     console.error("GET Test Cases Error:", err);
     res.status(500).json({
@@ -154,8 +152,15 @@ exports.getTestCaseStepCount = async (req, res) => {
 // ✅ CREATE (with steps)
 exports.createTestCase = async (req, res) => {
   try {
-    const { suite_id, title, preconditions, priority, status, steps, playwright_script } =
-      req.body;
+    const {
+      suite_id,
+      title,
+      preconditions,
+      priority,
+      status,
+      steps,
+      playwright_script,
+    } = req.body;
     const userId = req.user?.id || null;
 
     if (!title?.trim()) {
@@ -179,7 +184,11 @@ exports.createTestCase = async (req, res) => {
       .input("preconditions", sql.VarChar, preconditions || null)
       .input("priority", sql.VarChar, priority || "Medium")
       .input("status", sql.VarChar, status || "Draft")
-      .input("playwright_script", sql.NVarChar(sql.MAX), playwright_script || null)
+      .input(
+        "playwright_script",
+        sql.NVarChar(sql.MAX),
+        playwright_script || null,
+      )
       .input("created_by", sql.Int, userId)
       .input("updated_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.test_cases
@@ -241,8 +250,15 @@ exports.createTestCase = async (req, res) => {
 exports.updateTestCase = async (req, res) => {
   try {
     const { id } = req.params;
-    const { suite_id, title, preconditions, priority, status, steps, playwright_script } =
-      req.body;
+    const {
+      suite_id,
+      title,
+      preconditions,
+      priority,
+      status,
+      steps,
+      playwright_script,
+    } = req.body;
     const userId = req.user?.id || null;
 
     if (!title?.trim()) {
@@ -261,7 +277,11 @@ exports.updateTestCase = async (req, res) => {
       .input("preconditions", sql.VarChar, preconditions || null)
       .input("priority", sql.VarChar, priority)
       .input("status", sql.VarChar, status)
-      .input("playwright_script", sql.NVarChar(sql.MAX), playwright_script || null)
+      .input(
+        "playwright_script",
+        sql.NVarChar(sql.MAX),
+        playwright_script || null,
+      )
       .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.test_cases
         SET suite_id      = @suite_id,
@@ -354,14 +374,11 @@ exports.deleteTestCase = async (req, res) => {
   }
 };
 
-
 exports.getTestCaseActivity = async (req, res) => {
   const { id } = req.params;
   const pool = await poolPromise;
 
-  const result = await pool.request()
-    .input("id", sql.Int, id)
-    .query(`
+  const result = await pool.request().input("id", sql.Int, id).query(`
       SELECT
           al.*,
           u.username
@@ -374,6 +391,6 @@ exports.getTestCaseActivity = async (req, res) => {
 
   res.json({
     success: true,
-    data: result.recordset
+    data: result.recordset,
   });
 };

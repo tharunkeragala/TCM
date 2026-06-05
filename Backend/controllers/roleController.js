@@ -68,10 +68,7 @@ exports.getAssignedUserCount = async (req, res) => {
 
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("role_id", sql.Int, id)
-      .query(`
+    const result = await pool.request().input("role_id", sql.Int, id).query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
         WHERE role_id = @role_id
@@ -110,8 +107,7 @@ exports.createRole = async (req, res) => {
     // ✅ Check duplicate
     const existing = await pool
       .request()
-      .input("role_name", sql.VarChar, role_name.trim())
-      .query(`
+      .input("role_name", sql.VarChar, role_name.trim()).query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE role_name = @role_name
       `);
@@ -124,9 +120,7 @@ exports.createRole = async (req, res) => {
     }
 
     // ✅ Insert
-    await pool
-      .request()
-      .input("role_name", sql.VarChar, role_name.trim())
+    await pool.request().input("role_name", sql.VarChar, role_name.trim())
       .query(`
         INSERT INTO test_case_manager.dbo.roles (role_name)
         VALUES (@role_name)
@@ -135,8 +129,7 @@ exports.createRole = async (req, res) => {
     // ✅ Audit log
     await pool
       .request()
-      .input("description", sql.VarChar, `Role '${role_name}' created`)
-      .query(`
+      .input("description", sql.VarChar, `Role '${role_name}' created`).query(`
         INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
         VALUES ('CREATE', 'ROLE', @description)
       `);
@@ -171,10 +164,7 @@ exports.updateRole = async (req, res) => {
     const pool = await poolPromise;
 
     // ✅ Check role exists
-    const existing = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`
+    const existing = await pool.request().input("id", sql.Int, id).query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE id = @id
       `);
@@ -190,8 +180,7 @@ exports.updateRole = async (req, res) => {
     const duplicate = await pool
       .request()
       .input("role_name", sql.VarChar, role_name.trim())
-      .input("id", sql.Int, id)
-      .query(`
+      .input("id", sql.Int, id).query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE role_name = @role_name AND id != @id
       `);
@@ -207,8 +196,7 @@ exports.updateRole = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("role_name", sql.VarChar, role_name.trim())
-      .query(`
+      .input("role_name", sql.VarChar, role_name.trim()).query(`
         UPDATE test_case_manager.dbo.roles
         SET role_name = @role_name
         WHERE id = @id
@@ -217,8 +205,11 @@ exports.updateRole = async (req, res) => {
     // ✅ Audit log
     await pool
       .request()
-      .input("description", sql.VarChar, `Role ID ${id} updated to '${role_name}'`)
-      .query(`
+      .input(
+        "description",
+        sql.VarChar,
+        `Role ID ${id} updated to '${role_name}'`,
+      ).query(`
         INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
         VALUES ('UPDATE', 'ROLE', @description)
       `);
@@ -245,10 +236,7 @@ exports.deleteRole = async (req, res) => {
     const pool = await poolPromise;
 
     // ✅ Check role exists
-    const existing = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`
+    const existing = await pool.request().input("id", sql.Int, id).query(`
         SELECT id, role_name FROM test_case_manager.dbo.roles
         WHERE id = @id
       `);
@@ -263,9 +251,7 @@ exports.deleteRole = async (req, res) => {
     const roleName = existing.recordset[0].role_name;
 
     // ✅ Count assigned users
-    const assignedUsersResult = await pool
-      .request()
-      .input("id", sql.Int, id)
+    const assignedUsersResult = await pool.request().input("id", sql.Int, id)
       .query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
@@ -280,10 +266,7 @@ exports.deleteRole = async (req, res) => {
     try {
       // ✅ Detach users from role
       if (userCount > 0) {
-        await transaction
-          .request()
-          .input("id", sql.Int, id)
-          .query(`
+        await transaction.request().input("id", sql.Int, id).query(`
             UPDATE test_case_manager.dbo.users
             SET role_id = NULL
             WHERE role_id = @id
@@ -291,35 +274,35 @@ exports.deleteRole = async (req, res) => {
 
         await transaction
           .request()
-          .input("description", sql.VarChar, `${userCount} user(s) detached from Role '${roleName}' (ID: ${id}) before deletion`)
-          .query(`
+          .input(
+            "description",
+            sql.VarChar,
+            `${userCount} user(s) detached from Role '${roleName}' (ID: ${id}) before deletion`,
+          ).query(`
             INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
             VALUES ('DETACH', 'ROLE', @description)
           `);
       }
 
       // ✅ Delete role permissions
-      await transaction
-        .request()
-        .input("id", sql.Int, id)
-        .query(`
+      await transaction.request().input("id", sql.Int, id).query(`
           DELETE FROM test_case_manager.dbo.role_permissions
           WHERE role_id = @id
         `);
 
       // ✅ Delete role
-      await transaction
-        .request()
-        .input("id", sql.Int, id)
-        .query(`
+      await transaction.request().input("id", sql.Int, id).query(`
           DELETE FROM test_case_manager.dbo.roles
           WHERE id = @id
         `);
 
       await transaction
         .request()
-        .input("description", sql.VarChar, `Role '${roleName}' (ID: ${id}) deleted`)
-        .query(`
+        .input(
+          "description",
+          sql.VarChar,
+          `Role '${roleName}' (ID: ${id}) deleted`,
+        ).query(`
           INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
           VALUES ('DELETE', 'ROLE', @description)
         `);
@@ -354,10 +337,7 @@ exports.getRolePermissions = async (req, res) => {
 
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("roleId", sql.Int, roleId)
-      .query(`
+    const result = await pool.request().input("roleId", sql.Int, roleId).query(`
         SELECT menu_id, can_view, can_create, can_edit, can_delete
         FROM test_case_manager.dbo.role_permissions
         WHERE role_id = @roleId
@@ -396,10 +376,7 @@ exports.saveRolePermissions = async (req, res) => {
 
     try {
       // ✅ Delete old permissions
-      await transaction
-        .request()
-        .input("roleId", sql.Int, roleId)
-        .query(`
+      await transaction.request().input("roleId", sql.Int, roleId).query(`
           DELETE FROM test_case_manager.dbo.role_permissions
           WHERE role_id = @roleId
         `);
@@ -413,8 +390,7 @@ exports.saveRolePermissions = async (req, res) => {
           .input("canView", sql.Bit, p.can_view)
           .input("canCreate", sql.Bit, p.can_create)
           .input("canEdit", sql.Bit, p.can_edit)
-          .input("canDelete", sql.Bit, p.can_delete)
-          .query(`
+          .input("canDelete", sql.Bit, p.can_delete).query(`
             INSERT INTO test_case_manager.dbo.role_permissions
               (role_id, menu_id, can_view, can_create, can_edit, can_delete)
             VALUES
@@ -425,8 +401,11 @@ exports.saveRolePermissions = async (req, res) => {
       // ✅ Audit log
       await transaction
         .request()
-        .input("description", sql.VarChar, `Permissions updated for role ${roleId}`)
-        .query(`
+        .input(
+          "description",
+          sql.VarChar,
+          `Permissions updated for role ${roleId}`,
+        ).query(`
           INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
           VALUES ('UPDATE', 'ROLE', @description)
         `);
@@ -458,10 +437,7 @@ exports.getMyPermissions = async (req, res) => {
 
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("userId", sql.Int, userId)
-      .query(`
+    const result = await pool.request().input("userId", sql.Int, userId).query(`
         SELECT m.menu_name, m.path
         FROM test_case_manager.dbo.role_permissions rp
         JOIN test_case_manager.dbo.users u ON u.role_id = rp.role_id

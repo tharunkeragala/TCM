@@ -1,10 +1,10 @@
 const clients = new Set();
 
 function attachWebSocketServer(wss) {
-  wss.on('connection', (ws) => {
+  wss.on("connection", (ws) => {
     clients.add(ws);
-    ws.on('close', () => clients.delete(ws));
-    ws.on('error', () => clients.delete(ws));
+    ws.on("close", () => clients.delete(ws));
+    ws.on("error", () => clients.delete(ws));
   });
 }
 

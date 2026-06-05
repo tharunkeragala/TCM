@@ -231,13 +231,13 @@ function SuiteGroup({
   cases,
   onEdit,
   onDelete,
-  onView,
+  // onView,
 }: {
   suite: TestSuite;
   cases: TestCase[];
   onEdit: (tc: TestCase) => void;
   onDelete: (tc: TestCase) => void;
-  onView: (tc: TestCase) => void;
+  // onView: (tc: TestCase) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -387,7 +387,7 @@ export default function TestCases() {
     message: string;
   } | null>(null);
 
-  const [viewingCase, setViewingCase] = useState<TestCase | null>(null);
+  // const [viewingCase, setViewingCase] = useState<TestCase | null>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingCase, setDeletingCase] = useState<TestCase | null>(null);
@@ -521,16 +521,16 @@ export default function TestCases() {
     }
   };
 
-  const handleView = async (tc: TestCase) => {
-    try {
-      const res = await API.get(`/api/test-cases/${tc.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (res.data.success) setViewingCase(res.data.data);
-    } catch {
-      setViewingCase(tc);
-    }
-  };
+  // const handleView = async (tc: TestCase) => {
+  //   try {
+  //     const res = await API.get(`/api/test-cases/${tc.id}`, {
+  //       headers: { Authorization: `Bearer ${getToken()}` },
+  //     });
+  //     if (res.data.success) setViewingCase(res.data.data);
+  //   } catch {
+  //     setViewingCase(tc);
+  //   }
+  // };
 
   const handleDeleteClick = (tc: TestCase) => {
     setDeletingCase(tc);
@@ -632,7 +632,7 @@ export default function TestCases() {
                   cases={cases}
                   onEdit={handleEdit}
                   onDelete={handleDeleteClick}
-                  onView={handleView}
+                  // onView={handleView}
                 />
               ))
             ) : (
@@ -645,12 +645,12 @@ export default function TestCases() {
       </div>
 
       {/* VIEW MODAL */}
-      {viewingCase && (
+      {/* {viewingCase && (
         <TestCaseViewModal
           tc={viewingCase}
           onClose={() => setViewingCase(null)}
         />
-      )}
+      )} */}
 
       {/* CREATE / EDIT MODAL */}
       {showModal && (
