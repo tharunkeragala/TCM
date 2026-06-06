@@ -132,7 +132,7 @@ function parseTestScript(script = "") {
 }
 
 async function runTestCase(testCaseId, userId = null) {
-  console.log("RUN TEST CASE CALLED", testCaseId);
+  // console.log("RUN TEST CASE CALLED", testCaseId);
   const pool = await poolPromise;
 
   const tcResult = await pool.request().input("id", sql.Int, testCaseId).query(`
@@ -171,7 +171,7 @@ async function runTestCase(testCaseId, userId = null) {
   const isAborted = () => abortCtrl.signal.aborted;
 
   broadcast({ type: "run_started", runId, testCaseId });
-  console.log("RUN STARTED", runId);
+  // console.log("RUN STARTED", runId);
 
   const steps = parseTestScript(testCase.playwright_script);
   let browser = null;
@@ -200,7 +200,7 @@ async function runTestCase(testCaseId, userId = null) {
         "--disable-blink-features=AutomationControlled",
       ],
     });
-    console.log("PLAYWRIGHT BROWSER LAUNCHED");
+    // console.log("PLAYWRIGHT BROWSER LAUNCHED");
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
     });
@@ -223,7 +223,7 @@ async function runTestCase(testCaseId, userId = null) {
     });
 
     for (let i = 0; i < steps.length; i++) {
-      console.log("RUNNING STEP", i + 1, steps[i]);
+      // console.log("RUNNING STEP", i + 1, steps[i]);
       if (isAborted()) {
         broadcast({ type: "run_aborted", runId, stoppedAtStep: i + 1 });
         break;
@@ -387,7 +387,7 @@ async function runTestCase(testCaseId, userId = null) {
     broadcast({ type: "run_completed", runId, status: finalStatus, duration });
   } catch (err) {
     const duration = Date.now() - startedAtMs;
-    console.error("PLAYWRIGHT ERROR:", err);
+    // console.error("PLAYWRIGHT ERROR:", err);
 
     await pool
       .request()
