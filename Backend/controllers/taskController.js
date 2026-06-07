@@ -967,9 +967,14 @@ exports.deleteTask = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // Check task exists
-    const taskResult = await pool.request().input("id", sql.Int, id).query(`
-        SELECT title
+    // Get task details
+    const taskResult = await pool.request()
+      .input("id", sql.Int, id)
+      .query(`
+        SELECT
+          id,
+          title,
+          created_by
         FROM test_case_manager.dbo.tasks
         WHERE id = @id
           AND is_archived = 0
@@ -982,11 +987,21 @@ exports.deleteTask = async (req, res) => {
       });
     }
 
-    // Soft delete (archive)
-    await pool
-      .request()
+    const task = taskResult.recordset[0];
+
+    // Only creator can delete
+    if (task.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the task creator can delete this task",
+      });
+    }
+
+    // Soft delete
+    await pool.request()
       .input("id", sql.Int, id)
-      .input("updated_by", sql.Int, userId).query(`
+      .input("updated_by", sql.Int, userId)
+      .query(`
         UPDATE test_case_manager.dbo.tasks
         SET
           is_archived = 1,
@@ -996,10 +1011,9 @@ exports.deleteTask = async (req, res) => {
         WHERE id = @id
       `);
 
-    // Audit log
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Task ID ${id} archived`).query(`
+    await pool.request()
+      .input("description", sql.VarChar, `Task ID ${id} archived`)
+      .query(`
         INSERT INTO audit_logs (action, module, description)
         VALUES ('ARCHIVE', 'TASK', @description)
       `);
@@ -1008,6 +1022,7 @@ exports.deleteTask = async (req, res) => {
       success: true,
       message: "Task archived successfully",
     });
+
   } catch (err) {
     console.error("ARCHIVE Task Error:", err);
 

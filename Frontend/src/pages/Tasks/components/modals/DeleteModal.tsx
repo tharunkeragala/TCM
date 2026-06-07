@@ -6,6 +6,7 @@ interface Props {
   deletingTask: Task | null;
   deleteAlert: AlertState | null;
   deletingInProgress: boolean;
+  currentUserId: number; // Logged-in user id
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -15,10 +16,13 @@ export default function DeleteModal({
   deletingTask,
   deleteAlert,
   deletingInProgress,
+  currentUserId,
   onClose,
   onConfirm,
 }: Props) {
   if (!showDeleteModal || !deletingTask) return null;
+
+  const canDelete = deletingTask.created_by === currentUserId;
 
   return (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
@@ -28,6 +32,7 @@ export default function DeleteModal({
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
             Delete Task
           </h2>
+
           <button
             onClick={onClose}
             className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400
@@ -49,8 +54,16 @@ export default function DeleteModal({
             />
           )}
 
+          {!canDelete && (
+            <Alert
+              variant="error"
+              title="Permission Denied"
+              message="Only the user who created this task can delete it."
+            />
+          )}
+
           <div className="flex items-start gap-4">
-            {/* Warning icon */}
+            {/* Warning Icon */}
             <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
               <svg
                 className="w-5 h-5 text-red-600 dark:text-red-400"
@@ -73,7 +86,11 @@ export default function DeleteModal({
                 <span className="font-semibold text-gray-900 dark:text-white">
                   "{deletingTask.title}"
                 </span>
-                ? All comments, progress logs, assignments, and attachments will
+                ?
+              </p>
+
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                All comments, progress logs, assignments, and attachments will
                 be permanently removed. This action cannot be undone.
               </p>
             </div>
@@ -93,14 +110,16 @@ export default function DeleteModal({
           >
             Cancel
           </button>
+
           <button
             onClick={onConfirm}
-            disabled={deletingInProgress}
+            disabled={deletingInProgress || !canDelete}
             className="px-4 py-2 text-sm font-medium rounded-lg
                        text-white bg-red-600 hover:bg-red-700
-                       disabled:opacity-50 transition-colors duration-150"
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       transition-colors duration-150"
           >
-            {deletingInProgress ? "Deleting…" : "Delete"}
+            {deletingInProgress ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>

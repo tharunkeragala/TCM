@@ -49,6 +49,7 @@ export default function Tasks() {
   const { data: projects } = useFetchWithAuth<Project[]>("/api/projects");
   const { data: allSuites } = useFetchWithAuth<TestSuite[]>("/api/test-suites");
   const { data: users } = useFetchWithAuth<User[]>("/api/dropdown/users");
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [filterStatus, setFilterStatus] = useState(
@@ -533,6 +534,7 @@ export default function Tasks() {
         deletingTask={deletingTask}
         deleteAlert={deleteAlert}
         deletingInProgress={deletingInProgress}
+        currentUserId={currentUser.id}
         onClose={() => {
           setShowDeleteModal(false);
           setDeletingTask(null);

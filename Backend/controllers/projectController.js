@@ -7,7 +7,9 @@ exports.getProjects = async (req, res) => {
     const pool = await poolPromise;
 
     // 1. Get logged-in user's department from DB
-    const userResult = await pool.request().input("user_id", req.user.id)
+    const userResult = await pool
+      .request()
+      .input("user_id", req.user.id)
       .query(`
         SELECT department_id 
         FROM users 
@@ -17,7 +19,9 @@ exports.getProjects = async (req, res) => {
     const userDeptId = userResult.recordset[0]?.department_id;
 
     // 2. Main query with safe filtering
-    const result = await pool.request().input("department_id", userDeptId)
+    const result = await pool
+      .request()
+      .input("department_id", userDeptId)
       .query(`
         SELECT 
           p.*,
@@ -29,8 +33,11 @@ exports.getProjects = async (req, res) => {
         LEFT JOIN test_case_manager.dbo.users u2 
           ON u2.id = p.updated_by
         WHERE 
-          u1.department_id = @department_id
-          OR u1.department_id IS NULL
+          p.is_archived = 0
+          AND (
+            u1.department_id = @department_id
+            OR u1.department_id IS NULL
+          )
         ORDER BY p.id ASC
       `);
 
@@ -237,41 +244,91 @@ exports.deleteProject = async (req, res) => {
     const userId = req.user?.id || null;
     const pool = await poolPromise;
 
-    const suiteCheck = await pool.request().input("project_id", sql.Int, id)
+    // Check ONLY active tasks
+    const taskCheck = await pool
+      .request()
+      .input("project_id", sql.Int, id)
       .query(`
-        SELECT COUNT(*) AS suite_count
-        FROM test_case_manager.dbo.test_suites
-        WHERE project_id = @project_id
+        SELECT
+          t.id,
+          t.task_code,
+          t.title,
+          ISNULL(
+            STRING_AGG(u.username, ', '),
+            'Unassigned'
+          ) AS assignees
+        FROM test_case_manager.dbo.tasks t
+
+        LEFT JOIN test_case_manager.dbo.task_assignments ta
+          ON ta.task_id = t.id
+          AND ta.role = 'Assignee'
+
+        LEFT JOIN test_case_manager.dbo.users u
+          ON u.id = ta.user_id
+
+        WHERE t.project_id = @project_id
+          AND t.is_archived = 0
+
+        GROUP BY
+          t.id,
+          t.task_code,
+          t.title
+        ORDER BY t.id
       `);
 
-    const suiteCount = suiteCheck.recordset[0]?.suite_count ?? 0;
+    // ❌ Block if active tasks exist
+    if (taskCheck.recordset.length > 0) {
+      const tasksText = taskCheck.recordset
+        .map(
+          (t, index) =>
+            `${index + 1}. ${t.task_code} - ${t.title} (Assignees: ${t.assignees})`
+        )
+        .join("\n");
 
-    if (suiteCount > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete: ${suiteCount} test suite(s) are linked to this project. Remove them first.`,
+        message:
+          `Cannot archive project. ${taskCheck.recordset.length} active task(s) exist. Archive them first:\n\n` +
+          tasksText,
+        linked_tasks: taskCheck.recordset,
       });
     }
 
+    // ✅ ARCHIVE PROJECT (instead of delete)
     await pool
       .request()
       .input("id", sql.Int, id)
-      .query(`DELETE FROM test_case_manager.dbo.projects WHERE id = @id`);
-
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Project ID ${id} deleted`)
-      .input("user_id", sql.Int, userId).query(`
-        INSERT INTO audit_logs (action, module, description, user_id)
-        VALUES ('DELETE', 'PROJECT', @description, @user_id)
+      .input("updated_by", sql.Int, userId)
+      .query(`
+        UPDATE test_case_manager.dbo.projects
+        SET is_archived = 1,
+            updated_by = @updated_by,
+            updated_at = GETDATE()
+        WHERE id = @id
       `);
 
-    res.json({ success: true, message: "Project deleted successfully" });
+    // Audit log
+    await pool
+      .request()
+      .input("description", sql.VarChar, `Project ID ${id} archived`)
+      .input("user_id", sql.Int, userId)
+      .query(`
+        INSERT INTO audit_logs
+          (action, module, description, user_id)
+        VALUES
+          ('ARCHIVE', 'PROJECT', @description, @user_id)
+      `);
+
+    res.json({
+      success: true,
+      message: "Project archived successfully",
+    });
   } catch (err) {
-    console.error("DELETE Project Error:", err);
+    console.error("ARCHIVE Project Error:", err);
+
     res.status(500).json({
       success: false,
-      message: "Failed to delete project",
+      message: "Failed to archive project",
       error: err.message,
     });
   }

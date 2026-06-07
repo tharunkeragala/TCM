@@ -223,7 +223,7 @@ export default function CreateEditModal({
             </div>
 
             <div>
-              <label className={LABEL_CLS}>Link to Suite</label>
+              {/* <label className={LABEL_CLS}>Link to Suite</label>
               <select
                 value={formData.suite_id}
                 onChange={(e) =>
@@ -237,19 +237,26 @@ export default function CreateEditModal({
                     {s.suite_name}
                   </option>
                 ))}
-              </select>
+              </select> */}
+              {/* Assignees */}
+              <UserMultiSelect
+              label="Assignees"
+              users={users || []}
+              selected={assignees}
+              onChange={setAssignees}
+            />
             </div>
           </div>
 
           {/* Assignees */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <UserMultiSelect
               label="Assignees"
               users={users || []}
               selected={assignees}
               onChange={setAssignees}
             />
-          </div>
+          </div> */}
 
           {/* Tags */}
           <div>
