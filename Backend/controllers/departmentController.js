@@ -1,5 +1,12 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
+const logAudit = require("./auditController");
+
+// departmentController.js — add this helper at the top
+const getAuditUser = (req) => ({
+  userId: req.user?.id ?? null,
+  performedBy: req.user?.username ?? null,
+});
 
 // ✅ GET ALL
 exports.getDepartments = async (req, res) => {
@@ -8,21 +15,18 @@ exports.getDepartments = async (req, res) => {
 
     const result = await pool.request().query(`
       SELECT 
-  d.id,
-  d.department_name,
-  d.is_active,
-  d.department_head_id,
-  u.username AS department_head_name
-FROM test_case_manager.dbo.departments d
-LEFT JOIN test_case_manager.dbo.users u 
-  ON d.department_head_id = u.id
-ORDER BY d.id ASC
+        d.id,
+        d.department_name,
+        d.is_active,
+        d.department_head_id,
+        u.username AS department_head_name
+      FROM test_case_manager.dbo.departments d
+      LEFT JOIN test_case_manager.dbo.users u 
+        ON d.department_head_id = u.id
+      ORDER BY d.id ASC
     `);
 
-    res.status(200).json({
-      success: true,
-      data: result.recordset,
-    });
+    res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Departments Error:", err);
     res.status(500).json({
@@ -39,18 +43,18 @@ exports.getAssignedUserCount = async (req, res) => {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool.request().input("department_id", sql.Int, id)
+    const result = await pool
+      .request()
+      .input("department_id", sql.Int, id)
       .query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
         WHERE department_id = @department_id
       `);
 
-    const count = result.recordset[0]?.user_count ?? 0;
-
     res.status(200).json({
       success: true,
-      count,
+      count: result.recordset[0]?.user_count ?? 0,
     });
   } catch (err) {
     console.error("GET Assigned User Count Error:", err);
@@ -68,30 +72,27 @@ exports.createDepartment = async (req, res) => {
     const { department_name, is_active, department_head_id } = req.body;
 
     if (!department_name) {
-      return res.status(400).json({
-        success: false,
-        message: "Department name is required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Department name is required" });
     }
 
     const pool = await poolPromise;
 
-    // ✅ CHECK EXISTING FIRST
     const existing = await pool
       .request()
-      .input("department_name", sql.VarChar, department_name).query(`
+      .input("department_name", sql.VarChar, department_name)
+      .query(`
         SELECT id FROM test_case_manager.dbo.departments
         WHERE department_name = @department_name
       `);
 
     if (existing.recordset.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Department already exists",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Department already exists" });
     }
 
-    // ✅ INSERT ONLY ONCE
     await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
@@ -99,17 +100,28 @@ exports.createDepartment = async (req, res) => {
       .input(
         "department_head_id",
         sql.Int,
-        department_head_id ? Number(department_head_id) : null,
-      ).query(`
+        department_head_id ? Number(department_head_id) : null
+      )
+      .query(`
         INSERT INTO test_case_manager.dbo.departments 
-        (department_name, is_active, department_head_id)
+          (department_name, is_active, department_head_id)
         VALUES (@department_name, @is_active, @department_head_id)
       `);
 
-    res.status(201).json({
-      success: true,
-      message: "Department created successfully",
+    await logAudit({
+      ...getAuditUser(req),
+      action: "CREATE",
+      module: "DEPARTMENT",
+      entityType: "DEPARTMENT",
+      entityName: department_name,
+      description: `Department "${department_name}" created`,
+      newValues: { department_name, is_active, department_head_id },
+      status: "SUCCESS",
     });
+
+    res
+      .status(201)
+      .json({ success: true, message: "Department created successfully" });
   } catch (err) {
     console.error("CREATE Department Error:", err);
     res.status(500).json({
@@ -128,23 +140,31 @@ exports.updateDepartment = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // ✅ CHECK DUPLICATE NAME
-    const existing = await pool
+    const duplicate = await pool
       .request()
       .input("department_name", sql.VarChar, department_name)
-      .input("id", sql.Int, id).query(`
+      .input("id", sql.Int, id)
+      .query(`
         SELECT id FROM test_case_manager.dbo.departments
         WHERE department_name = @department_name AND id != @id
       `);
 
-    if (existing.recordset.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Department name already exists",
-      });
+    if (duplicate.recordset.length > 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Department name already exists" });
     }
 
-    // ✅ SINGLE UPDATE
+    // Fetch old values for audit
+    const oldRecord = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
+        SELECT department_name, is_active, department_head_id
+        FROM test_case_manager.dbo.departments
+        WHERE id = @id
+      `);
+
     await pool
       .request()
       .input("id", sql.Int, id)
@@ -153,8 +173,9 @@ exports.updateDepartment = async (req, res) => {
       .input(
         "department_head_id",
         sql.Int,
-        department_head_id ? Number(department_head_id) : null,
-      ).query(`
+        department_head_id ? Number(department_head_id) : null
+      )
+      .query(`
         UPDATE test_case_manager.dbo.departments
         SET department_name = @department_name,
             is_active = @is_active,
@@ -162,10 +183,20 @@ exports.updateDepartment = async (req, res) => {
         WHERE id = @id
       `);
 
-    res.json({
-      success: true,
-      message: "Department updated successfully",
+    await logAudit({
+      ...getAuditUser(req),
+      action: "UPDATE",
+      module: "DEPARTMENT",
+      entityType: "DEPARTMENT",
+      entityId: Number(id),
+      entityName: department_name,
+      description: `Department "${department_name}" updated`,
+      oldValues: oldRecord.recordset[0] ?? null,
+      newValues: { department_name, is_active, department_head_id },
+      status: "SUCCESS",
     });
+
+    res.json({ success: true, message: "Department updated successfully" });
   } catch (err) {
     console.error("UPDATE Department Error:", err);
     res.status(500).json({
@@ -176,52 +207,69 @@ exports.updateDepartment = async (req, res) => {
   }
 };
 
-// ✅ DELETE (detaches assigned users before deleting)
+// ✅ DELETE
 exports.deleteDepartment = async (req, res) => {
   try {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const assignedUsersResult = await pool
+    const assignedResult = await pool
       .request()
-      .input("department_id", sql.Int, id).query(`
+      .input("department_id", sql.Int, id)
+      .query(`
         SELECT COUNT(*) AS user_count
         FROM test_case_manager.dbo.users
         WHERE department_id = @department_id
       `);
 
-    const userCount = assignedUsersResult.recordset[0]?.user_count ?? 0;
+    const userCount = assignedResult.recordset[0]?.user_count ?? 0;
+
+    // Fetch department name before delete
+    const deptRecord = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
+        SELECT department_name FROM test_case_manager.dbo.departments WHERE id = @id
+      `);
+    const deptName = deptRecord.recordset[0]?.department_name ?? `ID ${id}`;
 
     if (userCount > 0) {
-      await pool.request().input("department_id", sql.Int, id).query(`
+      await pool
+        .request()
+        .input("department_id", sql.Int, id)
+        .query(`
           UPDATE test_case_manager.dbo.users
           SET department_id = NULL
           WHERE department_id = @department_id
         `);
 
-      await pool
-        .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `${userCount} user(s) detached from Department ID ${id} before deletion`,
-        ).query(`
-          INSERT INTO audit_logs (action, module, description)
-          VALUES ('DETACH', 'DEPARTMENT', @description)
-        `);
+      await logAudit({
+        ...getAuditUser(req),
+        action: "DETACH",
+        module: "DEPARTMENT",
+        entityType: "DEPARTMENT",
+        entityId: Number(id),
+        entityName: deptName,
+        description: `${userCount} user(s) detached from Department "${deptName}" before deletion`,
+        status: "SUCCESS",
+      });
     }
-
-    await pool.request().input("id", sql.Int, id).query(`
-        DELETE FROM test_case_manager.dbo.departments
-        WHERE id = @id
-      `);
 
     await pool
       .request()
-      .input("description", sql.VarChar, `Department ID ${id} deleted`).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('DELETE', 'DEPARTMENT', @description)
-      `);
+      .input("id", sql.Int, id)
+      .query(`DELETE FROM test_case_manager.dbo.departments WHERE id = @id`);
+
+    await logAudit({
+      ...getAuditUser(req),
+      action: "DELETE",
+      module: "DEPARTMENT",
+      entityType: "DEPARTMENT",
+      entityId: Number(id),
+      entityName: deptName,
+      description: `Department "${deptName}" deleted`,
+      status: "SUCCESS",
+    });
 
     res.json({
       success: true,
@@ -247,30 +295,38 @@ exports.toggleDepartment = async (req, res) => {
     const { is_active } = req.body;
     const pool = await poolPromise;
 
+    // Fetch name for audit
+    const deptRecord = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
+        SELECT department_name FROM test_case_manager.dbo.departments WHERE id = @id
+      `);
+    const deptName = deptRecord.recordset[0]?.department_name ?? `ID ${id}`;
+
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("is_active", sql.Bit, is_active).query(`
+      .input("is_active", sql.Bit, is_active)
+      .query(`
         UPDATE test_case_manager.dbo.departments
         SET is_active = @is_active
         WHERE id = @id
       `);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Department ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('STATUS_CHANGE', 'DEPARTMENT', @description)
-      `);
-
-    res.json({
-      success: true,
-      message: "Department status updated",
+    await logAudit({
+      ...getAuditUser(req),
+      action: "STATUS_CHANGE",
+      module: "DEPARTMENT",
+      entityType: "DEPARTMENT",
+      entityId: Number(id),
+      entityName: deptName,
+      description: `Department "${deptName}" status changed to ${is_active ? "Active" : "Inactive"}`,
+      newValues: { is_active },
+      status: "SUCCESS",
     });
+
+    res.json({ success: true, message: "Department status updated" });
   } catch (err) {
     console.error("TOGGLE Department Error:", err);
     res.status(500).json({

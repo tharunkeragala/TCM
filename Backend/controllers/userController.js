@@ -1,5 +1,11 @@
 const { sql, poolPromise } = require("../config/db");
 const bcrypt = require("bcrypt");
+const logAudit = require("./auditController");
+
+const getAuditUser = (req) => ({
+  userId: req.user?.id ?? null,
+  performedBy: req.user?.username ?? null,
+});
 
 // ✅ GET ALL USERS
 exports.getUsers = async (req, res) => {
@@ -79,23 +85,24 @@ exports.createUser = async (req, res) => {
       .input("role_id", sql.Int, role_id)
       .input("department_id", sql.Int, department_id || null)
       .input("team_id", sql.Int, team_id || null)
-      .input("created_by", sql.Int, createdBy).query(`
+      .input("created_by", sql.Int, createdBy)
+      .query(`
         INSERT INTO users 
         (username, password, role_id, department_id, team_id, source, created_by, created_at, updated_at)
         VALUES 
         (@username, @password, @role_id, @department_id, @team_id, 'MANUAL', @created_by, GETDATE(), GETDATE())
       `);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `User ${username} created by ID ${createdBy}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('CREATE', 'USER', @description)
-      `);
+    await logAudit({
+      ...getAuditUser(req),
+      action: "CREATE",
+      module: "USER",
+      entityType: "USER",
+      entityName: username,
+      description: `User "${username}" created`,
+      newValues: { username, role_id, department_id, team_id, source: "MANUAL" },
+      status: "SUCCESS",
+    });
 
     return res.status(201).json({
       success: true,
@@ -144,23 +151,24 @@ exports.addADUser = async (req, res) => {
       .input("role_id", sql.Int, role_id)
       .input("department_id", sql.Int, department_id || null)
       .input("team_id", sql.Int, team_id || null)
-      .input("created_by", sql.Int, createdBy).query(`
+      .input("created_by", sql.Int, createdBy)
+      .query(`
         INSERT INTO users 
         (username, windows_username, role_id, department_id, team_id, source, created_by, created_at, updated_at)
         VALUES 
         (@username, @username, @role_id, @department_id, @team_id, 'AD', @created_by, GETDATE(), GETDATE())
       `);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `AD User ${windows_username} added by ID ${createdBy}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('CREATE', 'USER', @description)
-      `);
+    await logAudit({
+      ...getAuditUser(req),
+      action: "CREATE",
+      module: "USER",
+      entityType: "USER",
+      entityName: windows_username,
+      description: `AD User "${windows_username}" added`,
+      newValues: { username: windows_username, role_id, department_id, team_id, source: "AD" },
+      status: "SUCCESS",
+    });
 
     return res.status(201).json({
       success: true,
@@ -192,6 +200,16 @@ exports.updateUser = async (req, res) => {
     const updatedBy = req.user.id;
     const pool = await poolPromise;
 
+    // Fetch old values + username for audit
+    const oldRecord = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
+        SELECT username, role_id, department_id, team_id, is_active
+        FROM users WHERE id = @id
+      `);
+    const targetUsername = oldRecord.recordset[0]?.username ?? `ID ${id}`;
+
     if (password && password.trim()) {
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -203,7 +221,8 @@ exports.updateUser = async (req, res) => {
         .input("team_id", sql.Int, team_id || null)
         .input("is_active", sql.Bit, is_active)
         .input("password", sql.VarChar, hashedPassword)
-        .input("updated_by", sql.Int, updatedBy).query(`
+        .input("updated_by", sql.Int, updatedBy)
+        .query(`
           UPDATE users
           SET role_id       = @role_id,
               department_id = @department_id,
@@ -222,7 +241,8 @@ exports.updateUser = async (req, res) => {
         .input("department_id", sql.Int, department_id || null)
         .input("team_id", sql.Int, team_id || null)
         .input("is_active", sql.Bit, is_active)
-        .input("updated_by", sql.Int, updatedBy).query(`
+        .input("updated_by", sql.Int, updatedBy)
+        .query(`
           UPDATE users
           SET role_id       = @role_id,
               department_id = @department_id,
@@ -234,16 +254,18 @@ exports.updateUser = async (req, res) => {
         `);
     }
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `User ID ${id} updated by ID ${updatedBy}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('UPDATE', 'USER', @description)
-      `);
+    await logAudit({
+      ...getAuditUser(req),
+      action: "UPDATE",
+      module: "USER",
+      entityType: "USER",
+      entityId: Number(id),
+      entityName: targetUsername,
+      description: `User "${targetUsername}" updated`,
+      oldValues: oldRecord.recordset[0] ?? null,
+      newValues: { role_id, department_id, team_id, is_active, passwordChanged: !!(password && password.trim()) },
+      status: "SUCCESS",
+    });
 
     return res.json({
       success: true,
@@ -263,7 +285,6 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedBy = req.user.id;
     const pool = await poolPromise;
 
     const userResult = await pool
@@ -278,16 +299,16 @@ exports.deleteUser = async (req, res) => {
       .input("id", sql.Int, id)
       .query(`DELETE FROM users WHERE id = @id`);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `User ${username} deleted by ID ${deletedBy}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('DELETE', 'USER', @description)
-      `);
+    await logAudit({
+      ...getAuditUser(req),
+      action: "DELETE",
+      module: "USER",
+      entityType: "USER",
+      entityId: Number(id),
+      entityName: username,
+      description: `User "${username}" deleted`,
+      status: "SUCCESS",
+    });
 
     return res.json({
       success: true,
@@ -311,11 +332,18 @@ exports.toggleUser = async (req, res) => {
     const updatedBy = req.user.id;
     const pool = await poolPromise;
 
+    const userResult = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`SELECT username FROM users WHERE id = @id`);
+    const username = userResult.recordset[0]?.username ?? `ID ${id}`;
+
     await pool
       .request()
       .input("id", sql.Int, id)
       .input("is_active", sql.Bit, is_active)
-      .input("updated_by", sql.Int, updatedBy).query(`
+      .input("updated_by", sql.Int, updatedBy)
+      .query(`
         UPDATE users
         SET is_active  = @is_active,
             updated_by = @updated_by,
@@ -323,16 +351,17 @@ exports.toggleUser = async (req, res) => {
         WHERE id = @id
       `);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `User ID ${id} status changed by ID ${updatedBy}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('STATUS_CHANGE', 'USER', @description)
-      `);
+    await logAudit({
+      ...getAuditUser(req),
+      action: "STATUS_CHANGE",
+      module: "USER",
+      entityType: "USER",
+      entityId: Number(id),
+      entityName: username,
+      description: `User "${username}" status changed to ${is_active ? "Active" : "Inactive"}`,
+      newValues: { is_active },
+      status: "SUCCESS",
+    });
 
     return res.json({
       success: true,
