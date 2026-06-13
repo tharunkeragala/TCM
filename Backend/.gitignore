@@ -3,3 +3,4 @@ public
 logs/*.log
 logs/*.txt
 iisnode
+screenshot-*.png

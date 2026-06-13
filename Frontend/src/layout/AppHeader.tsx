@@ -78,7 +78,7 @@ const AppHeader: React.FC = () => {
     <>
       <header
         style={headerStyle}
-        className={`fixed top-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 ${
+        className={`fixed top-0 right-0 z-50 bg-blue-950 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 ${
           isBlurred ? "blur-sm pointer-events-none select-none" : ""
         }`}
       >
