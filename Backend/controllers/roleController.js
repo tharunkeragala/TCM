@@ -1,5 +1,7 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
+const logAudit = require("./auditController");
+
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function buildTree(data, parentId = null) {
@@ -65,14 +67,13 @@ exports.getRoles = async (req, res) => {
 exports.getAssignedUserCount = async (req, res) => {
   try {
     const { id } = req.params;
-
     const pool = await poolPromise;
 
     const result = await pool.request().input("role_id", sql.Int, id).query(`
-        SELECT COUNT(*) AS user_count
-        FROM test_case_manager.dbo.users
-        WHERE role_id = @role_id
-      `);
+      SELECT COUNT(*) AS user_count
+      FROM test_case_manager.dbo.users
+      WHERE role_id = @role_id
+    `);
 
     const count = result.recordset[0]?.user_count ?? 0;
 
@@ -104,10 +105,10 @@ exports.createRole = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // ✅ Check duplicate
     const existing = await pool
       .request()
-      .input("role_name", sql.VarChar, role_name.trim()).query(`
+      .input("role_name", sql.VarChar, role_name.trim())
+      .query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE role_name = @role_name
       `);
@@ -119,20 +120,22 @@ exports.createRole = async (req, res) => {
       });
     }
 
-    // ✅ Insert
     await pool.request().input("role_name", sql.VarChar, role_name.trim())
       .query(`
         INSERT INTO test_case_manager.dbo.roles (role_name)
         VALUES (@role_name)
       `);
 
-    // ✅ Audit log
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Role '${role_name}' created`).query(`
-        INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
-        VALUES ('CREATE', 'ROLE', @description)
-      `);
+    // ✅ AUDIT
+    await logAudit({
+      userId: req.user?.id,
+      action: "CREATE",
+      module: "ROLE",
+      entityType: "ROLE",
+      entityName: role_name,
+      description: `Role '${role_name}' created`,
+      newValues: { role_name },
+    });
 
     res.status(201).json({
       success: true,
@@ -148,7 +151,7 @@ exports.createRole = async (req, res) => {
   }
 };
 
-// ─── Edit Role ────────────────────────────────────────────────────────────────
+// ─── Update Role ──────────────────────────────────────────────────────────────
 exports.updateRole = async (req, res) => {
   try {
     const { id } = req.params;
@@ -163,11 +166,10 @@ exports.updateRole = async (req, res) => {
 
     const pool = await poolPromise;
 
-    // ✅ Check role exists
     const existing = await pool.request().input("id", sql.Int, id).query(`
-        SELECT id FROM test_case_manager.dbo.roles
-        WHERE id = @id
-      `);
+      SELECT id, role_name FROM test_case_manager.dbo.roles
+      WHERE id = @id
+    `);
 
     if (existing.recordset.length === 0) {
       return res.status(404).json({
@@ -176,11 +178,13 @@ exports.updateRole = async (req, res) => {
       });
     }
 
-    // ✅ Check duplicate name (excluding current)
+    const oldRole = existing.recordset[0];
+
     const duplicate = await pool
       .request()
       .input("role_name", sql.VarChar, role_name.trim())
-      .input("id", sql.Int, id).query(`
+      .input("id", sql.Int, id)
+      .query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE role_name = @role_name AND id != @id
       `);
@@ -192,27 +196,28 @@ exports.updateRole = async (req, res) => {
       });
     }
 
-    // ✅ Update
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("role_name", sql.VarChar, role_name.trim()).query(`
+      .input("role_name", sql.VarChar, role_name.trim())
+      .query(`
         UPDATE test_case_manager.dbo.roles
         SET role_name = @role_name
         WHERE id = @id
       `);
 
-    // ✅ Audit log
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Role ID ${id} updated to '${role_name}'`,
-      ).query(`
-        INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
-        VALUES ('UPDATE', 'ROLE', @description)
-      `);
+    // ✅ AUDIT
+    await logAudit({
+      userId: req.user?.id,
+      action: "UPDATE",
+      module: "ROLE",
+      entityType: "ROLE",
+      entityId: parseInt(id),
+      entityName: role_name,
+      description: `Role updated`,
+      oldValues: { role_name: oldRole.role_name },
+      newValues: { role_name },
+    });
 
     res.status(200).json({
       success: true,
@@ -232,14 +237,12 @@ exports.updateRole = async (req, res) => {
 exports.deleteRole = async (req, res) => {
   try {
     const { id } = req.params;
-
     const pool = await poolPromise;
 
-    // ✅ Check role exists
     const existing = await pool.request().input("id", sql.Int, id).query(`
-        SELECT id, role_name FROM test_case_manager.dbo.roles
-        WHERE id = @id
-      `);
+      SELECT id, role_name FROM test_case_manager.dbo.roles
+      WHERE id = @id
+    `);
 
     if (existing.recordset.length === 0) {
       return res.status(404).json({
@@ -250,7 +253,6 @@ exports.deleteRole = async (req, res) => {
 
     const roleName = existing.recordset[0].role_name;
 
-    // ✅ Count assigned users
     const assignedUsersResult = await pool.request().input("id", sql.Int, id)
       .query(`
         SELECT COUNT(*) AS user_count
@@ -264,56 +266,53 @@ exports.deleteRole = async (req, res) => {
     await transaction.begin();
 
     try {
-      // ✅ Detach users from role
       if (userCount > 0) {
         await transaction.request().input("id", sql.Int, id).query(`
-            UPDATE test_case_manager.dbo.users
-            SET role_id = NULL
-            WHERE role_id = @id
-          `);
-
-        await transaction
-          .request()
-          .input(
-            "description",
-            sql.VarChar,
-            `${userCount} user(s) detached from Role '${roleName}' (ID: ${id}) before deletion`,
-          ).query(`
-            INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
-            VALUES ('DETACH', 'ROLE', @description)
-          `);
-      }
-
-      // ✅ Delete role permissions
-      await transaction.request().input("id", sql.Int, id).query(`
-          DELETE FROM test_case_manager.dbo.role_permissions
+          UPDATE test_case_manager.dbo.users
+          SET role_id = NULL
           WHERE role_id = @id
         `);
 
-      // ✅ Delete role
-      await transaction.request().input("id", sql.Int, id).query(`
-          DELETE FROM test_case_manager.dbo.roles
-          WHERE id = @id
-        `);
+        await logAudit({
+          userId: req.user?.id,
+          action: "DETACH",
+          module: "ROLE",
+          entityType: "ROLE",
+          entityId: parseInt(id),
+          entityName: roleName,
+          description: `Users detached before role deletion`,
+          oldValues: { role_id: id, user_count: userCount },
+        });
+      }
 
-      await transaction
-        .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `Role '${roleName}' (ID: ${id}) deleted`,
-        ).query(`
-          INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
-          VALUES ('DELETE', 'ROLE', @description)
-        `);
+      await transaction.request().input("id", sql.Int, id).query(`
+        DELETE FROM test_case_manager.dbo.role_permissions
+        WHERE role_id = @id
+      `);
+
+      await transaction.request().input("id", sql.Int, id).query(`
+        DELETE FROM test_case_manager.dbo.roles
+        WHERE id = @id
+      `);
 
       await transaction.commit();
+
+      await logAudit({
+        userId: req.user?.id,
+        action: "DELETE",
+        module: "ROLE",
+        entityType: "ROLE",
+        entityId: parseInt(id),
+        entityName: roleName,
+        description: `Role deleted`,
+        oldValues: { role_id: id, role_name: roleName },
+      });
 
       res.status(200).json({
         success: true,
         message:
           userCount > 0
-            ? `Role deleted. ${userCount} user(s) have been detached and need to be reassigned.`
+            ? `Role deleted. ${userCount} user(s) detached.`
             : "Role deleted successfully",
       });
     } catch (innerErr) {
@@ -330,18 +329,17 @@ exports.deleteRole = async (req, res) => {
   }
 };
 
-// ─── Get Role Permissions ─────────────────────────────────────────────────────
+// ─── Role Permissions ────────────────────────────────────────────────────────
 exports.getRolePermissions = async (req, res) => {
   try {
     const { roleId } = req.params;
-
     const pool = await poolPromise;
 
     const result = await pool.request().input("roleId", sql.Int, roleId).query(`
-        SELECT menu_id, can_view, can_create, can_edit, can_delete
-        FROM test_case_manager.dbo.role_permissions
-        WHERE role_id = @roleId
-      `);
+      SELECT menu_id, can_view, can_create, can_edit, can_delete
+      FROM test_case_manager.dbo.role_permissions
+      WHERE role_id = @roleId
+    `);
 
     res.status(200).json({
       success: true,
@@ -357,7 +355,8 @@ exports.getRolePermissions = async (req, res) => {
   }
 };
 
-// ─── Save Role Permissions ────────────────────────────────────────────────────
+// ─── Save Role Permissions ───────────────────────────────────────────────────
+// ─── Save Role Permissions ───────────────────────────────────────────────────
 exports.saveRolePermissions = async (req, res) => {
   try {
     const { roleId, permissions } = req.body;
@@ -370,18 +369,61 @@ exports.saveRolePermissions = async (req, res) => {
     }
 
     const pool = await poolPromise;
+
+    // Get role details
+    const roleResult = await pool
+      .request()
+      .input("roleId", sql.Int, roleId)
+      .query(`
+        SELECT id, role_name
+        FROM test_case_manager.dbo.roles
+        WHERE id = @roleId
+      `);
+
+    const role = roleResult.recordset[0];
+
+    if (!role) {
+      return res.status(404).json({
+        success: false,
+        message: "Role not found",
+      });
+    }
+
+    // Get OLD permissions with menu names
+    const oldPermissionsResult = await pool
+      .request()
+      .input("roleId", sql.Int, roleId)
+      .query(`
+        SELECT
+          m.menu_name,
+          rp.can_view,
+          rp.can_create,
+          rp.can_edit,
+          rp.can_delete
+        FROM test_case_manager.dbo.role_permissions rp
+        INNER JOIN test_case_manager.dbo.menus m
+          ON m.id = rp.menu_id
+        WHERE rp.role_id = @roleId
+        ORDER BY m.menu_name
+      `);
+
+    const oldPermissions = oldPermissionsResult.recordset;
+
     const transaction = new sql.Transaction(pool);
 
     await transaction.begin();
 
     try {
-      // ✅ Delete old permissions
-      await transaction.request().input("roleId", sql.Int, roleId).query(`
+      // Delete existing permissions
+      await transaction
+        .request()
+        .input("roleId", sql.Int, roleId)
+        .query(`
           DELETE FROM test_case_manager.dbo.role_permissions
           WHERE role_id = @roleId
         `);
 
-      // ✅ Insert new permissions
+      // Insert new permissions
       for (const p of permissions) {
         await transaction
           .request()
@@ -390,27 +432,74 @@ exports.saveRolePermissions = async (req, res) => {
           .input("canView", sql.Bit, p.can_view)
           .input("canCreate", sql.Bit, p.can_create)
           .input("canEdit", sql.Bit, p.can_edit)
-          .input("canDelete", sql.Bit, p.can_delete).query(`
+          .input("canDelete", sql.Bit, p.can_delete)
+          .query(`
             INSERT INTO test_case_manager.dbo.role_permissions
-              (role_id, menu_id, can_view, can_create, can_edit, can_delete)
+            (
+              role_id,
+              menu_id,
+              can_view,
+              can_create,
+              can_edit,
+              can_delete
+            )
             VALUES
-              (@roleId, @menuId, @canView, @canCreate, @canEdit, @canDelete)
+            (
+              @roleId,
+              @menuId,
+              @canView,
+              @canCreate,
+              @canEdit,
+              @canDelete
+            )
           `);
       }
 
-      // ✅ Audit log
-      await transaction
-        .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `Permissions updated for role ${roleId}`,
-        ).query(`
-          INSERT INTO test_case_manager.dbo.audit_logs (action, module, description)
-          VALUES ('UPDATE', 'ROLE', @description)
+      await transaction.commit();
+
+      // Get menu names for NEW permissions
+      let newPermissions = [];
+
+      if (permissions.length > 0) {
+        const menuIds = permissions.map((p) => p.menu_id);
+
+        const menuResult = await pool.request().query(`
+          SELECT id, menu_name
+          FROM test_case_manager.dbo.menus
+          WHERE id IN (${menuIds.join(",")})
         `);
 
-      await transaction.commit();
+        const menuMap = {};
+
+        menuResult.recordset.forEach((menu) => {
+          menuMap[menu.id] = menu.menu_name;
+        });
+
+        newPermissions = permissions.map((p) => ({
+          menu_name: menuMap[p.menu_id] || `Menu ${p.menu_id}`,
+          can_view: p.can_view,
+          can_create: p.can_create,
+          can_edit: p.can_edit,
+          can_delete: p.can_delete,
+        }));
+      }
+
+      // Audit log
+      await logAudit({
+        userId: req.user?.id,
+        action: "UPDATE",
+        module: "ROLE_PERMISSIONS",
+        entityType: "ROLE",
+        entityId: Number(roleId),
+        entityName: role.role_name,
+        description: `Permissions updated for role '${role.role_name}'`,
+        oldValues: {
+          permissions: oldPermissions,
+        },
+        newValues: {
+          permissions: newPermissions,
+        },
+      });
 
       res.status(200).json({
         success: true,
@@ -429,21 +518,19 @@ exports.saveRolePermissions = async (req, res) => {
     });
   }
 };
-
-// ─── Get My Permissions (logged-in user) ──────────────────────────────────────
+// ─── My Permissions ──────────────────────────────────────────────────────────
 exports.getMyPermissions = async (req, res) => {
   try {
     const userId = req.user.id;
-
     const pool = await poolPromise;
 
     const result = await pool.request().input("userId", sql.Int, userId).query(`
-        SELECT m.menu_name, m.path
-        FROM test_case_manager.dbo.role_permissions rp
-        JOIN test_case_manager.dbo.users u ON u.role_id = rp.role_id
-        JOIN test_case_manager.dbo.menus m ON m.id = rp.menu_id
-        WHERE u.id = @userId AND rp.can_view = 1
-      `);
+      SELECT m.menu_name, m.path
+      FROM test_case_manager.dbo.role_permissions rp
+      JOIN test_case_manager.dbo.users u ON u.role_id = rp.role_id
+      JOIN test_case_manager.dbo.menus m ON m.id = rp.menu_id
+      WHERE u.id = @userId AND rp.can_view = 1
+    `);
 
     res.status(200).json({
       success: true,
