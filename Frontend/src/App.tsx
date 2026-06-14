@@ -154,9 +154,17 @@ const PlaywrightPreview = lazy(() =>
 
 function Loader() {
   return (
-    <div className="flex items-center justify-center h-screen bg-[#03045e] dark:bg-gray-900">
-      <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-    </div>
+    <div className="flex flex-col items-center justify-center h-screen bg-white dark:bg-gray-900">
+  <div className="relative">
+    <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-lg animate-pulse" />
+
+    <div className="w-10 h-10 border-2 border-gray-300/30 dark:border-white/20 border-t-blue-500 dark:border-t-white rounded-full animate-spin animate-[pulse_2s_ease-in-out_infinite]" />
+  </div>
+
+  <p className="mt-4 text-sm tracking-wide text-gray-500 dark:text-gray-400">
+    Loading...
+  </p>
+</div>
   );
 }
 
