@@ -59,7 +59,7 @@ export default function ProtectedRoute() {
 
   // ⏳ Still loading permissions
   if (loading) {
-    return <div className="p-10 text-center">Loading...</div>;
+    return <div className="p-10 text-center"></div>;
   }
 
   const currentPath = normalize(location.pathname);

@@ -645,7 +645,7 @@ export default function TestCaseDetails() {
                             <span className="text-sm font-semibold text-gray-900 dark:text-white">
                               Run #{run.id}
                               {stepsLoadingRunId === run.id && (
-                                <span className="ml-2 text-xs font-normal text-gray-400">Loading...</span>
+                                <span className="ml-2 text-xs font-normal text-gray-400"></span>
                               )}
                             </span>
                             <StatusPill value={run.status} type="run" />
