@@ -1,5 +1,6 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
+const logAudit = require("./auditController");
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -41,6 +42,33 @@ async function insertNotification(pool, userId, taskId, type, message) {
       VALUES
         (@user_id, @task_id, @type, @message)
     `);
+}
+
+// Fields to exclude from old/new audit values
+const AUDIT_EXCLUDE_FIELDS = new Set([
+  "created_by",
+  "updated_by",
+  "created_at",
+  "updated_at",
+  "archived_at",
+  "created_by_name",
+  "updated_by_name",
+]);
+
+const AUDIT_DATE_FIELDS = new Set(["start_date", "due_date"]);
+
+function sanitizeForAudit(obj) {
+  if (!obj) return null;
+  return Object.fromEntries(
+    Object.entries(obj)
+      .filter(([key]) => !AUDIT_EXCLUDE_FIELDS.has(key))
+      .map(([key, value]) => {
+        if (AUDIT_DATE_FIELDS.has(key) && value) {
+          return [key, new Date(value).toISOString().split("T")[0]];
+        }
+        return [key, value];
+      }),
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -253,21 +281,21 @@ exports.getTaskById = async (req, res) => {
     // Core task
     const taskResult = await pool.request().input("id", sql.Int, id).query(`
         SELECT
-  t.id,
-  t.task_code,
-  t.title,
-  t.description,
-  t.status,
-  t.priority,
-  t.start_date,
-  t.due_date,
-  t.project_id,
-  t.suite_id,
-  t.tags,
-  t.created_by,
-  t.updated_by,
-  t.created_at,
-  t.updated_at,
+          t.id,
+          t.task_code,
+          t.title,
+          t.description,
+          t.status,
+          t.priority,
+          t.start_date,
+          t.due_date,
+          t.project_id,
+          t.suite_id,
+          t.tags,
+          t.created_by,
+          t.updated_by,
+          t.created_at,
+          t.updated_at,
           u1.username   AS created_by_name,
           u2.username   AS updated_by_name,
           p.project_name,
@@ -278,7 +306,7 @@ exports.getTaskById = async (req, res) => {
         LEFT JOIN test_case_manager.dbo.projects p     ON p.id  = t.project_id
         LEFT JOIN test_case_manager.dbo.test_suites ts ON ts.id = t.suite_id
         WHERE t.id = @id
-AND t.is_archived = 0
+          AND t.is_archived = 0
       `);
 
     if (!taskResult.recordset.length) {
@@ -416,10 +444,10 @@ exports.createTask = async (req, res) => {
       .request()
       .input("id", sql.Int, taskId)
       .input("task_code", sql.VarChar, taskCode).query(`
-    UPDATE test_case_manager.dbo.tasks
-    SET task_code = @task_code
-    WHERE id = @id
-  `);
+        UPDATE test_case_manager.dbo.tasks
+        SET task_code = @task_code
+        WHERE id = @id
+      `);
 
     // Insert Owner assignment
     await pool
@@ -481,12 +509,27 @@ exports.createTask = async (req, res) => {
       `Task created with status "Pending"`,
     );
 
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Task "${title}" created`).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('CREATE', 'TASK', @description)
-      `);
+    await logAudit({
+      userId,
+      action: "CREATE",
+      module: "TASK",
+      entityType: "Task",
+      entityId: taskId,
+      entityName: title,
+      description: `Task "${title}" created`,
+      newValues: sanitizeForAudit({
+        task_code: taskCode,
+        title,
+        description: description || null,
+        priority: priority || "Medium",
+        start_date: start_date || null,
+        due_date: due_date || null,
+        project_id: project_id || null,
+        suite_id: suite_id || null,
+        tags: tags || null,
+        status: "Pending",
+      }),
+    });
 
     res.status(201).json({
       success: true,
@@ -542,6 +585,8 @@ exports.updateTask = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Task not found" });
     }
+
+    const oldTask = current.recordset[0];
 
     await pool
       .request()
@@ -606,15 +651,42 @@ exports.updateTask = async (req, res) => {
     }
 
     const username = req.user?.username || `User ${userId}`;
-
     await insertSystemComment(pool, id, `Task details updated by ${username}`);
 
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Task ID ${id} updated`).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('UPDATE', 'TASK', @description)
-      `);
+    // Build comparable snapshots (only editable fields, no metadata)
+    const oldValues = sanitizeForAudit({
+      title: oldTask.title,
+      description: oldTask.description,
+      priority: oldTask.priority,
+      start_date: oldTask.start_date,
+      due_date: oldTask.due_date,
+      project_id: oldTask.project_id,
+      suite_id: oldTask.suite_id,
+      tags: oldTask.tags,
+    });
+
+    const newValues = sanitizeForAudit({
+      title,
+      description: description || null,
+      priority,
+      start_date: start_date || null,
+      due_date: due_date || null,
+      project_id: project_id || null,
+      suite_id: suite_id || null,
+      tags: tags || null,
+    });
+
+    await logAudit({
+      userId,
+      action: "UPDATE",
+      module: "TASK",
+      entityType: "Task",
+      entityId: parseInt(id),
+      entityName: title,
+      description: `Task ID ${id} updated by ${username}`,
+      oldValues,
+      newValues,
+    });
 
     res.json({ success: true, message: "Task updated successfully" });
   } catch (err) {
@@ -692,16 +764,17 @@ exports.updateTaskStatus = async (req, res) => {
       ),
     );
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Task ID ${id} status changed to ${status}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('STATUS_CHANGE', 'TASK', @description)
-      `);
+    await logAudit({
+      userId,
+      action: "STATUS_CHANGE",
+      module: "TASK",
+      entityType: "Task",
+      entityId: parseInt(id),
+      entityName: taskTitle,
+      description: `Task "${taskTitle}" status changed from "${oldStatus}" to "${status}" by ${username}`,
+      oldValues: { status: oldStatus },
+      newValues: { status },
+    });
 
     res.json({ success: true, message: "Status updated successfully" });
   } catch (err) {
@@ -749,6 +822,7 @@ exports.extendETA = async (req, res) => {
 
     const oldETA = current.recordset[0].due_date;
     const taskTitle = current.recordset[0].title;
+    const oldETAStr = oldETA ? oldETA.toISOString().split("T")[0] : null;
 
     // Save ETA history
     await pool
@@ -782,9 +856,7 @@ exports.extendETA = async (req, res) => {
     await insertSystemComment(
       pool,
       id,
-      `ETA extended by ${username} from "${
-        oldETA ? oldETA.toISOString().split("T")[0] : "not set"
-      }" to "${new_eta}". Reason: ${reason}`,
+      `ETA extended by ${username} from "${oldETAStr ?? "not set"}" to "${new_eta}". Reason: ${reason}`,
     );
 
     // Notify participants
@@ -803,6 +875,18 @@ exports.extendETA = async (req, res) => {
         `ETA for task "${taskTitle}" has been updated to ${new_eta}`,
       );
     }
+
+    await logAudit({
+      userId,
+      action: "UPDATE",
+      module: "TASK",
+      entityType: "Task",
+      entityId: parseInt(id),
+      entityName: taskTitle,
+      description: `ETA extended by ${username}. Reason: ${reason}`,
+      oldValues: { due_date: oldETAStr },
+      newValues: { due_date: new_eta, eta_reason: reason },
+    });
 
     res.json({ success: true, message: "ETA extended successfully" });
   } catch (err) {
@@ -968,13 +1052,8 @@ exports.deleteTask = async (req, res) => {
     const pool = await poolPromise;
 
     // Get task details
-    const taskResult = await pool.request()
-      .input("id", sql.Int, id)
-      .query(`
-        SELECT
-          id,
-          title,
-          created_by
+    const taskResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT id, title, created_by
         FROM test_case_manager.dbo.tasks
         WHERE id = @id
           AND is_archived = 0
@@ -998,34 +1077,37 @@ exports.deleteTask = async (req, res) => {
     }
 
     // Soft delete
-    await pool.request()
+    await pool
+      .request()
       .input("id", sql.Int, id)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.tasks
         SET
           is_archived = 1,
           archived_at = GETDATE(),
-          updated_by = @updated_by,
-          updated_at = GETDATE()
+          updated_by  = @updated_by,
+          updated_at  = GETDATE()
         WHERE id = @id
       `);
 
-    await pool.request()
-      .input("description", sql.VarChar, `Task ID ${id} archived`)
-      .query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('ARCHIVE', 'TASK', @description)
-      `);
+    await logAudit({
+      userId,
+      action: "ARCHIVE",
+      module: "TASK",
+      entityType: "Task",
+      entityId: parseInt(id),
+      entityName: task.title,
+      description: `Task "${task.title}" archived`,
+      oldValues: { is_archived: false },
+      newValues: { is_archived: true },
+    });
 
     res.json({
       success: true,
       message: "Task archived successfully",
     });
-
   } catch (err) {
     console.error("ARCHIVE Task Error:", err);
-
     res.status(500).json({
       success: false,
       message: "Failed to archive task",
@@ -1036,6 +1118,7 @@ exports.deleteTask = async (req, res) => {
 
 // ─────────────────────────────────────────────
 // SET REMINDER — deactivates previous reminders first
+// ─────────────────────────────────────────────
 exports.setReminder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1114,7 +1197,9 @@ exports.setReminder = async (req, res) => {
   }
 };
 
-// GET LATEST ACTIVE REMINDER for a task (scoped to the requesting user)
+// ─────────────────────────────────────────────
+// GET LATEST ACTIVE REMINDER
+// ─────────────────────────────────────────────
 exports.getLatestReminder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1232,10 +1317,6 @@ exports.markNotificationsRead = async (req, res) => {
 
 // ─────────────────────────────────────────────
 // GET TASK DASHBOARD STATS
-// Returns counts scoped to the logged-in user:
-//   - tasks they created
-//   - tasks assigned to them
-//   - if dept head: all tasks created by users in same department
 // ─────────────────────────────────────────────
 exports.getTaskDashboardStats = async (req, res) => {
   try {
@@ -1262,11 +1343,11 @@ exports.getTaskDashboardStats = async (req, res) => {
         .input("dept_id", sql.Int, deptId).query(`
           SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN t.status = 'Pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN t.status = 'Pending'     THEN 1 ELSE 0 END) AS pending,
             SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress,
-            SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN t.status = 'On Hold' THEN 1 ELSE 0 END) AS on_hold,
-            SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
+            SUM(CASE WHEN t.status = 'Completed'   THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN t.status = 'On Hold'     THEN 1 ELSE 0 END) AS on_hold,
+            SUM(CASE WHEN t.status = 'Cancelled'   THEN 1 ELSE 0 END) AS cancelled
           FROM test_case_manager.dbo.tasks t
           WHERE t.is_archived = 0
           AND (
@@ -1287,11 +1368,11 @@ exports.getTaskDashboardStats = async (req, res) => {
         .query(`
           SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN t.status = 'Pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN t.status = 'Pending'     THEN 1 ELSE 0 END) AS pending,
             SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress,
-            SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN t.status = 'On Hold' THEN 1 ELSE 0 END) AS on_hold,
-            SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
+            SUM(CASE WHEN t.status = 'Completed'   THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN t.status = 'On Hold'     THEN 1 ELSE 0 END) AS on_hold,
+            SUM(CASE WHEN t.status = 'Cancelled'   THEN 1 ELSE 0 END) AS cancelled
           FROM test_case_manager.dbo.tasks t
           WHERE t.is_archived = 0
           AND (
@@ -1330,21 +1411,41 @@ exports.getTaskDashboardStats = async (req, res) => {
   }
 };
 
-// Restore Task Endpoint
+// ─────────────────────────────────────────────
+// RESTORE TASK
+// ─────────────────────────────────────────────
 exports.restoreTask = async (req, res) => {
   try {
     const { id } = req.params;
-
+    const userId = req.user?.id || null;
     const pool = await poolPromise;
+
+    const taskResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT title FROM test_case_manager.dbo.tasks WHERE id = @id
+      `);
+
+    const taskTitle = taskResult.recordset[0]?.title || `Task ${id}`;
 
     await pool.request().input("id", sql.Int, id).query(`
         UPDATE test_case_manager.dbo.tasks
         SET
           is_archived = 0,
           archived_at = NULL,
-          updated_at = GETDATE()
+          updated_at  = GETDATE()
         WHERE id = @id
       `);
+
+    await logAudit({
+      userId,
+      action: "RESTORE",
+      module: "TASK",
+      entityType: "Task",
+      entityId: parseInt(id),
+      entityName: taskTitle,
+      description: `Task "${taskTitle}" restored from archive`,
+      oldValues: { is_archived: true },
+      newValues: { is_archived: false },
+    });
 
     res.json({
       success: true,
@@ -1352,7 +1453,6 @@ exports.restoreTask = async (req, res) => {
     });
   } catch (err) {
     console.error("RESTORE Task Error:", err);
-
     res.status(500).json({
       success: false,
       message: "Failed to restore task",
