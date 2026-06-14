@@ -16,8 +16,6 @@ import {
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type SubItem = {
   name: string;
   path: string;
@@ -36,8 +34,6 @@ interface UserPermission {
   menu_name: string;
   path: string;
 }
-
-// ─── Menu Definitions ─────────────────────────────────────────────────────────
 
 const navItems: NavItem[] = [
   { icon: <GridIcon />, name: "Dashboard", path: "/home" },
@@ -122,8 +118,6 @@ const othersItems: NavItem[] = [
   },
 ];
 
-// ─── Permission Filter ────────────────────────────────────────────────────────
-
 function filterMenuByPermissions(
   items: NavItem[],
   allowedPaths: Set<string>,
@@ -146,8 +140,6 @@ function filterMenuByPermissions(
     .filter(Boolean) as NavItem[];
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
@@ -163,10 +155,7 @@ const AppSidebar: React.FC = () => {
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // True when sidebar is visually wide
   const isOpen = isExpanded || isHovered || isMobileOpen;
-
-  // ─── Permissions ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     const fetchPermissions = async () => {
@@ -197,8 +186,6 @@ const AppSidebar: React.FC = () => {
       ? othersItems
       : filterMenuByPermissions(othersItems, allowedPaths);
 
-  // ─── Active helpers ───────────────────────────────────────────────────────
-
   const isActive = useCallback(
     (path: string) => location.pathname === path,
     [location.pathname],
@@ -209,8 +196,6 @@ const AppSidebar: React.FC = () => {
       nav.subItems?.some((s) => location.pathname.startsWith(s.path)) ?? false,
     [location.pathname],
   );
-
-  // ─── Auto-open submenu on navigation ─────────────────────────────────────
 
   useEffect(() => {
     let matched = false;
@@ -230,8 +215,6 @@ const AppSidebar: React.FC = () => {
     if (!matched) setOpenSubmenu(null);
   }, [location.pathname, permissionsLoaded]);
 
-  // ─── Measure submenu height for smooth animation ──────────────────────────
-
   useEffect(() => {
     if (openSubmenu !== null) {
       const key = `${openSubmenu.type}-${openSubmenu.index}`;
@@ -250,8 +233,6 @@ const AppSidebar: React.FC = () => {
     );
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-
   const renderMenuItems = (items: NavItem[], menuType: "main" | "others") => (
     <ul className="flex flex-col gap-0.5">
       {items.map((nav, index) => {
@@ -261,7 +242,6 @@ const AppSidebar: React.FC = () => {
 
         return (
           <li key={nav.name}>
-            {/* ── Parent with children ── */}
             {nav.subItems ? (
               <button
                 onClick={() => handleSubmenuToggle(index, menuType)}
@@ -270,30 +250,27 @@ const AppSidebar: React.FC = () => {
                   transition-colors duration-150 cursor-pointer
                   ${
                     parentActive || isSubmenuOpen
-                      ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
+                      ? "bg-white/10 text-white"
+                      : "text-white hover:bg-white/10 hover:text-white"
                   }
                 `}
               >
-                {/* Icon */}
                 <span
                   className={`flex-shrink-0 w-5 h-5 ${
                     parentActive || isSubmenuOpen
-                      ? "text-brand-600 dark:text-brand-400"
-                      : "text-gray-400 dark:text-gray-500"
+                      ? "text-white"
+                      : "text-white"
                   }`}
                 >
                   {nav.icon}
                 </span>
 
-                {/* Label */}
                 {isOpen && (
                   <span className="flex-1 text-left leading-snug">
                     {nav.name}
                   </span>
                 )}
 
-                {/* Chevron */}
                 {isOpen && (
                   <ChevronDownIcon
                     className={`flex-shrink-0 w-4 h-4 transition-transform duration-200 ${
@@ -303,7 +280,6 @@ const AppSidebar: React.FC = () => {
                 )}
               </button>
             ) : (
-              /* ── Leaf link ── */
               nav.path && (
                 <Link
                   to={nav.path}
@@ -312,26 +288,25 @@ const AppSidebar: React.FC = () => {
                     transition-colors duration-150
                     ${
                       isActive(nav.path)
-                        ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
-                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
+                        ? "bg-white/10 text-white"
+                        : "text-white hover:bg-white/10 hover:text-white"
                     }
                   `}
                 >
                   <span
                     className={`flex-shrink-0 w-5 h-5 ${
-                      isActive(nav.path)
-                        ? "text-brand-600 dark:text-brand-400"
-                        : "text-gray-400 dark:text-gray-500"
+                      isActive(nav.path) ? "text-white" : "text-white"
                     }`}
                   >
                     {nav.icon}
                   </span>
-                  {isOpen && <span className="flex-1 leading-snug">{nav.name}</span>}
+                  {isOpen && (
+                    <span className="flex-1 leading-snug">{nav.name}</span>
+                  )}
                 </Link>
               )
             )}
 
-            {/* ── Submenu ── */}
             {nav.subItems && isOpen && (
               <div
                 ref={(el) => {
@@ -344,7 +319,7 @@ const AppSidebar: React.FC = () => {
                     : "0px",
                 }}
               >
-                <ul className="mt-1 ml-8 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-3">
+                <ul className="mt-1 ml-8 space-y-0.5 border-l border-white/20 pl-3">
                   {nav.subItems.map((subItem) => (
                     <li key={subItem.name}>
                       <Link
@@ -354,22 +329,20 @@ const AppSidebar: React.FC = () => {
                           transition-colors duration-150
                           ${
                             isActive(subItem.path)
-                              ? "text-brand-600 dark:text-brand-400 font-medium bg-brand-50 dark:bg-brand-500/10"
-                              : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                              ? "text-white font-medium bg-white/10"
+                              : "text-white hover:text-white hover:bg-white/10"
                           }
                         `}
                       >
                         <span>{subItem.name}</span>
-
-                        {/* Badges */}
                         <span className="flex items-center gap-1 ml-2">
                           {subItem.new && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white">
                               new
                             </span>
                           )}
                           {subItem.pro && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-400/20 text-amber-300">
                               pro
                             </span>
                           )}
@@ -386,27 +359,25 @@ const AppSidebar: React.FC = () => {
     </ul>
   );
 
-  // ── Skeleton while permissions load ──────────────────────────────────────
-
   if (!permissionsLoaded) {
     return (
       <aside
         className={`
           fixed top-0 left-0 h-screen z-50
-          bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
+          bg-[#00013D] dark:bg-gray-900 border-r border-[#0a0e7a] dark:border-gray-800
           transition-[width] duration-300 ease-in-out
           ${isExpanded || isMobileOpen ? "w-[256px]" : isHovered ? "w-[256px]" : "w-[64px]"}
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
         `}
       >
-        <div className="p-4 flex justify-center border-b border-gray-200 dark:border-gray-800">
-          <div className="w-28 h-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+        <div className="p-4 flex justify-center border-b border-[#0a0e7a] dark:border-gray-800">
+          <div className="w-28 h-8 bg-[#0a0e7a] dark:bg-gray-700 rounded-md animate-pulse" />
         </div>
         <div className="p-3 flex flex-col gap-2 mt-2">
           {[...Array(7)].map((_, i) => (
             <div
               key={i}
-              className="h-9 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"
+              className="h-9 bg-[#0a0e7a] dark:bg-gray-800 rounded-lg animate-pulse"
             />
           ))}
         </div>
@@ -418,7 +389,7 @@ const AppSidebar: React.FC = () => {
     <aside
       className={`
         fixed top-0 left-0 h-screen z-50 flex flex-col
-        bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
+        bg-[#00013D] dark:bg-gray-900 border-r border-[#0a0e7a] dark:border-gray-800
         transition-[width] duration-300 ease-in-out
         ${isExpanded || isMobileOpen ? "w-[256px]" : isHovered ? "w-[256px]" : "w-[64px]"}
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
@@ -426,44 +397,29 @@ const AppSidebar: React.FC = () => {
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* ── Logo ─────────────────────────────────────────────────────────── */}
+      {/* Logo */}
       <div
         className={`
           flex-shrink-0 flex items-center h-16 px-4
-          border-b border-gray-200 dark:border-gray-800
+          border-b border-[#0a0e7a] dark:border-gray-800
           ${!isOpen ? "lg:justify-center" : "justify-start"}
         `}
       >
         <Link to="/" className="block">
           {isOpen ? (
-            <>
-              <img
-                className="dark:hidden h-8"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-              />
-              <img
-                className="hidden dark:block h-8"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-              />
-            </>
+            <img className="h-8" src="/images/logo/logo-dark.svg" alt="Logo" />
           ) : (
-            <img
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              className="w-8 h-8"
-            />
+            <img src="/images/logo/logo-icon.svg" alt="Logo" className="w-8 h-8" />
           )}
         </Link>
       </div>
 
-      {/* ── Navigation ───────────────────────────────────────────────────── */}
+      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 no-scrollbar">
         {filteredNavItems.length > 0 ? (
           renderMenuItems(filteredNavItems, "main")
         ) : (
-          <p className="text-xs text-gray-400 px-3 py-2">No menu access</p>
+          <p className="text-xs text-white px-3 py-2">No menu access</p>
         )}
       </nav>
     </aside>

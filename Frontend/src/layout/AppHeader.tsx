@@ -22,7 +22,6 @@ const AppHeader: React.FC = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Header left offset tracks the currently visible sidebar width
   const sidebarWidth =
     isExpanded || isHovered ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
@@ -40,7 +39,6 @@ const AppHeader: React.FC = () => {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Blur when a modal is open
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsBlurred(document.body.classList.contains("modal-open"));
@@ -49,7 +47,6 @@ const AppHeader: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Ctrl/Cmd + K → focus search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -78,22 +75,26 @@ const AppHeader: React.FC = () => {
     <>
       <header
         style={headerStyle}
-        className={`fixed top-0 right-0 z-50 bg-[#03045e] dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 ${
-          isBlurred ? "blur-sm pointer-events-none select-none" : ""
-        }`}
+        className={`
+          fixed top-0 right-0 z-50
+          bg-[#00013D] dark:bg-gray-900
+          border-b border-[#0a0e7a] dark:border-gray-800
+          ${isBlurred ? "blur-sm pointer-events-none select-none" : ""}
+        `}
       >
         <div className="flex items-center justify-between h-full px-4 lg:px-5">
-          {/* ── LEFT ─────────────────────────────── */}
+
+          {/* LEFT */}
           <div className="flex items-center gap-2">
             {/* Sidebar toggle */}
             <button
               onClick={handleToggle}
               aria-label="Toggle Sidebar"
-              className="flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 dark:text-gray-400
-                         hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+              className="flex items-center justify-center w-9 h-9 rounded-lg
+                         text-blue-200 hover:bg-white/10 hover:text-white
+                         transition-colors duration-150"
             >
               {isMobileOpen ? (
-                /* Close icon */
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path
                     fillRule="evenodd"
@@ -103,7 +104,6 @@ const AppHeader: React.FC = () => {
                   />
                 </svg>
               ) : (
-                /* Hamburger icon */
                 <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
                   <path
                     fillRule="evenodd"
@@ -115,29 +115,16 @@ const AppHeader: React.FC = () => {
               )}
             </button>
 
-            {/* Logo (mobile only — desktop logo lives in the sidebar) */}
+            {/* Logo — mobile only */}
             <Link to="/" className="lg:hidden">
-              <img
-                className="dark:hidden h-7"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-              />
-              <img
-                className="hidden dark:block h-7"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-              />
+              <img className="h-7" src="/images/logo/logo-dark.svg" alt="Logo" />
             </Link>
 
-            {/* Search (desktop) */}
+            {/* Search — desktop only */}
             <div className="hidden lg:block ml-1">
               <div className="relative">
                 <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                  >
+                  <svg className="w-4 h-4 text-blue-300" viewBox="0 0 20 20" fill="none">
                     <path
                       fillRule="evenodd"
                       clipRule="evenodd"
@@ -150,33 +137,35 @@ const AppHeader: React.FC = () => {
                   ref={inputRef}
                   type="text"
                   placeholder="Search…"
-                  className="h-9 w-64 xl:w-80 rounded-lg border border-gray-200 dark:border-gray-700
-                             bg-gray-50 dark:bg-gray-800 pl-9 pr-12
-                             text-sm text-gray-900 dark:text-white placeholder:text-gray-400
-                             focus:border-brand-500 dark:focus:border-brand-500 focus:outline-none
+                  className="h-9 w-64 xl:w-80 rounded-lg
+                             border border-white/20
+                             bg-white/10
+                             pl-9 pr-12
+                             text-sm text-white placeholder:text-blue-300
+                             focus:border-white/40 focus:outline-none focus:bg-white/15
                              transition-colors duration-150"
                 />
-                <kbd className="absolute inset-y-0 right-3 flex items-center gap-0.5 text-[11px]
-                                text-gray-400 dark:text-gray-500 pointer-events-none">
+                <kbd className="absolute inset-y-0 right-3 flex items-center gap-0.5
+                                text-[11px] text-blue-300 pointer-events-none">
                   <span className="font-sans">⌘</span>K
                 </kbd>
               </div>
             </div>
           </div>
 
-          {/* ── RIGHT ────────────────────────────── */}
+          {/* RIGHT */}
           <div className="flex items-center gap-1.5">
             <ThemeToggleButton />
             <NotificationDropdown />
             <UserDropdown />
 
-            {/* Mobile overflow menu toggle */}
+            {/* Mobile overflow toggle */}
             <button
               onClick={() => setApplicationMenuOpen(!isApplicationMenuOpen)}
               aria-label="Application menu"
               className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg
-                         text-gray-500 dark:text-gray-400
-                         hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+                         text-blue-200 hover:bg-white/10 hover:text-white
+                         transition-colors duration-150"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="5" cy="12" r="1.5" fill="currentColor" />
@@ -188,7 +177,6 @@ const AppHeader: React.FC = () => {
         </div>
       </header>
 
-      {/* Push page content below the fixed header */}
       <div style={{ height: HEADER_HEIGHT }} />
     </>
   );

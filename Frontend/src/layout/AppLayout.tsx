@@ -3,35 +3,35 @@ import { Outlet } from "react-router";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
+import PlexusBackground from "../components/background/PlexusBackground";
+
 
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-
-  // Mirror the exact sidebar widths declared in AppSidebar
   const sidebarOpen = isExpanded || isHovered;
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 lg:flex">
-      {/* Sidebar + mobile backdrop */}
-      <AppSidebar />
-      <Backdrop />
+    <div className="min-h-screen bg-white dark:bg-[#0d0b1a] lg:flex relative">
 
-      {/* Main area shifts right exactly as wide as the sidebar */}
-      <div
-        className={`
+      <PlexusBackground />
+
+      <div className="relative z-10 flex flex-1 min-h-screen lg:flex">
+        <AppSidebar />
+        <Backdrop />
+
+        <div className={`
           flex-1 flex flex-col min-w-0
           transition-[margin] duration-300 ease-in-out
           ${sidebarOpen ? "lg:ml-[256px]" : "lg:ml-[64px]"}
           ${isMobileOpen ? "overflow-hidden" : ""}
-        `}
-      >
-        <AppHeader />
-
-        {/* Page content — full width, consistent padding */}
-        <main className="flex-1 p-4 md:p-6">
-          <Outlet />
-        </main>
+        `}>
+          <AppHeader />
+          <main className="flex-1 p-4 md:p-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
+
     </div>
   );
 };
