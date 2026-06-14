@@ -120,7 +120,6 @@ export default function TasksReport() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [filterProject, setFilterProject] = useState("");
-  const [filterSuite, setFilterSuite] = useState("");
   const [filterOverdue, setFilterOverdue] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
 
@@ -128,6 +127,7 @@ export default function TasksReport() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [exporting, setExporting] = useState(false);
+
   // ── Derived dropdown options ───────────────────────────────────────────────
   const projects = useMemo(
     () =>
@@ -135,17 +135,6 @@ export default function TasksReport() {
         ...new Set(
           (tasks ?? [])
             .map((t) => t.project_name)
-            .filter((v): v is string => Boolean(v)),
-        ),
-      ].sort(),
-    [tasks],
-  );
-  const suites = useMemo(
-    () =>
-      [
-        ...new Set(
-          (tasks ?? [])
-            .map((t) => t.suite_name)
             .filter((v): v is string => Boolean(v)),
         ),
       ].sort(),
@@ -180,7 +169,6 @@ export default function TasksReport() {
     filterStatus,
     filterPriority,
     filterProject,
-    filterSuite,
     filterOverdue,
     filterAssignee,
   ].filter(Boolean).length;
@@ -190,7 +178,6 @@ export default function TasksReport() {
     setFilterStatus("");
     setFilterPriority("");
     setFilterProject("");
-    setFilterSuite("");
     setFilterOverdue("");
     setCurrentPage(1);
     setFilterAssignee("");
@@ -216,7 +203,6 @@ export default function TasksReport() {
         !t.title.toLowerCase().includes(q) &&
         !t.task_code.toLowerCase().includes(q) &&
         !(t.project_name ?? "").toLowerCase().includes(q) &&
-        !(t.suite_name ?? "").toLowerCase().includes(q) &&
         !(t.assignees ?? "").toLowerCase().includes(q) &&
         !(t.tags ?? "").toLowerCase().includes(q) &&
         !(t.created_by_name ?? "").toLowerCase().includes(q) &&
@@ -226,7 +212,6 @@ export default function TasksReport() {
       if (filterStatus && t.status !== filterStatus) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
       if (filterProject && t.project_name !== filterProject) return false;
-      if (filterSuite && t.suite_name !== filterSuite) return false;
       if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
         return false;
       if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
@@ -248,7 +233,6 @@ export default function TasksReport() {
     filterStatus,
     filterPriority,
     filterProject,
-    filterSuite,
     filterOverdue,
     filterAssignee,
   ]);
@@ -271,143 +255,114 @@ export default function TasksReport() {
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const all = tasks ?? [];
-
     const normalize = (s?: string | null) => (s ?? "").trim().toLowerCase();
-
     return {
       total: all.length,
-
       completed: all.filter((t) => normalize(t.status) === "completed").length,
-
       pending: all.filter((t) => normalize(t.status) === "pending").length,
-
-      inProgress: all.filter((t) => normalize(t.status) === "in progress")
-        .length,
-
+      inProgress: all.filter((t) => normalize(t.status) === "in progress").length,
       onHold: all.filter((t) => normalize(t.status) === "on hold").length,
-
       cancelled: all.filter((t) => normalize(t.status) === "cancelled").length,
-
       overdue: all.filter((t) => isOverdue(t.due_date, t.status)).length,
     };
   }, [tasks]);
 
   // ── Excel export ──────────────────────────────────────────────────────────
   const handleExport = async () => {
-  try {
-    setExporting(true);
+    try {
+      setExporting(true);
 
-    // Fetch ALL tasks without pagination
-    const response = await axios.get(
-      "/api/reports/tasks/list?download=true",
-      {
+      const response = await axios.get("/api/reports/tasks/list?download=true", {
         withCredentials: true,
-      },
-    );
+      });
 
-    const allTasks: TaskReport[] = response.data.data || [];
+      const allTasks: TaskReport[] = response.data.data || [];
+      const q = search.toLowerCase().trim();
 
-    // Apply SAME frontend filters to full dataset
-    const q = search.toLowerCase().trim();
+      const exportFiltered = allTasks.filter((t) => {
+        if (
+          q &&
+          !t.title.toLowerCase().includes(q) &&
+          !t.task_code.toLowerCase().includes(q) &&
+          !(t.project_name ?? "").toLowerCase().includes(q) &&
+          !(t.assignees ?? "").toLowerCase().includes(q) &&
+          !(t.tags ?? "").toLowerCase().includes(q) &&
+          !(t.created_by_name ?? "").toLowerCase().includes(q) &&
+          !String(t.id).includes(q)
+        )
+          return false;
+        if (filterStatus && t.status !== filterStatus) return false;
+        if (filterPriority && t.priority !== filterPriority) return false;
+        if (filterProject && t.project_name !== filterProject) return false;
+        if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
+          return false;
+        if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
+          return false;
+        if (
+          filterAssignee &&
+          !(t.assignees ?? "")
+            .split(",")
+            .map((a) => a.trim())
+            .includes(filterAssignee)
+        )
+          return false;
+        return true;
+      });
 
-    const exportFiltered = allTasks.filter((t) => {
-      if (
-        q &&
-        !t.title.toLowerCase().includes(q) &&
-        !t.task_code.toLowerCase().includes(q) &&
-        !(t.project_name ?? "").toLowerCase().includes(q) &&
-        !(t.suite_name ?? "").toLowerCase().includes(q) &&
-        !(t.assignees ?? "").toLowerCase().includes(q) &&
-        !(t.tags ?? "").toLowerCase().includes(q) &&
-        !(t.created_by_name ?? "").toLowerCase().includes(q) &&
-        !String(t.id).includes(q)
-      )
-        return false;
+      const rows = exportFiltered.map((t, i) => ({
+        "#": i + 1,
+        "Task Code": t.task_code,
+        Title: t.title,
+        Status: t.status,
+        Priority: t.priority,
+        Project: t.project_name ?? "",
+        Assignees: t.assignees ?? "",
+        "Start Date": formatDatePlain(t.start_date),
+        "Due Date": formatDatePlain(t.due_date),
+        Overdue: isOverdue(t.due_date, t.status) ? "Yes" : "No",
+        "Created By": t.created_by_name ?? "",
+        "Created At": formatDatePlain(t.created_at),
+        "Updated By": t.updated_by_name ?? "",
+        "Updated At": formatDatePlain(t.updated_at),
+      }));
 
-      if (filterStatus && t.status !== filterStatus) return false;
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws["!cols"] = [
+        { wch: 5 },
+        { wch: 12 },
+        { wch: 35 },
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 25 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 8 },
+        { wch: 16 },
+        { wch: 22 },
+        { wch: 16 },
+        { wch: 22 },
+      ];
 
-      if (filterPriority && t.priority !== filterPriority) return false;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Tasks Report");
 
-      if (filterProject && t.project_name !== filterProject) return false;
+      const stamp = new Date()
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+        .replace(/ /g, "-");
 
-      if (filterSuite && t.suite_name !== filterSuite) return false;
-
-      if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
-        return false;
-
-      if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
-        return false;
-
-      if (
-        filterAssignee &&
-        !(t.assignees ?? "")
-          .split(",")
-          .map((a) => a.trim())
-          .includes(filterAssignee)
-      )
-        return false;
-
-      return true;
-    });
-
-    const rows = exportFiltered.map((t, i) => ({
-      "#": i + 1,
-      "Task Code": t.task_code,
-      Title: t.title,
-      Status: t.status,
-      Priority: t.priority,
-      Project: t.project_name ?? "",
-      Suite: t.suite_name ?? "",
-      Assignees: t.assignees ?? "",
-      "Start Date": formatDatePlain(t.start_date),
-      "Due Date": formatDatePlain(t.due_date),
-      Overdue: isOverdue(t.due_date, t.status) ? "Yes" : "No",
-      "Created By": t.created_by_name ?? "",
-      "Created At": formatDatePlain(t.created_at),
-      "Updated By": t.updated_by_name ?? "",
-      "Updated At": formatDatePlain(t.updated_at),
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-
-    ws["!cols"] = [
-      { wch: 5 },
-      { wch: 12 },
-      { wch: 35 },
-      { wch: 14 },
-      { wch: 10 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 8 },
-      { wch: 16 },
-      { wch: 22 },
-      { wch: 16 },
-      { wch: 22 },
-    ];
-
-    const wb = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(wb, ws, "Tasks Report");
-
-    const stamp = new Date()
-      .toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-      .replace(/ /g, "-");
-
-    XLSX.writeFile(wb, `Tasks_Report_${stamp}.xlsx`);
-  } catch (err) {
-    console.error("Excel export failed:", err);
-    alert("Failed to export Excel report");
-  } finally {
-    setExporting(false);
-  }
-};
+      XLSX.writeFile(wb, `Tasks_Report_${stamp}.xlsx`);
+    } catch (err) {
+      console.error("Excel export failed:", err);
+      alert("Failed to export Excel report");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -417,77 +372,42 @@ export default function TasksReport() {
 
       <div className="mt-4 min-w-0">
         {/* ── Summary Cards ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
+        {/* Scrollable on tablet/mobile, natural wrap on desktop */}
+        <div
+          className="mb-5"
+          style={{ overflowX: "auto", overflowY: "visible" }}
+        >
+        <div className="grid grid-cols-7 gap-3" style={{ minWidth: "560px" }}>
           {[
-            {
-              label: "Total",
-              value: stats.total,
-              color: "blue",
-            },
-            {
-              label: "Completed",
-              value: stats.completed,
-              color: "green",
-            },
-            {
-              label: "Pending",
-              value: stats.pending,
-              color: "yellow",
-            },
-            {
-              label: "In Progress",
-              value: stats.inProgress,
-              color: "sky",
-            },
-            {
-              label: "On Hold",
-              value: stats.onHold,
-              color: "orange",
-            },
-            {
-              label: "Cancelled",
-              value: stats.cancelled,
-              color: "red",
-            },
-            {
-              label: "Overdue",
-              value: stats.overdue,
-              color: "rose",
-            },
+            { label: "Total",       value: stats.total,      color: "blue"   },
+            { label: "Completed",   value: stats.completed,  color: "green"  },
+            { label: "Pending",     value: stats.pending,    color: "yellow" },
+            { label: "In Progress", value: stats.inProgress, color: "sky"    },
+            { label: "On Hold",     value: stats.onHold,     color: "orange" },
+            { label: "Cancelled",   value: stats.cancelled,  color: "red"    },
+            { label: "Overdue",     value: stats.overdue,    color: "rose"   },
           ].map(({ label, value, color }) => (
             <div
               key={label}
               className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm px-5 py-4"
             >
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                {label}
-              </p>
-
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
               <p
                 className={`text-2xl font-bold ${
-                  color === "blue"
-                    ? "text-blue-600 dark:text-blue-400"
-                    : color === "green"
-                      ? "text-green-600 dark:text-green-400"
-                      : color === "yellow"
-                        ? "text-yellow-500 dark:text-yellow-400"
-                        : color === "sky"
-                          ? "text-sky-600 dark:text-sky-400"
-                          : color === "orange"
-                            ? "text-orange-600 dark:text-orange-400"
-                            : color === "rose"
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-red-600 dark:text-red-400"
+                  color === "blue"   ? "text-blue-600 dark:text-blue-400"     :
+                  color === "green"  ? "text-green-600 dark:text-green-400"   :
+                  color === "yellow" ? "text-yellow-500 dark:text-yellow-400" :
+                  color === "sky"    ? "text-sky-600 dark:text-sky-400"       :
+                  color === "orange" ? "text-orange-600 dark:text-orange-400" :
+                  color === "rose"   ? "text-rose-600 dark:text-rose-400"     :
+                                       "text-red-600 dark:text-red-400"
                 }`}
               >
-                {loading ? (
-                  <span className="text-gray-300 dark:text-gray-700">—</span>
-                ) : (
-                  value
-                )}
+                {loading ? <span className="text-gray-300 dark:text-gray-700">—</span> : value}
               </p>
             </div>
           ))}
+        </div>
         </div>
 
         {/* ── Filters Bar ───────────────────────────────────────────────── */}
@@ -500,7 +420,7 @@ export default function TasksReport() {
                 type="text"
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search by title, code, project, suite, assignees, tags, created by…"
+                placeholder="Search by title, code, project, assignees, tags, created by…"
                 className="w-full pl-8 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {search && (
@@ -527,90 +447,53 @@ export default function TasksReport() {
                 </button>
               )}
               <button
-  onClick={handleExport}
-  disabled={loading || exporting || filtered.length === 0}
+                onClick={handleExport}
+                disabled={loading || exporting || filtered.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition duration-150 whitespace-nowrap"
               >
                 <FaFileExcel />
-
-{exporting ? "Exporting..." : "Export Excel"}
-
-{!loading && !exporting && filtered.length > 0 && (
-  <span className="bg-green-500 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none">
-    {filtered.length}
-  </span>
-)}
+                {exporting ? "Exporting..." : "Export Excel"}
+                {!loading && !exporting && filtered.length > 0 && (
+                  <span className="bg-green-500 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none">
+                    {filtered.length}
+                  </span>
+                )}
               </button>
             </div>
           </div>
 
-          {/* Row 2: dropdowns */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Row 2: dropdowns — 5 cols (suite removed) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <select
               value={filterStatus}
-              onChange={(e) =>
-                handleFilterChange(setFilterStatus)(e.target.value)
-              }
+              onChange={(e) => handleFilterChange(setFilterStatus)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterStatus ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
             >
               <option value="">All Statuses</option>
-              {statuses.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
 
             <select
               value={filterPriority}
-              onChange={(e) =>
-                handleFilterChange(setFilterPriority)(e.target.value)
-              }
+              onChange={(e) => handleFilterChange(setFilterPriority)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterPriority ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
             >
               <option value="">All Priorities</option>
-              {priorities.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              {priorities.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
 
             <select
               value={filterProject}
-              onChange={(e) =>
-                handleFilterChange(setFilterProject)(e.target.value)
-              }
+              onChange={(e) => handleFilterChange(setFilterProject)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterProject ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
             >
               <option value="">All Projects</option>
-              {projects.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterSuite}
-              onChange={(e) =>
-                handleFilterChange(setFilterSuite)(e.target.value)
-              }
-              className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterSuite ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
-            >
-              <option value="">All Suites</option>
-              {suites.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {projects.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
 
             <select
               value={filterOverdue}
-              onChange={(e) =>
-                handleFilterChange(setFilterOverdue)(e.target.value)
-              }
+              onChange={(e) => handleFilterChange(setFilterOverdue)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterOverdue ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
             >
               <option value="">All (Overdue)</option>
@@ -620,17 +503,11 @@ export default function TasksReport() {
 
             <select
               value={filterAssignee}
-              onChange={(e) =>
-                handleFilterChange(setFilterAssignee)(e.target.value)
-              }
+              onChange={(e) => handleFilterChange(setFilterAssignee)(e.target.value)}
               className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterAssignee ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
             >
               <option value="">All Assignees</option>
-              {assignees.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
+              {assignees.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
         </div>
@@ -640,21 +517,16 @@ export default function TasksReport() {
           <div className="flex items-center gap-2 mb-3 px-1">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Showing{" "}
-              <span className="font-semibold text-gray-700 dark:text-gray-200">
-                {filtered.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-semibold text-gray-700 dark:text-gray-200">
-                {tasks?.length ?? 0}
-              </span>{" "}
-              tasks
+              <span className="font-semibold text-gray-700 dark:text-gray-200">{filtered.length}</span>
+              {" "}of{" "}
+              <span className="font-semibold text-gray-700 dark:text-gray-200">{tasks?.length ?? 0}</span>
+              {" "}tasks
             </p>
-            {activeFilterCount > 0 &&
-              filtered.length !== (tasks?.length ?? 0) && (
-                <span className="text-xs text-blue-600 dark:text-blue-400">
-                  · {(tasks?.length ?? 0) - filtered.length} filtered out
-                </span>
-              )}
+            {activeFilterCount > 0 && filtered.length !== (tasks?.length ?? 0) && (
+              <span className="text-xs text-blue-600 dark:text-blue-400">
+                · {(tasks?.length ?? 0) - filtered.length} filtered out
+              </span>
+            )}
           </div>
         )}
 
@@ -673,55 +545,30 @@ export default function TasksReport() {
         {/* ── Table ─────────────────────────────────────────────────────── */}
         {!loading && !error && (
           <>
-            {/* Table Wrapper */}
+            {/*
+              Outer wrapper: constrained to viewport, clips page overflow.
+              Inner wrapper: scrolls only the table horizontally.
+            */}
             <div className="w-full min-w-0">
-              <div className="w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg bg-white dark:bg-gray-900">
-                <table className="w-full table-auto text-sm text-left border-collapse">
+              <div
+                className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg"
+                style={{ overflowX: "auto", overflowY: "visible" }}
+              >
+                <table className="w-full text-sm text-left border-collapse bg-white dark:bg-gray-900" style={{ minWidth: "900px" }}>
                   <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
                     <tr>
                       <th className="px-4 py-3 whitespace-nowrap">#</th>
-
                       <th className="px-4 py-3 whitespace-nowrap">Code</th>
-
-                      <th
-                        className="px-4 py-3 whitespace-nowrap"
-                        style={{ minWidth: "220px", maxWidth: "300px" }}
-                      >
-                        Title
-                      </th>
-
+                      <th className="px-4 py-3 whitespace-nowrap" style={{ minWidth: "220px", maxWidth: "300px" }}>Title</th>
                       <th className="px-4 py-3 whitespace-nowrap">Status</th>
-
                       <th className="px-4 py-3 whitespace-nowrap">Priority</th>
-
                       <th className="px-4 py-3 whitespace-nowrap">Project</th>
-
-                      <th className="px-4 py-3 whitespace-nowrap">Suite</th>
-
-                      <th
-                        className="px-4 py-3 whitespace-nowrap"
-                        style={{ minWidth: "180px" }}
-                      >
-                        Assignees
-                      </th>
-
+                      <th className="px-4 py-3 whitespace-nowrap" style={{ minWidth: "180px" }}>Assignees</th>
                       <th className="px-4 py-3 whitespace-nowrap">Due Date</th>
-
-                      <th className="px-4 py-3 whitespace-nowrap">
-                        Created By
-                      </th>
-
-                      <th className="px-4 py-3 whitespace-nowrap">
-                        Created At
-                      </th>
-
-                      <th className="px-4 py-3 whitespace-nowrap">
-                        Updated By
-                      </th>
-
-                      <th className="px-4 py-3 whitespace-nowrap">
-                        Updated At
-                      </th>
+                      <th className="px-4 py-3 whitespace-nowrap" style={{ minWidth: "100px", maxWidth: "130px" }}>Created By</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Created At</th>
+                      <th className="px-4 py-3 whitespace-nowrap" style={{ minWidth: "100px", maxWidth: "130px" }}>Updated By</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Updated At</th>
                     </tr>
                   </thead>
 
@@ -754,18 +601,11 @@ export default function TasksReport() {
                             </td>
 
                             {/* Title */}
-                            <td
-                              className="px-4 py-3"
-                              style={{
-                                minWidth: "220px",
-                                maxWidth: "300px",
-                              }}
-                            >
+                            <td className="px-4 py-3" style={{ minWidth: "220px", maxWidth: "300px" }}>
                               <div className="flex items-start gap-1.5">
                                 {overdue && (
                                   <FaExclamationCircle className="text-red-500 dark:text-red-400 w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                                 )}
-
                                 <span
                                   className="text-sm font-medium text-gray-900 dark:text-white leading-snug overflow-hidden line-clamp-2"
                                   title={task.title}
@@ -779,8 +619,7 @@ export default function TasksReport() {
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span
                                 className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
-                                  STATUS_COLORS[statusKey] ??
-                                  "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  STATUS_COLORS[statusKey] ?? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                                 }`}
                               >
                                 {task.status}
@@ -791,8 +630,7 @@ export default function TasksReport() {
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span
                                 className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
-                                  PRIORITY_COLORS[priorityKey] ??
-                                  "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  PRIORITY_COLORS[priorityKey] ?? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                                 }`}
                               >
                                 {task.priority}
@@ -810,19 +648,8 @@ export default function TasksReport() {
                               )}
                             </td>
 
-                            {/* Suite */}
-                            <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                              {task.suite_name ?? <Dash />}
-                            </td>
-
                             {/* Assignees */}
-                            <td
-                              className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400"
-                              style={{
-                                minWidth: "180px",
-                                maxWidth: "220px",
-                              }}
-                            >
+                            <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400" style={{ minWidth: "180px", maxWidth: "220px" }}>
                               <span className="break-words leading-snug">
                                 {task.assignees ?? <Dash />}
                               </span>
@@ -838,14 +665,11 @@ export default function TasksReport() {
                                       : "text-gray-700 dark:text-gray-200"
                                   }`}
                                 >
-                                  {new Date(task.due_date).toLocaleDateString(
-                                    "en-GB",
-                                    {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    },
-                                  )}
+                                  {new Date(task.due_date).toLocaleDateString("en-GB", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}
                                 </span>
                               ) : (
                                 <Dash />
@@ -853,8 +677,10 @@ export default function TasksReport() {
                             </td>
 
                             {/* Created By */}
-                            <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                              {task.created_by_name ?? <Dash />}
+                            <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400" style={{ maxWidth: "130px" }}>
+                              <span className="block truncate" title={task.created_by_name ?? ""}>
+                                {task.created_by_name ?? <Dash />}
+                              </span>
                             </td>
 
                             {/* Created At */}
@@ -863,8 +689,10 @@ export default function TasksReport() {
                             </td>
 
                             {/* Updated By */}
-                            <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                              {task.updated_by_name ?? <Dash />}
+                            <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400" style={{ maxWidth: "130px" }}>
+                              <span className="block truncate" title={task.updated_by_name ?? ""}>
+                                {task.updated_by_name ?? <Dash />}
+                              </span>
                             </td>
 
                             {/* Updated At */}
@@ -877,7 +705,7 @@ export default function TasksReport() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={13}
+                          colSpan={12}
                           className="text-center py-8 text-gray-500 dark:text-gray-400"
                         >
                           {activeFilterCount > 0
