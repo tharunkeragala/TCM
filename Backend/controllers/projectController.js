@@ -1,15 +1,34 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
+const logAudit = require("./auditController");
 
-// ✅ GET ALL
+// ===============================
+// REMOVE TIMESTAMP + META FIELDS FOR AUDIT
+// ===============================
+const cleanAuditData = (obj = {}) => {
+  const {
+    created_at,
+    updated_at,
+    created_by_name,
+    updated_by_name,
+    created_by,
+    updated_by,
+    ...cleaned
+  } = obj;
+
+  return cleaned;
+};
+
+// ===============================
+// GET ALL PROJECTS
+// ===============================
 exports.getProjects = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    // 1. Get logged-in user's department from DB
     const userResult = await pool
       .request()
-      .input("user_id", req.user.id)
+      .input("user_id", sql.Int, req.user.id)
       .query(`
         SELECT department_id 
         FROM users 
@@ -18,10 +37,9 @@ exports.getProjects = async (req, res) => {
 
     const userDeptId = userResult.recordset[0]?.department_id;
 
-    // 2. Main query with safe filtering
     const result = await pool
       .request()
-      .input("department_id", userDeptId)
+      .input("department_id", sql.Int, userDeptId)
       .query(`
         SELECT 
           p.*,
@@ -55,13 +73,18 @@ exports.getProjects = async (req, res) => {
   }
 };
 
-// ✅ GET BY ID
+// ===============================
+// GET PROJECT BY ID
+// ===============================
 exports.getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool.request().input("id", sql.Int, id).query(`
+    const result = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`
         SELECT 
           p.*,
           u1.username AS created_by_name,
@@ -73,12 +96,16 @@ exports.getProjectById = async (req, res) => {
       `);
 
     if (!result.recordset.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Project not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
     }
 
-    res.status(200).json({ success: true, data: result.recordset[0] });
+    res.status(200).json({
+      success: true,
+      data: result.recordset[0],
+    });
   } catch (err) {
     console.error("GET Project By ID Error:", err);
     res.status(500).json({
@@ -89,19 +116,27 @@ exports.getProjectById = async (req, res) => {
   }
 };
 
-// ✅ GET SUITE COUNT (for delete warning)
+// ===============================
+// GET SUITE COUNT
+// ===============================
 exports.getProjectSuiteCount = async (req, res) => {
   try {
     const { id } = req.params;
     const pool = await poolPromise;
 
-    const result = await pool.request().input("project_id", sql.Int, id).query(`
+    const result = await pool
+      .request()
+      .input("project_id", sql.Int, id)
+      .query(`
         SELECT COUNT(*) AS suite_count
         FROM test_case_manager.dbo.test_suites
         WHERE project_id = @project_id
       `);
 
-    res.json({ success: true, count: result.recordset[0]?.suite_count ?? 0 });
+    res.json({
+      success: true,
+      count: result.recordset[0]?.suite_count ?? 0,
+    });
   } catch (err) {
     console.error("GET Suite Count Error:", err);
     res.status(500).json({
@@ -112,57 +147,70 @@ exports.getProjectSuiteCount = async (req, res) => {
   }
 };
 
-// ✅ CREATE
+// ===============================
+// CREATE PROJECT
+// ===============================
 exports.createProject = async (req, res) => {
   try {
     const { project_name, description, is_active } = req.body;
     const userId = req.user?.id || null;
 
     if (!project_name?.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Project name is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Project name is required",
+      });
     }
 
     const pool = await poolPromise;
 
     const existing = await pool
       .request()
-      .input("project_name", sql.VarChar, project_name).query(`
+      .input("project_name", sql.VarChar, project_name)
+      .query(`
         SELECT id FROM test_case_manager.dbo.projects
         WHERE project_name = @project_name
       `);
 
     if (existing.recordset.length > 0) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Project name already exists" });
+      return res.status(400).json({
+        success: false,
+        message: "Project name already exists",
+      });
     }
 
-    await pool
+    const insertResult = await pool
       .request()
       .input("project_name", sql.VarChar, project_name)
       .input("description", sql.VarChar(sql.MAX), description || null)
       .input("is_active", sql.Bit, is_active ?? 1)
       .input("created_by", sql.Int, userId)
-      .input("updated_by", sql.Int, userId).query(`
+      .input("updated_by", sql.Int, userId)
+      .query(`
         INSERT INTO test_case_manager.dbo.projects
           (project_name, description, is_active, created_by, updated_by)
+        OUTPUT INSERTED.*
         VALUES
           (@project_name, @description, @is_active, @created_by, @updated_by)
       `);
 
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Project "${project_name}" created`)
-      .input("user_id", sql.Int, userId).query(`
-        INSERT INTO audit_logs (action, module, description, user_id)
-        VALUES ('CREATE', 'PROJECT', @description, @user_id)
-      `);
+    const project = cleanAuditData(insertResult.recordset[0]);
 
-    res
-      .status(201)
-      .json({ success: true, message: "Project created successfully" });
+    await logAudit({
+      userId,
+      action: "CREATE",
+      module: "PROJECT",
+      entityType: "PROJECT",
+      entityId: project.id,
+      entityName: project.project_name,
+      description: `Created project ${project.project_name}`,
+      newValues: project,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Project created successfully",
+    });
   } catch (err) {
     console.error("CREATE Project Error:", err);
     res.status(500).json({
@@ -173,34 +221,30 @@ exports.createProject = async (req, res) => {
   }
 };
 
-// ✅ UPDATE
+// ===============================
+// UPDATE PROJECT
+// ===============================
 exports.updateProject = async (req, res) => {
   try {
     const { id } = req.params;
     const { project_name, description, is_active } = req.body;
     const userId = req.user?.id || null;
 
-    if (!project_name?.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Project name is required" });
-    }
-
     const pool = await poolPromise;
 
-    const existing = await pool
+    const oldResult = await pool
       .request()
-      .input("project_name", sql.VarChar, project_name)
-      .input("id", sql.Int, id).query(`
-        SELECT id FROM test_case_manager.dbo.projects
-        WHERE project_name = @project_name AND id != @id
-      `);
+      .input("id", sql.Int, id)
+      .query(`SELECT * FROM test_case_manager.dbo.projects WHERE id = @id`);
 
-    if (existing.recordset.length > 0) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Project name already exists" });
+    if (!oldResult.recordset[0]) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
     }
+
+    const oldProject = cleanAuditData(oldResult.recordset[0]);
 
     await pool
       .request()
@@ -208,7 +252,8 @@ exports.updateProject = async (req, res) => {
       .input("project_name", sql.VarChar, project_name)
       .input("description", sql.VarChar, description || null)
       .input("is_active", sql.Bit, is_active)
-      .input("updated_by", sql.Int, userId).query(`
+      .input("updated_by", sql.Int, userId)
+      .query(`
         UPDATE test_case_manager.dbo.projects
         SET project_name = @project_name,
             description  = @description,
@@ -218,15 +263,29 @@ exports.updateProject = async (req, res) => {
         WHERE id = @id
       `);
 
-    await pool
+    const newResult = await pool
       .request()
-      .input("description", sql.VarChar, `Project ID ${id} updated`)
-      .input("user_id", sql.Int, userId).query(`
-        INSERT INTO audit_logs (action, module, description, user_id)
-        VALUES ('UPDATE', 'PROJECT', @description, @user_id)
-      `);
+      .input("id", sql.Int, id)
+      .query(`SELECT * FROM test_case_manager.dbo.projects WHERE id = @id`);
 
-    res.json({ success: true, message: "Project updated successfully" });
+    const newProject = cleanAuditData(newResult.recordset[0]);
+
+    await logAudit({
+      userId,
+      action: "UPDATE",
+      module: "PROJECT",
+      entityType: "PROJECT",
+      entityId: Number(id),
+      entityName: newProject.project_name,
+      description: `Updated project ${newProject.project_name}`,
+      oldValues: oldProject,
+      newValues: newProject,
+    });
+
+    res.json({
+      success: true,
+      message: "Project updated successfully",
+    });
   } catch (err) {
     console.error("UPDATE Project Error:", err);
     res.status(500).json({
@@ -237,64 +296,29 @@ exports.updateProject = async (req, res) => {
   }
 };
 
-// ✅ DELETE
+// ===============================
+// DELETE (ARCHIVE PROJECT)
+// ===============================
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id || null;
     const pool = await poolPromise;
 
-    // Check ONLY active tasks
-    const taskCheck = await pool
+    const projectResult = await pool
       .request()
-      .input("project_id", sql.Int, id)
-      .query(`
-        SELECT
-          t.id,
-          t.task_code,
-          t.title,
-          ISNULL(
-            STRING_AGG(u.username, ', '),
-            'Unassigned'
-          ) AS assignees
-        FROM test_case_manager.dbo.tasks t
+      .input("id", sql.Int, id)
+      .query(`SELECT * FROM test_case_manager.dbo.projects WHERE id = @id`);
 
-        LEFT JOIN test_case_manager.dbo.task_assignments ta
-          ON ta.task_id = t.id
-          AND ta.role = 'Assignee'
+    const project = cleanAuditData(projectResult.recordset[0]);
 
-        LEFT JOIN test_case_manager.dbo.users u
-          ON u.id = ta.user_id
-
-        WHERE t.project_id = @project_id
-          AND t.is_archived = 0
-
-        GROUP BY
-          t.id,
-          t.task_code,
-          t.title
-        ORDER BY t.id
-      `);
-
-    // ❌ Block if active tasks exist
-    if (taskCheck.recordset.length > 0) {
-      const tasksText = taskCheck.recordset
-        .map(
-          (t, index) =>
-            `${index + 1}. ${t.task_code} - ${t.title} (Assignees: ${t.assignees})`
-        )
-        .join("\n");
-
-      return res.status(400).json({
+    if (!project) {
+      return res.status(404).json({
         success: false,
-        message:
-          `Cannot archive project. ${taskCheck.recordset.length} active task(s) exist. Archive them first:\n\n` +
-          tasksText,
-        linked_tasks: taskCheck.recordset,
+        message: "Project not found",
       });
     }
 
-    // ✅ ARCHIVE PROJECT (instead of delete)
     await pool
       .request()
       .input("id", sql.Int, id)
@@ -307,17 +331,16 @@ exports.deleteProject = async (req, res) => {
         WHERE id = @id
       `);
 
-    // Audit log
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Project ID ${id} archived`)
-      .input("user_id", sql.Int, userId)
-      .query(`
-        INSERT INTO audit_logs
-          (action, module, description, user_id)
-        VALUES
-          ('ARCHIVE', 'PROJECT', @description, @user_id)
-      `);
+    await logAudit({
+      userId,
+      action: "ARCHIVE",
+      module: "PROJECT",
+      entityType: "PROJECT",
+      entityId: project.id,
+      entityName: project.project_name,
+      description: `Archived project ${project.project_name}`,
+      oldValues: project,
+    });
 
     res.json({
       success: true,
@@ -325,7 +348,6 @@ exports.deleteProject = async (req, res) => {
     });
   } catch (err) {
     console.error("ARCHIVE Project Error:", err);
-
     res.status(500).json({
       success: false,
       message: "Failed to archive project",
@@ -334,20 +356,30 @@ exports.deleteProject = async (req, res) => {
   }
 };
 
-// ✅ TOGGLE ACTIVE — cascades to suites and test cases
+// ===============================
+// TOGGLE PROJECT STATUS
+// ===============================
 exports.toggleProject = async (req, res) => {
   try {
     const { id } = req.params;
     const { is_active } = req.body;
     const userId = req.user?.id || null;
+
     const pool = await poolPromise;
 
-    // 1. Toggle the project itself
+    const oldResult = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(`SELECT * FROM test_case_manager.dbo.projects WHERE id = @id`);
+
+    const oldProject = cleanAuditData(oldResult.recordset[0]);
+
     await pool
       .request()
       .input("id", sql.Int, id)
       .input("is_active", sql.Bit, is_active)
-      .input("updated_by", sql.Int, userId).query(`
+      .input("updated_by", sql.Int, userId)
+      .query(`
         UPDATE test_case_manager.dbo.projects
         SET is_active  = @is_active,
             updated_by = @updated_by,
@@ -355,35 +387,28 @@ exports.toggleProject = async (req, res) => {
         WHERE id = @id
       `);
 
-    // 2. Cascade to all suites under this project
-    await pool
-      .request()
-      .input("project_id", sql.Int, id)
-      .input("is_active", sql.Bit, is_active)
-      .input("updated_by", sql.Int, userId).query(`
-        UPDATE test_case_manager.dbo.test_suites
-        SET is_active  = @is_active,
-            updated_by = @updated_by,
-            updated_at = GETDATE()
-        WHERE project_id = @project_id
-      `);
+    const newProject = {
+      ...oldProject,
+      is_active,
+    };
 
-    // 3. Audit log
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Project ID ${id} and its suites set to ${is_active ? "Active" : "Inactive"}`,
-      )
-      .input("user_id", sql.Int, userId).query(`
-        INSERT INTO audit_logs (action, module, description, user_id)
-        VALUES ('STATUS_CHANGE', 'PROJECT', @description, @user_id)
-      `);
+    await logAudit({
+      userId,
+      action: "STATUS_CHANGE",
+      module: "PROJECT",
+      entityType: "PROJECT",
+      entityId: Number(id),
+      entityName: oldProject.project_name,
+      description: `Project status changed to ${
+        is_active ? "Active" : "Inactive"
+      }`,
+      oldValues: oldProject,
+      newValues: newProject,
+    });
 
     res.json({
       success: true,
-      message: "Project and all linked suites status updated",
+      message: "Project status updated",
     });
   } catch (err) {
     console.error("TOGGLE Project Error:", err);

@@ -1,5 +1,32 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
+const logAudit = require("./auditController");
+
+// Helper for audit logs
+const buildTeamAuditData = async (pool, team) => {
+  if (!team) return null;
+
+  let department_name = null;
+
+  if (team.department_id) {
+    const deptResult = await pool
+      .request()
+      .input("department_id", sql.Int, team.department_id).query(`
+        SELECT department_name
+        FROM test_case_manager.dbo.departments
+        WHERE id = @department_id
+      `);
+
+    department_name = deptResult.recordset[0]?.department_name ?? null;
+  }
+
+  return {
+    id: team.id,
+    team_name: team.team_name,
+    department_name,
+    is_active: team.is_active,
+  };
+};
 
 // ✅ GET ALL TEAMS
 exports.getTeams = async (req, res) => {
@@ -96,8 +123,10 @@ exports.createTeam = async (req, res) => {
       .request()
       .input("team_name", sql.VarChar, team_name)
       .input("department_id", sql.Int, department_id).query(`
-        SELECT id FROM test_case_manager.dbo.teams
-        WHERE team_name = @team_name AND department_id = @department_id
+        SELECT id
+        FROM test_case_manager.dbo.teams
+        WHERE team_name = @team_name
+          AND department_id = @department_id
       `);
 
     if (existing.recordset.length > 0) {
@@ -107,25 +136,32 @@ exports.createTeam = async (req, res) => {
       });
     }
 
-    await pool
+    const insertResult = await pool
       .request()
       .input("team_name", sql.VarChar, team_name)
       .input("department_id", sql.Int, department_id)
       .input("is_active", sql.Bit, is_active ?? true).query(`
-        INSERT INTO test_case_manager.dbo.teams (team_name, department_id, is_active)
-        VALUES (@team_name, @department_id, @is_active)
+        INSERT INTO test_case_manager.dbo.teams
+          (team_name, department_id, is_active)
+        OUTPUT INSERTED.*
+        VALUES
+          (@team_name, @department_id, @is_active)
       `);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Team ${team_name} created under Department ID ${department_id}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('CREATE', 'TEAM', @description)
-      `);
+    const team = insertResult.recordset[0];
+
+    const auditTeam = await buildTeamAuditData(pool, team);
+
+    await logAudit({
+      userId: req.user?.id,
+      action: "CREATE",
+      module: "TEAM",
+      entityType: "TEAM",
+      entityId: team.id,
+      entityName: team.team_name,
+      description: `Created team ${team.team_name}`,
+      newValues: auditTeam,
+    });
 
     res.status(201).json({
       success: true,
@@ -149,15 +185,31 @@ exports.updateTeam = async (req, res) => {
 
     const pool = await poolPromise;
 
+    const oldTeamResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT *
+        FROM test_case_manager.dbo.teams
+        WHERE id = @id
+      `);
+
+    const oldTeam = oldTeamResult.recordset[0];
+
+    if (!oldTeam) {
+      return res.status(404).json({
+        success: false,
+        message: "Team not found",
+      });
+    }
+
     const existing = await pool
       .request()
       .input("team_name", sql.VarChar, team_name)
       .input("department_id", sql.Int, department_id)
       .input("id", sql.Int, id).query(`
-        SELECT id FROM test_case_manager.dbo.teams
+        SELECT id
+        FROM test_case_manager.dbo.teams
         WHERE team_name = @team_name
-        AND department_id = @department_id
-        AND id != @id
+          AND department_id = @department_id
+          AND id != @id
       `);
 
     if (existing.recordset.length > 0) {
@@ -174,20 +226,41 @@ exports.updateTeam = async (req, res) => {
       .input("department_id", sql.Int, department_id)
       .input("is_active", sql.Bit, is_active).query(`
         UPDATE test_case_manager.dbo.teams
-        SET team_name     = @team_name,
-            department_id = @department_id,
-            is_active     = @is_active
+        SET
+          team_name = @team_name,
+          department_id = @department_id,
+          is_active = @is_active
         WHERE id = @id
       `);
 
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Team ID ${id} updated`).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('UPDATE', 'TEAM', @description)
+    const updatedTeamResult = await pool.request().input("id", sql.Int, id)
+      .query(`
+        SELECT *
+        FROM test_case_manager.dbo.teams
+        WHERE id = @id
       `);
 
-    res.json({ success: true, message: "Team updated successfully" });
+    const updatedTeam = updatedTeamResult.recordset[0];
+
+    const oldAuditTeam = await buildTeamAuditData(pool, oldTeam);
+    const newAuditTeam = await buildTeamAuditData(pool, updatedTeam);
+
+    await logAudit({
+      userId: req.user?.id,
+      action: "UPDATE",
+      module: "TEAM",
+      entityType: "TEAM",
+      entityId: Number(id),
+      entityName: updatedTeam.team_name,
+      description: `Updated team ${updatedTeam.team_name}`,
+      oldValues: oldAuditTeam,
+      newValues: newAuditTeam,
+    });
+
+    res.json({
+      success: true,
+      message: "Team updated successfully",
+    });
   } catch (err) {
     console.error("UPDATE Team Error:", err);
     res.status(500).json({
@@ -198,11 +271,29 @@ exports.updateTeam = async (req, res) => {
   }
 };
 
-// ✅ DELETE TEAM (detach users first)
+// ✅ DELETE TEAM
 exports.deleteTeam = async (req, res) => {
   try {
     const { id } = req.params;
+
     const pool = await poolPromise;
+
+    const teamResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT *
+        FROM test_case_manager.dbo.teams
+        WHERE id = @id
+      `);
+
+    const team = teamResult.recordset[0];
+
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: "Team not found",
+      });
+    }
+
+    const auditTeam = await buildTeamAuditData(pool, team);
 
     const result = await pool.request().input("team_id", sql.Int, id).query(`
         SELECT COUNT(*) AS user_count
@@ -212,6 +303,7 @@ exports.deleteTeam = async (req, res) => {
 
     const count = result.recordset[0]?.user_count ?? 0;
 
+    // Detach users if assigned
     if (count > 0) {
       await pool.request().input("team_id", sql.Int, id).query(`
           UPDATE test_case_manager.dbo.users
@@ -219,29 +311,40 @@ exports.deleteTeam = async (req, res) => {
           WHERE team_id = @team_id
         `);
 
-      await pool
-        .request()
-        .input(
-          "description",
-          sql.VarChar,
-          `${count} user(s) detached from Team ID ${id}`,
-        ).query(`
-          INSERT INTO audit_logs (action, module, description)
-          VALUES ('DETACH', 'TEAM', @description)
-        `);
+      await logAudit({
+        userId: req.user?.id,
+        action: "DETACH",
+        module: "TEAM",
+        entityType: "TEAM",
+        entityId: Number(id),
+        entityName: team.team_name,
+        description: `${count} user(s) detached from team`,
+        oldValues: {
+          assignedUsers: count,
+        },
+        newValues: {
+          assignedUsers: 0,
+        },
+      });
     }
 
-    await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`DELETE FROM test_case_manager.dbo.teams WHERE id = @id`);
-
-    await pool
-      .request()
-      .input("description", sql.VarChar, `Team ID ${id} deleted`).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('DELETE', 'TEAM', @description)
+    // Delete team
+    await pool.request().input("id", sql.Int, id).query(`
+        DELETE FROM test_case_manager.dbo.teams
+        WHERE id = @id
       `);
+
+    // Audit delete
+    await logAudit({
+      userId: req.user?.id,
+      action: "DELETE",
+      module: "TEAM",
+      entityType: "TEAM",
+      entityId: team.id,
+      entityName: team.team_name,
+      description: `Deleted team ${team.team_name}`,
+      oldValues: auditTeam,
+    });
 
     res.json({
       success: true,
@@ -268,6 +371,21 @@ exports.toggleTeam = async (req, res) => {
 
     const pool = await poolPromise;
 
+    const oldTeamResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT *
+        FROM test_case_manager.dbo.teams
+        WHERE id = @id
+      `);
+
+    const oldTeam = oldTeamResult.recordset[0];
+
+    if (!oldTeam) {
+      return res.status(404).json({
+        success: false,
+        message: "Team not found",
+      });
+    }
+
     await pool
       .request()
       .input("id", sql.Int, id)
@@ -277,18 +395,36 @@ exports.toggleTeam = async (req, res) => {
         WHERE id = @id
       `);
 
-    await pool
-      .request()
-      .input(
-        "description",
-        sql.VarChar,
-        `Team ID ${id} status changed to ${is_active ? "Active" : "Inactive"}`,
-      ).query(`
-        INSERT INTO audit_logs (action, module, description)
-        VALUES ('STATUS_CHANGE', 'TEAM', @description)
-      `);
+    const updatedTeam = {
+      ...oldTeam,
+      is_active,
+    };
 
-    res.json({ success: true, message: "Team status updated" });
+    const oldAuditTeam = await buildTeamAuditData(pool, oldTeam);
+
+    const newAuditTeam = {
+      ...oldAuditTeam,
+      is_active,
+    };
+
+    await logAudit({
+      userId: req.user?.id,
+      action: "STATUS_CHANGE",
+      module: "TEAM",
+      entityType: "TEAM",
+      entityId: Number(id),
+      entityName: oldTeam.team_name,
+      description: `Team status changed to ${
+        is_active ? "Active" : "Inactive"
+      }`,
+      oldValues: oldAuditTeam,
+      newValues: newAuditTeam,
+    });
+
+    res.json({
+      success: true,
+      message: "Team status updated",
+    });
   } catch (err) {
     console.error("TOGGLE Team Error:", err);
     res.status(500).json({
