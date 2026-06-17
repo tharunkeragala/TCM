@@ -2,7 +2,6 @@ const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 const logAudit = require("./auditController");
 
-
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function buildTree(data, parentId = null) {
   return data
@@ -11,6 +10,50 @@ function buildTree(data, parentId = null) {
       ...item,
       children: buildTree(data, item.id),
     }));
+}
+
+function getPermissionDiff(oldPermissions, newPermissions) {
+  const oldChanges = [];
+  const newChanges = [];
+
+  const oldMap = Object.fromEntries(
+    oldPermissions.map((p) => [p.menu_name, p]),
+  );
+
+  const newMap = Object.fromEntries(
+    newPermissions.map((p) => [p.menu_name, p]),
+  );
+
+  const allMenus = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
+
+  for (const menuName of allMenus) {
+    const oldPerm = oldMap[menuName] || {};
+    const newPerm = newMap[menuName] || {};
+
+    for (const field of ["can_view", "can_create", "can_edit", "can_delete"]) {
+      const oldVal = Number(oldPerm[field] || 0);
+      const newVal = Number(newPerm[field] || 0);
+
+      if (oldVal !== newVal) {
+        oldChanges.push({
+          menu: menuName,
+          permission: field,
+          value: oldVal,
+        });
+
+        newChanges.push({
+          menu: menuName,
+          permission: field,
+          value: newVal,
+        });
+      }
+    }
+  }
+
+  return {
+    oldChanges,
+    newChanges,
+  };
 }
 
 // ─── Menu Tree ────────────────────────────────────────────────────────────────
@@ -107,8 +150,7 @@ exports.createRole = async (req, res) => {
 
     const existing = await pool
       .request()
-      .input("role_name", sql.VarChar, role_name.trim())
-      .query(`
+      .input("role_name", sql.VarChar, role_name.trim()).query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE role_name = @role_name
       `);
@@ -183,8 +225,7 @@ exports.updateRole = async (req, res) => {
     const duplicate = await pool
       .request()
       .input("role_name", sql.VarChar, role_name.trim())
-      .input("id", sql.Int, id)
-      .query(`
+      .input("id", sql.Int, id).query(`
         SELECT id FROM test_case_manager.dbo.roles
         WHERE role_name = @role_name AND id != @id
       `);
@@ -199,8 +240,7 @@ exports.updateRole = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("role_name", sql.VarChar, role_name.trim())
-      .query(`
+      .input("role_name", sql.VarChar, role_name.trim()).query(`
         UPDATE test_case_manager.dbo.roles
         SET role_name = @role_name
         WHERE id = @id
@@ -371,9 +411,7 @@ exports.saveRolePermissions = async (req, res) => {
     const pool = await poolPromise;
 
     // Get role details
-    const roleResult = await pool
-      .request()
-      .input("roleId", sql.Int, roleId)
+    const roleResult = await pool.request().input("roleId", sql.Int, roleId)
       .query(`
         SELECT id, role_name
         FROM test_case_manager.dbo.roles
@@ -392,8 +430,7 @@ exports.saveRolePermissions = async (req, res) => {
     // Get OLD permissions with menu names
     const oldPermissionsResult = await pool
       .request()
-      .input("roleId", sql.Int, roleId)
-      .query(`
+      .input("roleId", sql.Int, roleId).query(`
         SELECT
           m.menu_name,
           rp.can_view,
@@ -415,10 +452,7 @@ exports.saveRolePermissions = async (req, res) => {
 
     try {
       // Delete existing permissions
-      await transaction
-        .request()
-        .input("roleId", sql.Int, roleId)
-        .query(`
+      await transaction.request().input("roleId", sql.Int, roleId).query(`
           DELETE FROM test_case_manager.dbo.role_permissions
           WHERE role_id = @roleId
         `);
@@ -432,8 +466,7 @@ exports.saveRolePermissions = async (req, res) => {
           .input("canView", sql.Bit, p.can_view)
           .input("canCreate", sql.Bit, p.can_create)
           .input("canEdit", sql.Bit, p.can_edit)
-          .input("canDelete", sql.Bit, p.can_delete)
-          .query(`
+          .input("canDelete", sql.Bit, p.can_delete).query(`
             INSERT INTO test_case_manager.dbo.role_permissions
             (
               role_id,
@@ -485,21 +518,24 @@ exports.saveRolePermissions = async (req, res) => {
       }
 
       // Audit log
-      await logAudit({
-        userId: req.user?.id,
-        action: "UPDATE",
-        module: "ROLE_PERMISSIONS",
-        entityType: "ROLE",
-        entityId: Number(roleId),
-        entityName: role.role_name,
-        description: `Permissions updated for role '${role.role_name}'`,
-        oldValues: {
-          permissions: oldPermissions,
-        },
-        newValues: {
-          permissions: newPermissions,
-        },
-      });
+      const { oldChanges, newChanges } = getPermissionDiff(
+        oldPermissions,
+        newPermissions,
+      );
+
+      if (oldChanges.length > 0) {
+        await logAudit({
+          userId: req.user?.id,
+          action: "UPDATE",
+          module: "ROLE_PERMISSIONS",
+          entityType: "ROLE",
+          entityId: Number(roleId),
+          entityName: role.role_name,
+          description: `Permissions updated for role '${role.role_name}'`,
+          oldValues: oldChanges,
+          newValues: newChanges,
+        });
+      }
 
       res.status(200).json({
         success: true,
