@@ -278,44 +278,44 @@ export default function UserReport() {
 
       <div className="mt-4">
         {/* ── Summary Cards ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-          {[
-            { label: "Total Users", value: stats.total, color: "blue" },
-            { label: "Active", value: stats.active, color: "green" },
-            { label: "Inactive", value: stats.inactive, color: "red" },
-            { label: "Manual", value: stats.manual, color: "purple" },
-            { label: "AD Users", value: stats.ad, color: "orange" },
-          ].map(({ label, value, color }) => (
-            <div
-              key={label}
-              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm px-5 py-4"
-            >
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                {label}
-              </p>
-              <p
-                className={`text-2xl font-bold ${
-                  color === "blue"
-                    ? "text-blue-600 dark:text-blue-400"
-                    : color === "green"
-                      ? "text-green-600 dark:text-green-400"
-                      : color === "red"
-                        ? "text-red-600 dark:text-red-400"
-                        : color === "purple"
-                          ? "text-purple-600 dark:text-purple-400"
-                          : "text-orange-500 dark:text-orange-400"
-                }`}
-              >
-                {loading ? (
-                  <span className="text-gray-300 dark:text-gray-700">—</span>
-                ) : (
-                  value
-                )}
-              </p>
-            </div>
-          ))}
-        </div>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-5 mb-5">
+  {[
+    { label: "Total Users", value: stats.total, color: "blue" },
+    { label: "Active", value: stats.active, color: "green" },
+    { label: "Inactive", value: stats.inactive, color: "red" },
+    { label: "Manual", value: stats.manual, color: "purple" },
+    { label: "AD Users", value: stats.ad, color: "orange" },
+  ].map(({ label, value, color }) => (
+    <div
+      key={label}
+      className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm px-5 py-4"
+    >
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate">
+        {label}
+      </p>
 
+      <p
+        className={`text-2xl font-bold ${
+          color === "blue"
+            ? "text-blue-600 dark:text-blue-400"
+            : color === "green"
+              ? "text-green-600 dark:text-green-400"
+              : color === "red"
+                ? "text-red-600 dark:text-red-400"
+                : color === "purple"
+                  ? "text-purple-600 dark:text-purple-400"
+                  : "text-orange-500 dark:text-orange-400"
+        }`}
+      >
+        {loading ? (
+          <span className="text-gray-300 dark:text-gray-700">—</span>
+        ) : (
+          value
+        )}
+      </p>
+    </div>
+  ))}
+</div>
         {/* ── Filters Bar ───────────────────────────────────────────────── */}
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm mb-4 p-4">
           {/* Row 1: search + export */}
