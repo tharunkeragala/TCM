@@ -125,6 +125,7 @@ app.use("/api/test-cases", require("./routes/testCaseRoutes"));
 app.use("/api/playwright", require("./routes/playwrightRoutes"));
 app.use("/api/dropdown", require("./routes/dropdownRoute"));
 app.use("/api/reports", require("./routes/reportRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "Test Case Manager API" });
