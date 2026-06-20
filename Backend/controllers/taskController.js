@@ -179,6 +179,8 @@ exports.getTasks = async (req, res) => {
           AND (
             t.title LIKE @search
             OR t.description LIKE @search
+            OR t.tags LIKE @search
+            OR t.id LIKE @search
           )
         `;
       }

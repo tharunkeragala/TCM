@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import axios from "../../utils/axios";
 import {
@@ -6,6 +6,7 @@ import {
   FaTimes,
   FaFileExcel,
   FaExclamationCircle,
+  FaChevronDown,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -82,6 +83,26 @@ const isOverdue = (dueDate: string | null, status: string) => {
   return new Date(dueDate) < new Date();
 };
 
+// Inclusive range check against a YYYY-MM-DD "from"/"to" pair (from <input type="date">).
+// A task whose date field is null can never satisfy an active range, so it's excluded.
+const isInDateRange = (
+  dateStr: string | null,
+  from: string,
+  to: string,
+): boolean => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (from) {
+    const fromDate = new Date(`${from}T00:00:00`);
+    if (d < fromDate) return false;
+  }
+  if (to) {
+    const toDate = new Date(`${to}T23:59:59.999`);
+    if (d > toDate) return false;
+  }
+  return true;
+};
+
 const Dash = () => (
   <span className="text-gray-400 dark:text-gray-500 italic text-xs">—</span>
 );
@@ -107,6 +128,13 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
+const dateInputClass = (active: boolean) =>
+  `w-full px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${
+    active
+      ? "border-blue-400 dark:border-blue-500"
+      : "border-gray-300 dark:border-gray-600"
+  }`;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TasksReport() {
   const {
@@ -121,7 +149,28 @@ export default function TasksReport() {
   const [filterPriority, setFilterPriority] = useState("");
   const [filterProject, setFilterProject] = useState("");
   const [filterOverdue, setFilterOverdue] = useState("");
-  const [filterAssignee, setFilterAssignee] = useState("");
+  const [filterAssignees, setFilterAssignees] = useState<string[]>([]);
+  const [filterDueFrom, setFilterDueFrom] = useState("");
+  const [filterDueTo, setFilterDueTo] = useState("");
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState("");
+  const [filterCreatedTo, setFilterCreatedTo] = useState("");
+
+  // ── Assignee multi-select dropdown state ────────────────────────────────────
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+  const assigneeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        assigneeDropdownRef.current &&
+        !assigneeDropdownRef.current.contains(e.target as Node)
+      ) {
+        setAssigneeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // ── Pagination state ──────────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -164,14 +213,13 @@ export default function TasksReport() {
     [tasks],
   );
 
-  const activeFilterCount = [
-    search,
-    filterStatus,
-    filterPriority,
-    filterProject,
-    filterOverdue,
-    filterAssignee,
-  ].filter(Boolean).length;
+  const activeFilterCount =
+    [search, filterStatus, filterPriority, filterProject, filterOverdue].filter(
+      Boolean,
+    ).length +
+    (filterAssignees.length > 0 ? 1 : 0) +
+    (filterDueFrom || filterDueTo ? 1 : 0) +
+    (filterCreatedFrom || filterCreatedTo ? 1 : 0);
 
   const clearFilters = () => {
     setSearch("");
@@ -179,8 +227,13 @@ export default function TasksReport() {
     setFilterPriority("");
     setFilterProject("");
     setFilterOverdue("");
+    setFilterAssignees([]);
+    setFilterDueFrom("");
+    setFilterDueTo("");
+    setFilterCreatedFrom("");
+    setFilterCreatedTo("");
+    setAssigneeDropdownOpen(false);
     setCurrentPage(1);
-    setFilterAssignee("");
   };
 
   const handleFilterChange = (setter: (v: string) => void) => (val: string) => {
@@ -193,40 +246,58 @@ export default function TasksReport() {
     setCurrentPage(1);
   };
 
+  const toggleAssignee = (name: string) => {
+    setFilterAssignees((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name],
+    );
+    setCurrentPage(1);
+  };
+
+  // ── Shared filter predicate (used for both table view and export) ──────────
+  const matchesFilters = (t: TaskReport, q: string) => {
+    if (
+      q &&
+      !t.title.toLowerCase().includes(q) &&
+      !t.task_code.toLowerCase().includes(q) &&
+      !(t.project_name ?? "").toLowerCase().includes(q) &&
+      !(t.assignees ?? "").toLowerCase().includes(q) &&
+      !(t.tags ?? "").toLowerCase().includes(q) &&
+      !(t.created_by_name ?? "").toLowerCase().includes(q) &&
+      !String(t.id).includes(q)
+    )
+      return false;
+    if (filterStatus && t.status !== filterStatus) return false;
+    if (filterPriority && t.priority !== filterPriority) return false;
+    if (filterProject && t.project_name !== filterProject) return false;
+    if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
+      return false;
+    if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
+      return false;
+    if (filterAssignees.length > 0) {
+      const taskAssignees = (t.assignees ?? "")
+        .split(",")
+        .map((a) => a.trim());
+      if (!filterAssignees.some((a) => taskAssignees.includes(a)))
+        return false;
+    }
+    if (
+      (filterDueFrom || filterDueTo) &&
+      !isInDateRange(t.due_date, filterDueFrom, filterDueTo)
+    )
+      return false;
+    if (
+      (filterCreatedFrom || filterCreatedTo) &&
+      !isInDateRange(t.created_at, filterCreatedFrom, filterCreatedTo)
+    )
+      return false;
+    return true;
+  };
+
   // ── Filtered data ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!tasks) return [];
     const q = search.toLowerCase().trim();
-    return tasks.filter((t) => {
-      if (
-        q &&
-        !t.title.toLowerCase().includes(q) &&
-        !t.task_code.toLowerCase().includes(q) &&
-        !(t.project_name ?? "").toLowerCase().includes(q) &&
-        !(t.assignees ?? "").toLowerCase().includes(q) &&
-        !(t.tags ?? "").toLowerCase().includes(q) &&
-        !(t.created_by_name ?? "").toLowerCase().includes(q) &&
-        !String(t.id).includes(q)
-      )
-        return false;
-      if (filterStatus && t.status !== filterStatus) return false;
-      if (filterPriority && t.priority !== filterPriority) return false;
-      if (filterProject && t.project_name !== filterProject) return false;
-      if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
-        return false;
-      if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
-        return false;
-      if (
-        filterAssignee &&
-        !(t.assignees ?? "")
-          .split(",")
-          .map((a) => a.trim())
-          .includes(filterAssignee)
-      )
-        return false;
-
-      return true;
-    });
+    return tasks.filter((t) => matchesFilters(t, q));
   }, [
     tasks,
     search,
@@ -234,7 +305,11 @@ export default function TasksReport() {
     filterPriority,
     filterProject,
     filterOverdue,
-    filterAssignee,
+    filterAssignees,
+    filterDueFrom,
+    filterDueTo,
+    filterCreatedFrom,
+    filterCreatedTo,
   ]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
@@ -279,35 +354,7 @@ export default function TasksReport() {
       const allTasks: TaskReport[] = response.data.data || [];
       const q = search.toLowerCase().trim();
 
-      const exportFiltered = allTasks.filter((t) => {
-        if (
-          q &&
-          !t.title.toLowerCase().includes(q) &&
-          !t.task_code.toLowerCase().includes(q) &&
-          !(t.project_name ?? "").toLowerCase().includes(q) &&
-          !(t.assignees ?? "").toLowerCase().includes(q) &&
-          !(t.tags ?? "").toLowerCase().includes(q) &&
-          !(t.created_by_name ?? "").toLowerCase().includes(q) &&
-          !String(t.id).includes(q)
-        )
-          return false;
-        if (filterStatus && t.status !== filterStatus) return false;
-        if (filterPriority && t.priority !== filterPriority) return false;
-        if (filterProject && t.project_name !== filterProject) return false;
-        if (filterOverdue === "yes" && !isOverdue(t.due_date, t.status))
-          return false;
-        if (filterOverdue === "no" && isOverdue(t.due_date, t.status))
-          return false;
-        if (
-          filterAssignee &&
-          !(t.assignees ?? "")
-            .split(",")
-            .map((a) => a.trim())
-            .includes(filterAssignee)
-        )
-          return false;
-        return true;
-      });
+      const exportFiltered = allTasks.filter((t) => matchesFilters(t, q));
 
       const rows = exportFiltered.map((t, i) => ({
         "#": i + 1,
@@ -462,7 +509,7 @@ export default function TasksReport() {
             </div>
           </div>
 
-          {/* Row 2: dropdowns — 5 cols (suite removed) */}
+          {/* Row 2: dropdowns — status, priority, project, overdue, assignees (multi-select) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <select
               value={filterStatus}
@@ -501,15 +548,127 @@ export default function TasksReport() {
               <option value="no">Not Overdue</option>
             </select>
 
-            <select
-              value={filterAssignee}
-              onChange={(e) => handleFilterChange(setFilterAssignee)(e.target.value)}
-              className={`px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${filterAssignee ? "border-blue-400 dark:border-blue-500" : "border-gray-300 dark:border-gray-600"}`}
-            >
-              <option value="">All Assignees</option>
-              {assignees.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            {/* Assignees — multi-select dropdown */}
+            <div className="relative min-w-0" ref={assigneeDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setAssigneeDropdownOpen((o) => !o)}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-0 ${
+                  filterAssignees.length > 0
+                    ? "border-blue-400 dark:border-blue-500"
+                    : "border-gray-300 dark:border-gray-600"
+                }`}
+              >
+                <span className="truncate text-left">
+                  {filterAssignees.length === 0
+                    ? "All Assignees"
+                    : filterAssignees.length === 1
+                    ? filterAssignees[0]
+                    : `${filterAssignees.length} Assignees`}
+                </span>
+                <FaChevronDown
+                  className={`text-[10px] flex-shrink-0 text-gray-400 transition-transform ${
+                    assigneeDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {assigneeDropdownOpen && (
+                <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-1">
+                  {assignees.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">
+                      No assignees
+                    </p>
+                  ) : (
+                    <>
+                      {filterAssignees.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterAssignees([]);
+                            setCurrentPage(1);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 mb-1"
+                        >
+                          Clear selection
+                        </button>
+                      )}
+                      {assignees.map((a) => (
+                        <label
+                          key={a}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={filterAssignees.includes(a)}
+                            onChange={() => toggleAssignee(a)}
+                            className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="truncate">{a}</span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Row 3: date ranges — due date + created date */}
+          {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Due From
+              </label>
+              <input
+                type="date"
+                value={filterDueFrom}
+                max={filterDueTo || undefined}
+                onChange={(e) => handleFilterChange(setFilterDueFrom)(e.target.value)}
+                className={dateInputClass(Boolean(filterDueFrom))}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Due To
+              </label>
+              <input
+                type="date"
+                value={filterDueTo}
+                min={filterDueFrom || undefined}
+                onChange={(e) => handleFilterChange(setFilterDueTo)(e.target.value)}
+                className={dateInputClass(Boolean(filterDueTo))}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Created From
+              </label>
+              <input
+                type="date"
+                value={filterCreatedFrom}
+                max={filterCreatedTo || undefined}
+                onChange={(e) =>
+                  handleFilterChange(setFilterCreatedFrom)(e.target.value)
+                }
+                className={dateInputClass(Boolean(filterCreatedFrom))}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Created To
+              </label>
+              <input
+                type="date"
+                value={filterCreatedTo}
+                min={filterCreatedFrom || undefined}
+                onChange={(e) =>
+                  handleFilterChange(setFilterCreatedTo)(e.target.value)
+                }
+                className={dateInputClass(Boolean(filterCreatedTo))}
+              />
+            </div>
+          </div> */}
         </div>
 
         {/* ── Result count ──────────────────────────────────────────────── */}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { FaPlus, FaSearch, FaUser, FaBell, FaTimes } from "react-icons/fa";
 
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -25,13 +26,6 @@ import ViewModal from "./components/modals/ViewModal";
 import DeleteModal from "./components/modals/DeleteModal";
 import TablePagination from "../../components/common/TablePagination";
 
-// ─── Shared filter input class ────────────────────────────────────────────────
-const FILTER_INPUT =
-  "px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg " +
-  "bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 " +
-  "focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 " +
-  "transition-colors duration-150";
-
 // ─── Default form state ───────────────────────────────────────────────────────
 const DEFAULT_FORM: TaskFormData = {
   title: "",
@@ -45,6 +39,8 @@ const DEFAULT_FORM: TaskFormData = {
 };
 
 export default function Tasks() {
+  const navigate = useNavigate();
+
   // ── Data fetches ──────────────────────────────────────────────────────────
   const { data: projects } = useFetchWithAuth<Project[]>("/api/projects");
   const { data: allSuites } = useFetchWithAuth<TestSuite[]>("/api/test-suites");
@@ -58,6 +54,15 @@ export default function Tasks() {
   const [filterPriority, setFilterPriority] = useState("");
   const [filterAssignedMe, setFilterAssignedMe] = useState(false);
   const [search, setSearch] = useState("");
+
+  const hasFilters = !!(filterStatus || filterPriority || filterAssignedMe || search);
+
+  const clearFilters = () => {
+    setFilterStatus("");
+    setFilterPriority("");
+    setFilterAssignedMe(false);
+    setSearch("");
+  };
 
   // ── Pagination ────────────────────────────────────────────────────────────
   const [page, setPage] = useState(1);
@@ -73,6 +78,11 @@ export default function Tasks() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ── Result range (e.g. "1 - 5 of 13") ───────────────────────────────────────
+  const startItem =
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+  const endItem = Math.min(pagination.page * pagination.limit, pagination.total);
 
   // ── Create / Edit modal ───────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
@@ -356,18 +366,17 @@ export default function Tasks() {
       )}
 
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 items-center">
+      <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
-          <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+          <div className="relative flex-1 min-w-[220px]">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search tasks…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`${FILTER_INPUT} pl-8 w-48`}
+              placeholder="Search tasks…"
+              className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
           </div>
 
@@ -375,7 +384,7 @@ export default function Tasks() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className={FILTER_INPUT}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
             <option value="">All Statuses</option>
             {ALL_STATUSES.map((s) => (
@@ -387,7 +396,7 @@ export default function Tasks() {
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className={FILTER_INPUT}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
             <option value="">All Priorities</option>
             {ALL_PRIORITIES.map((p) => (
@@ -398,29 +407,41 @@ export default function Tasks() {
           {/* Assigned to me toggle */}
           <button
             onClick={() => setFilterAssignedMe(!filterAssignedMe)}
-            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors duration-150 ${
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
               filterAssignedMe
-                ? "bg-brand-600 border-brand-600 text-white"
-                : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:border-brand-300 dark:hover:border-brand-700"
+                ? "bg-brand-600 text-white hover:bg-brand-700"
+                : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             }`}
           >
-            <FaUser className="w-3 h-3" />
+            <FaUser className="h-3.5 w-3.5" />
             Assigned to me
           </button>
-        </div>
 
-        {/* Create button */}
-        <button
-          onClick={() => {
-            setEditingTask(null);
-            resetForm();
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors duration-150 flex-shrink-0"
-        >
-          <FaPlus className="w-3 h-3" />
-          Create Task
-        </button>
+          {/* Clear filters */}
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+            >
+              <FaTimes className="h-3 w-3" /> Clear
+            </button>
+          )}
+
+          {/* Create button */}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => {
+                setEditingTask(null);
+                resetForm();
+                setShowModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            >
+              <FaPlus className="h-3.5 w-3.5" />
+              Create Task
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── Error ──────────────────────────────────────────────────────────── */}
@@ -441,10 +462,21 @@ export default function Tasks() {
       {/* ── Task list ──────────────────────────────────────────────────────── */}
       {!loading && !error && (
         <>
-          {/* Result count */}
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Showing {tasks.length} of {pagination.total} task
-            {pagination.total !== 1 ? "s" : ""}
+          {/* Result range */}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Showing{" "}
+            <span className="font-semibold text-gray-700 dark:text-gray-200">
+              {startItem}
+            </span>
+            {" - "}
+            <span className="font-semibold text-gray-700 dark:text-gray-200">
+              {endItem}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-gray-700 dark:text-gray-200">
+              {pagination.total}
+            </span>{" "}
+            tasks
           </p>
 
           <div className="space-y-2">
@@ -527,6 +559,7 @@ export default function Tasks() {
         onReminderSaved={showReminderToast}
         onStatusChanged={refreshViewingTask}
         onETAChanged={refreshViewingTask}
+        onOpenFullPage={() => viewingTask && navigate(`/tasks/${viewingTask.id}`)}
       />
 
       <DeleteModal

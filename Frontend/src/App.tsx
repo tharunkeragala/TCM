@@ -85,7 +85,6 @@
 //   );
 // }
 
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import { lazy, Suspense } from "react";
 
@@ -118,6 +117,7 @@ const TasksReport = lazy(() => import("./pages/Reports/TasksReport"));
 
 // Tasks
 const Tasks = lazy(() => import("./pages/Tasks/Tasks"));
+const TaskDetails = lazy(() => import("./pages/Tasks/TaskDetails"));
 
 // Test Management
 const Projects = lazy(() => import("./pages/TestManagement/Projects"));
@@ -212,6 +212,7 @@ export default function App() {
               <Route path="/reports/tasks" element={<TasksReport />} />
 
               <Route path="/tasks" element={<Tasks />} />
+              <Route path="/tasks/:id" element={<TaskDetails />} />
 
               <Route path="/projects" element={<Projects />} />
               <Route path="/test-suites" element={<TestSuites />} />

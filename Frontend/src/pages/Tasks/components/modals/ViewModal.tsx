@@ -1,4 +1,4 @@
-import { FaExclamationCircle } from "react-icons/fa";
+import { FaExclamationCircle, FaExternalLinkAlt } from "react-icons/fa";
 import { Task, User } from "../../types";
 import { isOverdue } from "../../utils";
 import TagList from "../TagList";
@@ -18,6 +18,7 @@ interface Props {
   onReminderSaved: (msg: string) => void;
   onStatusChanged: () => void;
   onETAChanged: () => void;
+  onOpenFullPage: () => void;
 }
 
 export default function ViewModal({
@@ -31,6 +32,7 @@ export default function ViewModal({
   onReminderSaved,
   onStatusChanged,
   onETAChanged,
+  onOpenFullPage,
 }: Props) {
   if (!showViewModal) return null;
 
@@ -90,6 +92,18 @@ export default function ViewModal({
                     onToast={onReminderSaved}
                     onETAChanged={onETAChanged}
                   />
+
+                  {/* ── Open full page ── */}
+                  <button
+                    onClick={onOpenFullPage}
+                    title="Open full page"
+                    className="w-7 h-7 flex items-center justify-center rounded-md
+                               text-gray-400 hover:text-gray-600 dark:hover:text-gray-200
+                               hover:bg-white/60 dark:hover:bg-gray-800
+                               transition-colors duration-150"
+                  >
+                    <FaExternalLinkAlt className="w-3 h-3" />
+                  </button>
                 </>
               )}
 

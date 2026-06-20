@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import {
   FaEdit,
   FaTrash,
   FaEye,
+  FaInfoCircle,
   FaChevronDown,
   FaChevronUp,
   FaCalendarAlt,
@@ -30,6 +32,7 @@ export default function TaskAccordionRow({
   onDelete,
   onView,
 }: Props) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<Task | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -152,12 +155,20 @@ export default function TaskAccordionRow({
           className="flex items-center gap-3 flex-shrink-0 ml-1"
           onClick={(e) => e.stopPropagation()}
         >
+          
           <button
             onClick={() => onView(task)}
             className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
             title="View"
           >
             <FaEye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => navigate(`/tasks/${task.id}`)}
+            className="text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+            title="Task details page"
+          >
+            <FaInfoCircle className="w-4 h-4" />
           </button>
           <button
             onClick={() => onEdit(task)}
