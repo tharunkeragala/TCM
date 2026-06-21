@@ -224,7 +224,7 @@ export default function TaskDetails() {
         title={task ? `${task.task_code} · ${task.title}` : "Task Details"}
         description="Task Details"
       />
-      <PageBreadcrumb pageTitle={task ? task.task_code : "Task Details"} />
+      <PageBreadcrumb pageTitle={task ? String(task.task_code) : "Task Details"} />
 
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {toast && (
