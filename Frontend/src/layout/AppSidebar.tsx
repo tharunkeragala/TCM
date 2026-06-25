@@ -44,6 +44,7 @@ const navItems: NavItem[] = [
       { name: "Projects", path: "/projects" },
       { name: "Test Suites", path: "/test-suites" },
       { name: "Test Cases", path: "/test-cases" },
+      { name: "Sprint", path: "/sprints" },
     ],
   },
   { icon: <ListIcon />, name: "Tasks", path: "/tasks" },

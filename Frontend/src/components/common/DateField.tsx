@@ -149,8 +149,8 @@ export default function DateField({
         </button>
 
         {open && (
-  <div
-    className="
+          <div
+            className="
       absolute z-30 mt-2
       left-0 sm:left-auto sm:right-0
       w-full sm:w-72
@@ -158,7 +158,7 @@ export default function DateField({
       rounded-lg border border-gray-300 dark:border-gray-600
       bg-white dark:bg-gray-800 shadow-lg p-3
     "
-  >
+          >
             {/* Month nav */}
             <div className="flex items-center justify-between mb-3">
               <button

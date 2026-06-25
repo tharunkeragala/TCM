@@ -126,6 +126,8 @@ const TestCases = lazy(() => import("./pages/TestManagement/TestCases"));
 const TestCaseDetails = lazy(
   () => import("./pages/TestManagement/TestCaseDetails")
 );
+const Sprintboard = lazy(() => import("./pages/TestManagement/Sprintboard"));
+const Sprints = lazy(() => import("./pages/TestManagement/Sprints"));
 
 // Playwright
 const PlaywrightRecorder = lazy(() =>
@@ -207,6 +209,8 @@ export default function App() {
               <Route path="/departments" element={<Departments />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/teams" element={<Teams />} />
+              <Route path="/sprints" element={<Sprints />} />
+              <Route path="/sprints/:id" element={<Sprintboard />} />
 
               <Route path="/reports/users" element={<UserReport />} />
               <Route path="/reports/tasks" element={<TasksReport />} />
