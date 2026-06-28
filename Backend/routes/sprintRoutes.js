@@ -15,13 +15,7 @@ router.get(
   sprintController.getSprints
 );
 
-router.get(
-  "/:id",
-  verifyToken,
-  checkPermission(MENU, "can_view"),
-  sprintController.getSprintById
-);
-
+// ⚠️ CRITICAL: ALL specific routes must come BEFORE /:id
 router.post(
   "/create",
   verifyToken,
@@ -36,13 +30,6 @@ router.put(
   sprintController.updateSprint
 );
 
-router.put(
-  "/:id/status",
-  verifyToken,
-  checkPermission(MENU, "can_edit"),
-  sprintController.changeSprintStatus
-);
-
 router.delete(
   "/delete/:id",
   verifyToken,
@@ -50,7 +37,22 @@ router.delete(
   sprintController.deleteSprint
 );
 
-// ─── Board (suites on the sprint) ──────────────────────────
+// ─── Sprint by ID (keep AFTER static-segment routes) ───────
+router.get(
+  "/:id",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  sprintController.getSprintById
+);
+
+router.put(
+  "/:id/status",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.changeSprintStatus
+);
+
+// ─── Board ──────────────────────────────────────────────────
 router.get(
   "/:id/board",
   verifyToken,
@@ -79,7 +81,7 @@ router.delete(
   sprintController.removeSuiteFromSprint
 );
 
-// ─── Test cases inside a suite, for a given sprint ─────────
+// ─── Test cases ─────────────────────────────────────────────
 router.get(
   "/:id/suites/:suiteId/test-cases",
   verifyToken,
@@ -113,6 +115,94 @@ router.delete(
   verifyToken,
   checkPermission(MENU, "can_edit"),
   sprintController.unlinkTestCaseFromSuite
+);
+
+// ─── Execution progress ─────────────────────────────────────
+router.post(
+  "/:id/suites/:suiteId/test-cases/:testCaseId/execution-started",
+  verifyToken,
+  sprintController.notifyExecutionStarted
+);
+
+router.get(
+  "/:id/suites/:suiteId/progress",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  sprintController.getExecutionProgress
+);
+
+// ─── Assignees ──────────────────────────────────────────────
+router.get(
+  "/:id/assignees",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  sprintController.getSprintAssignees
+);
+
+router.post(
+  "/:id/assignees",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.addSprintAssignee
+);
+
+router.delete(
+  "/:id/assignees/:assigneeUserId",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.removeSprintAssignee
+);
+
+// ─── Comments ───────────────────────────────────────────────
+router.get(
+  "/:id/comments",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  sprintController.getSprintComments
+);
+
+router.post(
+  "/:id/comments",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.addSprintComment
+);
+
+router.delete(
+  "/:id/comments/:commentId",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.deleteSprintComment
+);
+
+// ─── Activity ───────────────────────────────────────────────
+router.get(
+  "/:id/activity",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  sprintController.getSprintActivity
+);
+
+// ─── Batch execution ────────────────────────────────────────
+router.post(
+  "/:id/suites/:suiteId/execute-all",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.executeAllInSuite
+);
+
+router.get(
+  "/:id/suites/:suiteId/batch-runs/:batchId",
+  verifyToken,
+  checkPermission(MENU, "can_view"),
+  sprintController.getBatchRunStatus
+);
+
+router.post(
+  "/:id/suites/:suiteId/batch-runs/:batchId/cancel",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  sprintController.cancelBatch
 );
 
 module.exports = router;
