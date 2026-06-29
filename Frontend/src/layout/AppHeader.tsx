@@ -4,6 +4,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
+import QuickActionsDropdown from "../components/common/QuickActionsDropdown";
 
 const SIDEBAR_EXPANDED_WIDTH = 256;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
@@ -155,6 +156,7 @@ const AppHeader: React.FC = () => {
 
           {/* RIGHT */}
           <div className="flex items-center gap-1.5">
+            <QuickActionsDropdown />
             <ThemeToggleButton />
             <NotificationDropdown />
             <UserDropdown />

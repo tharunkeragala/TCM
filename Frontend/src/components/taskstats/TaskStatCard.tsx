@@ -10,174 +10,136 @@ export type TaskStatCardProps = {
   accentBorder: string;
   filterStatus?: string;
   loading?: boolean;
+  trend?: { value: number; label: string };
 };
 
 const TaskStatCard: React.FC<TaskStatCardProps> = ({
-  label,
-  count,
-  icon,
-  accentColor,
-  accentBg,
-  accentBorder,
-  filterStatus,
-  loading = false,
+  label, count, icon,
+  accentColor, accentBg, accentBorder,
+  filterStatus, loading = false, trend,
 }) => {
   const href = filterStatus
     ? `/tasks?status=${encodeURIComponent(filterStatus)}`
     : "/tasks";
 
   return (
-    <Link to={href} className="task-stat-card" data-accent={accentColor}>
+    <Link
+      to={href}
+      className="tsc-card"
+      style={{ "--accent": accentColor, "--accent-bg": accentBg, "--accent-border": accentBorder } as React.CSSProperties}
+    >
       <style>{`
-        .task-stat-card {
+        .tsc-card {
           position: relative;
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          padding: 20px;
-          background: var(--card-bg);
-          border: 1px solid var(--card-border);
-          border-radius: 14px;
+          padding: 14px 16px 12px;
+          border: 1px solid rgba(15,23,42,0.07);
+          border-radius: 12px;
+          background: rgba(15,23,42,0.015);
           text-decoration: none;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-          cursor: pointer;
           overflow: hidden;
+          transition: border-color 0.15s, transform 0.15s;
         }
-        .task-stat-card:hover {
-          transform: translateY(-3px);
-          background: var(--card-bg-hover);
-          border-color: var(--card-border-hover);
-          box-shadow: 0 12px 32px var(--card-shadow);
+        .dark .tsc-card {
+          background: rgba(255,255,255,0.03);
+          border-color: rgba(148,163,184,0.1);
         }
-        .task-stat-card .accent-line {
+        .tsc-card:hover {
+          border-color: var(--accent-border);
+          transform: translateY(-1px);
+        }
+        .tsc-accent-strip {
           position: absolute;
           top: 0; left: 0; right: 0;
-          height: 3px;
-          border-radius: 14px 14px 0 0;
-          opacity: 0.75;
+          height: 2px;
+          background: var(--accent);
+          opacity: 0.7;
+          border-radius: 12px 12px 0 0;
         }
-        .task-stat-card .top-row {
+        .tsc-top {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-top: 4px;
+          margin-bottom: 10px;
         }
-        .task-stat-card .icon-wrap {
-          width: 38px;
-          height: 38px;
-          border-radius: 10px;
+        .tsc-icon-wrap {
+          width: 32px;
+          height: 32px;
+          border-radius: 9px;
           display: flex;
           align-items: center;
           justify-content: center;
-          flex-shrink: 0;
-          border: 1px solid;
+          background: var(--accent-bg);
+          border: 1px solid var(--accent-border);
+          color: var(--accent);
         }
-        .task-stat-card .label-pill {
+        .tsc-label {
           font-size: 11px;
           font-weight: 600;
-          padding: 3px 10px;
-          border-radius: 20px;
-          letter-spacing: 0.04em;
           text-transform: uppercase;
-          border: 1px solid;
+          letter-spacing: 0.08em;
+          color: #94a3b8;
         }
-        .task-stat-card .count-row {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-        }
-        .task-stat-card .count {
-          font-size: 36px;
-          font-weight: 700;
+        .tsc-count {
+          font-size: 30px;
+          font-weight: 600;
           line-height: 1;
           letter-spacing: -1px;
+          color: #0f172a;
+          margin-bottom: 10px;
           font-variant-numeric: tabular-nums;
         }
-        .task-stat-card .skeleton {
-          width: 56px;
-          height: 36px;
+        .dark .tsc-count { color: #f1f5f9; }
+        .tsc-skeleton {
+          width: 52px;
+          height: 30px;
           border-radius: 6px;
-          background: var(--skeleton-bg);
-          animation: shimmer 1.6s ease-in-out infinite;
+          background: rgba(148,163,184,0.15);
+          animation: tsc-pulse 1.4s infinite;
+          margin-bottom: 10px;
         }
-        @keyframes shimmer {
-          0%, 100% { opacity: 0.5; }
+        @keyframes tsc-pulse {
+          0%, 100% { opacity: 0.4; }
           50% { opacity: 1; }
         }
-        .task-stat-card .bottom-row {
+        .tsc-footer {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding-top: 2px;
-          border-top: 1px solid var(--card-divider);
+          padding-top: 8px;
+          border-top: 1px solid rgba(15,23,42,0.05);
         }
-        .task-stat-card .view-label {
-          font-size: 11.5px;
-          font-weight: 500;
-          color: var(--text-muted);
-          letter-spacing: 0.01em;
+        .dark .tsc-footer { border-top-color: rgba(148,163,184,0.08); }
+        .tsc-trend {
+          font-size: 11px;
+          color: #94a3b8;
         }
-        .task-stat-card .arrow-icon {
-          color: var(--text-muted);
-          transition: transform 0.18s ease, color 0.18s ease;
+        .tsc-arrow {
+          color: var(--accent);
+          opacity: 0.45;
+          transition: opacity 0.12s, transform 0.12s;
         }
-        .task-stat-card:hover .arrow-icon {
-          transform: translateX(3px);
+        .tsc-card:hover .tsc-arrow {
+          opacity: 1;
+          transform: translateX(2px);
         }
       `}</style>
 
-      {/* Top accent line */}
-      <div className="accent-line" style={{ background: accentColor }} />
-
-      {/* Icon + label pill */}
-      <div className="top-row">
-        <div
-          className="icon-wrap"
-          style={{
-            background: accentBg,
-            borderColor: accentBorder,
-            color: accentColor,
-          }}
-        >
-          {icon}
-        </div>
-        <span
-          className="label-pill"
-          style={{
-            background: accentBg,
-            color: accentColor,
-            borderColor: accentBorder,
-          }}
-        >
-          {label}
-        </span>
+      <div className="tsc-accent-strip" />
+      <div className="tsc-top">
+        <div className="tsc-icon-wrap">{icon}</div>
+        <span className="tsc-label">{label}</span>
       </div>
 
-      {/* Count */}
-      <div className="count-row">
-        {loading ? (
-          <div className="skeleton" />
-        ) : (
-          <span className="count" style={{ color: accentColor }}>
-            {count}
-          </span>
-        )}
-      </div>
+      {loading
+        ? <div className="tsc-skeleton" />
+        : <div className="tsc-count">{count.toLocaleString()}</div>
+      }
 
-      {/* Footer */}
-      <div className="bottom-row">
-        <span className="view-label">View tasks</span>
-        <svg
-          className="arrow-icon"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+      <div className="tsc-footer">
+        <span className="tsc-trend">{trend?.label ?? "View all tasks"}</span>
+        <svg className="tsc-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="5" y1="12" x2="19" y2="12" />
           <polyline points="12 5 19 12 12 19" />
         </svg>
