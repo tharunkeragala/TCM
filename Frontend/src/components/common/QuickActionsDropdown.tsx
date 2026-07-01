@@ -18,7 +18,7 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 const ITEMS = [
   {
     label: "Dashboard",
-    to: "/",
+    to: "/home",
     color: "#2563EB",
     icon: <LayoutDashboard size={18} strokeWidth={2} />,
   },

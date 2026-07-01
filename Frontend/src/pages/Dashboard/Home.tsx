@@ -27,7 +27,7 @@ export default function Home() {
 
   useEffect(() => {
     // Playwright global stats
-    API.get("/api/pw/stats")
+    API.get("/api/playwright/stats")
       .then(res => setPwStats(res.data.data))
       .catch(() => {})
       .finally(() => setPwLoading(false));
@@ -140,8 +140,8 @@ export default function Home() {
       `}</style>
 
       <div className="home-layout">
-        {/* ── Row 4: Quick access ─────────────────────────
-        <DashboardQuickAccess /> */}  
+        {/* ── Row 4: Quick access ───────────────────────── */}
+        {/* <DashboardQuickAccess />   */}
 
         {/* ── Row 1: Playwright KPIs ─────────────────────── */}
         <DashboardKPIRow items={kpiItems} loading={pwLoading} />
