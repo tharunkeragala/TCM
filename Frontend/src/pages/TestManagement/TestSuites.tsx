@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FaEdit,
   FaTrash,
@@ -8,6 +8,8 @@ import {
   FaClipboardList,
   FaEye,
   FaPlus,
+  FaSearch,
+  FaTimes,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -70,6 +72,8 @@ const STATUS_COLORS: Record<string, string> = {
   Ready: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   Deprecated: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
 };
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const emptyStep = (): TestStep => ({
   step_number: 1,
@@ -1142,6 +1146,17 @@ export default function TestSuites() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // ─── SEARCH & FILTER STATE ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterProject, setFilterProject] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"" | "active" | "inactive">(
+    "",
+  );
+
+  // ─── PAGINATION STATE ───────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const onRefresh = () => {
     if (typeof refetchSuites === "function") {
       refetchSuites();
@@ -1150,24 +1165,162 @@ export default function TestSuites() {
     } else window.location.reload();
   };
 
+  // ─── SEARCH + FILTER LOGIC ───────────────────────────────────────────────
+  const filteredSuites = useMemo(() => {
+    if (!suites) return [];
+
+    return suites.filter((suite) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        suite.suite_name.toLowerCase().includes(q) ||
+        (suite.description ?? "").toLowerCase().includes(q) ||
+        (suite.project_name ?? "").toLowerCase().includes(q);
+
+      const matchesProject =
+        !filterProject || String(suite.project_id) === filterProject;
+
+      const matchesStatus =
+        !filterStatus ||
+        (filterStatus === "active" ? suite.is_active : !suite.is_active);
+
+      return matchesSearch && matchesProject && matchesStatus;
+    });
+  }, [suites, searchQuery, filterProject, filterStatus]);
+
+  // ─── PAGINATION LOGIC ────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredSuites.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedSuites = filteredSuites.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  // Reset to page 1 whenever filters change
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterProjectChange = (val: string) => {
+    setFilterProject(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterStatusChange = (val: "" | "active" | "inactive") => {
+    setFilterStatus(val);
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    searchQuery || filterProject || filterStatus,
+  );
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setFilterProject("");
+    setFilterStatus("");
+    setCurrentPage(1);
+  };
+
+  // ─── PAGINATION RANGE ────────────────────────────────────────────────────
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, safePage - delta);
+    const right = Math.min(totalPages - 1, safePage + delta);
+
+    range.push(1);
+    if (left > 2) range.push("...");
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) range.push("...");
+    if (totalPages > 1) range.push(totalPages);
+
+    return range;
+  };
+
   return (
     <div>
       <PageMeta title="Test Suites" description="Test Suites page" />
       <PageBreadcrumb pageTitle="Test Suites" />
 
       <div className="mt-4">
-        <div className="flex items-center justify-between mb-4">
+        {/* Summary */}
+        <div className="mb-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {suites?.length ?? 0} suite{suites?.length !== 1 ? "s" : ""} ·{" "}
-            {allTestCases?.length ?? 0} test case
+            {filteredSuites.length} suite{filteredSuites.length !== 1 ? "s" : ""}{" "}
+            · {allTestCases?.length ?? 0} test case
             {allTestCases?.length !== 1 ? "s" : ""}
           </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-150 flex items-center gap-2"
+        </div>
+
+        {/* ── Search & Filters ── */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[220px]">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search suites…"
+              className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+
+          {/* Filters */}
+          <select
+            value={filterProject}
+            onChange={(e) => handleFilterProjectChange(e.target.value)}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
-            <FaPlus className="w-3 h-3" /> Create Suite
-          </button>
+            <option value="">All Projects</option>
+            {(projects || []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.project_name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) =>
+              handleFilterStatusChange(
+                e.target.value as "" | "active" | "inactive",
+              )
+            }
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+            >
+              <FaTimes className="h-3 w-3" /> Clear
+            </button>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <FaPlus className="h-3.5 w-3.5" /> Create
+            </button>
+          </div>
         </div>
 
         {/* <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
@@ -1191,17 +1344,27 @@ export default function TestSuites() {
 
         {!loading && !error && (
           <div>
-            {suites && suites.length > 0 ? (
-              suites.map((suite) => (
+            {paginatedSuites.length > 0 ? (
+              paginatedSuites.map((suite) => (
                 <SuiteAccordion
                   key={suite.id}
                   suite={suite}
                   testCases={allTestCases || []}
-                  allSuites={suites}
+                  allSuites={suites || []}
                   projects={projects || []}
                   onRefresh={onRefresh}
                 />
               ))
+            ) : suites && suites.length > 0 ? (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                No suites match your search or filters.{" "}
+                <button
+                  onClick={handleClearFilters}
+                  className="text-blue-500 hover:underline"
+                >
+                  Clear filters
+                </button>
+              </div>
             ) : (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 No test suites found.{" "}
@@ -1213,6 +1376,147 @@ export default function TestSuites() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {!loading && !error && filteredSuites.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            {/* Left: page size + info */}
+            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+              <span>Rows per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {PAGE_SIZE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <span>
+                {(safePage - 1) * pageSize + 1}–
+                {Math.min(safePage * pageSize, filteredSuites.length)} of{" "}
+                {filteredSuites.length}
+              </span>
+            </div>
+
+            {/* Right: page controls */}
+            <div className="flex items-center gap-1">
+              {/* First */}
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={safePage === 1}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="First page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Prev */}
+              <button
+                onClick={() => handlePageChange(safePage - 1)}
+                disabled={safePage === 1}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Previous page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Page numbers */}
+              {getPaginationRange().map((item, i) =>
+                item === "..." ? (
+                  <span
+                    key={`ellipsis-${i}`}
+                    className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => handlePageChange(item as number)}
+                    className={`min-w-[32px] px-2 py-1 rounded-md text-sm font-medium transition ${
+                      safePage === item
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+
+              {/* Next */}
+              <button
+                onClick={() => handlePageChange(safePage + 1)}
+                disabled={safePage === totalPages}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Next page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+
+              {/* Last */}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={safePage === totalPages}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Last page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 5l7 7-7 7M6 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>

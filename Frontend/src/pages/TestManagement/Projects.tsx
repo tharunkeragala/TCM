@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   FaEdit,
   FaTrash,
@@ -10,6 +10,8 @@ import {
   FaClipboardList,
   FaEye,
   FaPlus,
+  FaSearch,
+  FaTimes,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -76,6 +78,8 @@ const STATUS_COLORS: Record<string, string> = {
   Ready: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   Deprecated: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
 };
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const emptyStep = (): TestStep => ({
   step_number: 1,
@@ -1553,6 +1557,16 @@ export default function Projects() {
 
   const [showCreateProject, setShowCreateProject] = useState(false);
 
+  // ─── SEARCH & FILTER STATE ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"" | "active" | "inactive">(
+    "",
+  );
+
+  // ─── PAGINATION STATE ───────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const handleRefresh = useCallback(() => {
     refetchProjects?.();
     refetchSuites?.();
@@ -1568,28 +1582,139 @@ export default function Projects() {
     }
   }, [handleRefresh, refetchProjects]);
 
+  // ─── SEARCH + FILTER LOGIC ───────────────────────────────────────────────
+  const filteredProjects = useMemo(() => {
+    if (!projects) return [];
+
+    return projects.filter((project) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        project.project_name.toLowerCase().includes(q) ||
+        (project.description ?? "").toLowerCase().includes(q);
+
+      const matchesStatus =
+        !filterStatus ||
+        (filterStatus === "active" ? project.is_active : !project.is_active);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [projects, searchQuery, filterStatus]);
+
+  // ─── PAGINATION LOGIC ────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedProjects = filteredProjects.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  // Reset to page 1 whenever filters change
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
+  const handleFilterStatusChange = (val: "" | "active" | "inactive") => {
+    setFilterStatus(val);
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = Boolean(searchQuery || filterStatus);
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setFilterStatus("");
+    setCurrentPage(1);
+  };
+
+  // ─── PAGINATION RANGE ────────────────────────────────────────────────────
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, safePage - delta);
+    const right = Math.min(totalPages - 1, safePage + delta);
+
+    range.push(1);
+    if (left > 2) range.push("...");
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) range.push("...");
+    if (totalPages > 1) range.push(totalPages);
+
+    return range;
+  };
+
   return (
     <div>
       <PageMeta title="Projects" description="Projects page" />
       <PageBreadcrumb pageTitle="Projects" />
 
       <div className="mt-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {projects?.length ?? 0} project{projects?.length !== 1 ? "s" : ""}{" "}
-              · {allSuites?.length ?? 0} suite
-              {allSuites?.length !== 1 ? "s" : ""} · {allTestCases?.length ?? 0}{" "}
-              test case{allTestCases?.length !== 1 ? "s" : ""}
-            </p>
+        {/* Summary */}
+        <div className="mb-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {filteredProjects.length} project
+            {filteredProjects.length !== 1 ? "s" : ""} · {allSuites?.length ?? 0}{" "}
+            suite{allSuites?.length !== 1 ? "s" : ""} ·{" "}
+            {allTestCases?.length ?? 0} test case
+            {allTestCases?.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+
+        {/* ── Search & Filters ── */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[220px]">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search projects…"
+              className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
           </div>
-          <button
-            onClick={() => setShowCreateProject(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-150 flex items-center gap-2"
+
+          {/* Filters */}
+          <select
+            value={filterStatus}
+            onChange={(e) =>
+              handleFilterStatusChange(
+                e.target.value as "" | "active" | "inactive",
+              )
+            }
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
-            <FaPlus className="w-3 h-3" /> Create Project
-          </button>
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+            >
+              <FaTimes className="h-3 w-3" /> Clear
+            </button>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateProject(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <FaPlus className="h-3.5 w-3.5" /> Create
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -1606,17 +1731,27 @@ export default function Projects() {
 
         {!loading && !error && (
           <div>
-            {projects && projects.length > 0 ? (
-              projects.map((project) => (
+            {paginatedProjects.length > 0 ? (
+              paginatedProjects.map((project) => (
                 <ProjectAccordion
                   key={project.id}
                   project={project}
                   suites={allSuites || []}
                   testCases={allTestCases || []}
-                  projects={projects}
+                  projects={projects || []}
                   onRefresh={onRefresh}
                 />
               ))
+            ) : projects && projects.length > 0 ? (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                No projects match your search or filters.{" "}
+                <button
+                  onClick={handleClearFilters}
+                  className="text-blue-500 hover:underline"
+                >
+                  Clear filters
+                </button>
+              </div>
             ) : (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 No projects found.{" "}
@@ -1628,6 +1763,147 @@ export default function Projects() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {!loading && !error && filteredProjects.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            {/* Left: page size + info */}
+            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+              <span>Rows per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {PAGE_SIZE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <span>
+                {(safePage - 1) * pageSize + 1}–
+                {Math.min(safePage * pageSize, filteredProjects.length)} of{" "}
+                {filteredProjects.length}
+              </span>
+            </div>
+
+            {/* Right: page controls */}
+            <div className="flex items-center gap-1">
+              {/* First */}
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={safePage === 1}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="First page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Prev */}
+              <button
+                onClick={() => handlePageChange(safePage - 1)}
+                disabled={safePage === 1}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Previous page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Page numbers */}
+              {getPaginationRange().map((item, i) =>
+                item === "..." ? (
+                  <span
+                    key={`ellipsis-${i}`}
+                    className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => handlePageChange(item as number)}
+                    className={`min-w-[32px] px-2 py-1 rounded-md text-sm font-medium transition ${
+                      safePage === item
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+
+              {/* Next */}
+              <button
+                onClick={() => handlePageChange(safePage + 1)}
+                disabled={safePage === totalPages}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Next page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+
+              {/* Last */}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={safePage === totalPages}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Last page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 5l7 7-7 7M6 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>
