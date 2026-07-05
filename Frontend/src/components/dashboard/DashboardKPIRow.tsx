@@ -35,7 +35,7 @@ const Sparkline: React.FC<{ data: number[]; color: string }> = ({ data, color })
   );
 };
 
-const DashboardKPIRow: React.FC<Props> = ({ title = "Overview", items, loading = false }) => (
+const DashboardKPIRow: React.FC<Props> = ({ title = "TEST CASAE - Overview", items, loading = false }) => (
   <div className="dash-card">
     <style>{`
       .dash-card {

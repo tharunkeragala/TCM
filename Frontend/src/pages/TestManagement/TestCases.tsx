@@ -220,10 +220,10 @@ export default function TestCases() {
             )}
 
             <div className="ml-auto flex items-center gap-2">
-              <Link to="/playwright/recorder" className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700">
+              <Link to="/script/recorder" className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700">
                 <FaVideo className="h-3.5 w-3.5" /> Record
               </Link>
-              <Link to="/playwright/runner" className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">
+              <Link to="/script/runner" className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">
                 <FaPlay className="h-3.5 w-3.5" /> Runner
               </Link>
               <button
@@ -316,10 +316,10 @@ export default function TestCases() {
                             <Link to={`/test-cases/${tc.id}`} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition" title="View">
                               <FaEye className="h-3 w-3" />
                             </Link>
-                            <Link to={`/playwright/editor/${tc.id}`} className="p-1.5 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-500 hover:text-purple-700 transition" title="Edit Script">
+                            <Link to={`/script/editor/${tc.id}`} className="p-1.5 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-500 hover:text-purple-700 transition" title="Edit Script">
                               <FaCode className="h-3 w-3" />
                             </Link>
-                            <Link to={`/playwright/runner/${tc.id}`} className="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 text-green-500 hover:text-green-700 transition" title="Run">
+                            <Link to={`/script/runner/${tc.id}`} className="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 text-green-500 hover:text-green-700 transition" title="Run">
                               <FaPlay className="h-3 w-3" />
                             </Link>
                             <button onClick={() => handleEdit(tc)} className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-500 hover:text-blue-700 transition" title="Edit">
@@ -567,12 +567,12 @@ export default function TestCases() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Playwright Script
+              Script
             </label>
 
             {editingCase && (
               <Link
-                to={`/playwright/editor/${editingCase.id}`}
+                to={`/script/editor/${editingCase.id}`}
                 className="text-xs text-purple-600 hover:text-purple-700 font-medium"
               >
                 Open Full Editor →
@@ -588,7 +588,7 @@ export default function TestCases() {
                 playwright_script: e.target.value,
               })
             }
-            placeholder="Paste or record Playwright script here…"
+            placeholder="Paste or record Script here…"
             rows={5}
             spellCheck={false}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"

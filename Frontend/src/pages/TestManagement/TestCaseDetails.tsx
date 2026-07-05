@@ -341,9 +341,9 @@ export default function TestCaseDetails() {
     setRunning(true);
     try {
       await API.post(`/api/playwright/test-cases/${testCase.id}/run`);
-      navigate(`/playwright/runner/${testCase.id}`);
+      navigate(`/script/runner/${testCase.id}`);
     } catch {
-      navigate(`/playwright/runner/${testCase.id}`);
+      navigate(`/script/runner/${testCase.id}`);
     } finally {
       setRunning(false);
     }
@@ -352,7 +352,7 @@ export default function TestCaseDetails() {
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: "overview", label: "Overview", icon: <FaSearch className="h-3 w-3" /> },
     { key: "manual", label: "Manual Steps", icon: <FaTasks className="h-3 w-3" /> },
-    { key: "playwright", label: "Playwright Script", icon: <FaCode className="h-3 w-3" /> },
+    { key: "playwright", label: "Script", icon: <FaCode className="h-3 w-3" /> },
     { key: "runs", label: "Runs & Evidence", icon: <FaTerminal className="h-3 w-3" /> },
     { key: "activity", label: "Activity", icon: <FaHistory className="h-3 w-3" /> },
   ];
@@ -425,7 +425,7 @@ export default function TestCaseDetails() {
                 All Cases
               </Link>
               <Link
-                to={`/playwright/editor/${testCase.id}`}
+                to={`/script/editor/${testCase.id}`}
                 className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
               >
                 <FaCode className="h-3 w-3" /> Script Editor
@@ -457,13 +457,13 @@ export default function TestCaseDetails() {
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <InfoCard label="Manual Steps" value={manualSteps.length} icon={<FaTasks className="h-3 w-3" />} />
-          <InfoCard label="Playwright Runs" value={runs.length} icon={<FaTerminal className="h-3 w-3" />} />
+          <InfoCard label="Script Runs" value={runs.length} icon={<FaTerminal className="h-3 w-3" />} />
           <InfoCard label="Passed Runs" value={passedRuns} />
           <InfoCard label="Failed Runs" value={failedRuns} />
         </div>
 
         {/* Tabs */}
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 ">
           <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-700">
             <div className="flex min-w-max gap-1 px-4 pt-4">
               {tabs.map((tab) => (
@@ -483,7 +483,7 @@ export default function TestCaseDetails() {
             </div>
           </div>
 
-          <div className="p-5">
+          <div className="p-5 max-h-[70vh] overflow-y-auto pr-2">
             {/* ── Overview ── */}
             {activeTab === "overview" && (
               <div className="space-y-5">
@@ -512,7 +512,7 @@ export default function TestCaseDetails() {
                         </button>
                       </div>
                     ) : (
-                      <EmptyState title="No Playwright runs yet" description="Run this test to generate execution evidence." />
+                      <EmptyState title="No Script runs yet" description="Run this test to generate execution evidence." />
                     )}
                   </div>
                   <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
@@ -577,9 +577,9 @@ export default function TestCaseDetails() {
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Playwright Script</h2>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Script</h2>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Stored against this test case as <code>playwright_script</code>.
+                      Stored against this test case as <code>script</code>.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -591,7 +591,7 @@ export default function TestCaseDetails() {
                       <FaCopy className="h-3 w-3" /> {copied ? "Copied" : "Copy"}
                     </button>
                     <Link
-                      to={`/playwright/editor/${testCase.id}`}
+                      to={`/script/editor/${testCase.id}`}
                       className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-xs font-medium text-white hover:bg-purple-700"
                     >
                       <FaEdit className="h-3 w-3" /> Full Editor
@@ -603,7 +603,7 @@ export default function TestCaseDetails() {
                     <code>{playwrightScript}</code>
                   </pre>
                 ) : (
-                  <EmptyState title="No Playwright script saved" description="Use the recorder or editor to add automation for this test case." />
+                  <EmptyState title="No script saved" description="Use the recorder or editor to add automation for this test case." />
                 )}
               </div>
             )}
@@ -676,7 +676,7 @@ export default function TestCaseDetails() {
                           </div>
                         </div>
                         <Link
-                          to={`/playwright/preview/${selectedRun.id}`}
+                          to={`/script/preview/${selectedRun.id}`}
                           className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           Open Report <FaExternalLinkAlt className="h-3 w-3" />

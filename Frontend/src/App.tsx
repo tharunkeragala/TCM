@@ -1,90 +1,3 @@
-// import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
-// import SignIn from "./pages/AuthPages/SignIn";
-// import SignUp from "./pages/AuthPages/SignUp";
-// import NotFound from "./pages/OtherPage/NotFound";
-// import Home from "./pages/Dashboard/Home";
-// import Calendar from "./pages/Calendar";
-// import UserProfiles from "./pages/UserProfiles";
-// import AppLayout from "./layout/AppLayout";
-// import ProtectedRoute from "./components/auth/ProtectedRoute";
-// import PublicRoute from "./components/auth/PublicRoute";
-// import Users from "./pages/Users";
-// import Departments from "./pages/Departments";
-// import Roles from "./pages/Roles";
-// import Unauthorized from "./pages/Unauthorized"; // ✅ add this
-// import Teams from "./pages/Teams";
-// import UserReport from './pages/Reports/UserReport';
-// import Projects from "./pages/TestManagement/Projects";
-// import TestSuites from "./pages/TestManagement/TestSuites";
-// import TestCases from "./pages/TestManagement/TestCases";
-// import { PlaywrightRecorder, PlaywrightEditor, PlaywrightRunner, PlaywrightPreview } from "./pages/TestManagement/Playwright";
-// import Tasks from "./pages/Tasks/Tasks";
-// import TasksReport from "./pages/Reports/TasksReport";
-// import TestCaseDetails from "./pages/TestManagement/TestCaseDetails";
-
-// export default function App() {
-//   return (
-//     <Router>
-//       <Routes>
-//         {/* Public Routes */}
-//         <Route
-//           path="/signin"
-//           element={
-//             <PublicRoute>
-//               <SignIn />
-//             </PublicRoute>
-//           }
-//         />
-//         <Route
-//           path="/signup"
-//           element={
-//             <PublicRoute>
-//               <SignUp />
-//             </PublicRoute>
-//           }
-//         />
-
-//         {/* Unauthorized Route */}
-//         <Route path="/unauthorized" element={<Unauthorized />} />
-
-//         {/* Protected Routes */}
-//         <Route element={<ProtectedRoute />}>
-//           <Route element={<AppLayout />}>
-//             {/* Default redirect */}
-//             <Route path="/" element={<Navigate to="/home" replace />} />
-
-//             {/* Protected pages */}
-//             <Route path="/home" element={<Home />} />
-//             <Route path="/calendar" element={<Calendar />} />
-//             <Route path="/profile" element={<UserProfiles />} />
-//             <Route path="/users" element={<Users />} />
-//             <Route path="/departments" element={<Departments />} />
-//             <Route path="/roles" element={<Roles />} />
-//             <Route path="/teams" element={<Teams />} />
-//             <Route path="/reports/users" element={<UserReport />} />
-//             <Route path="/reports/tasks" element={<TasksReport />} />
-//             <Route path="/projects" element={<Projects />} />
-//             <Route path="/test-suites" element={<TestSuites />} />
-//             <Route path="/test-cases" element={<TestCases />} />
-//             <Route path="/test-cases/:id" element={<TestCaseDetails />} />
-//             <Route path="/playwright/recorder" element={<PlaywrightRecorder />} />
-//             <Route path="/playwright/editor" element={<PlaywrightEditor />} />
-//             <Route path="/playwright/editor/:testCaseId" element={<PlaywrightEditor />} />
-//             <Route path="/playwright/runner" element={<PlaywrightRunner />} />
-//             <Route path="/playwright/runner/:testCaseId" element={<PlaywrightRunner />} />
-//             <Route path="/playwright/preview" element={<PlaywrightPreview />} />
-//             <Route path="/playwright/preview/:runId" element={<PlaywrightPreview />} />
-//             <Route path="/tasks" element={<Tasks />} />
-//           </Route>
-//         </Route>
-
-//         {/* 404 */}
-//         <Route path="*" element={<NotFound />} />
-//       </Routes>
-//     </Router>
-//   );
-// }
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import { lazy, Suspense } from "react";
 
@@ -124,7 +37,7 @@ const Projects = lazy(() => import("./pages/TestManagement/Projects"));
 const TestSuites = lazy(() => import("./pages/TestManagement/TestSuites"));
 const TestCases = lazy(() => import("./pages/TestManagement/TestCases"));
 const TestCaseDetails = lazy(
-  () => import("./pages/TestManagement/TestCaseDetails")
+  () => import("./pages/TestManagement/TestCaseDetails"),
 );
 const Sprintboard = lazy(() => import("./pages/TestManagement/Sprintboard"));
 const Sprints = lazy(() => import("./pages/TestManagement/Sprints"));
@@ -133,47 +46,40 @@ const Sprints = lazy(() => import("./pages/TestManagement/Sprints"));
 const PlaywrightRecorder = lazy(() =>
   import("./pages/TestManagement/Playwright").then((m) => ({
     default: m.PlaywrightRecorder,
-  }))
+  })),
 );
 
 const PlaywrightEditor = lazy(() =>
   import("./pages/TestManagement/Playwright").then((m) => ({
     default: m.PlaywrightEditor,
-  }))
+  })),
 );
 
 const PlaywrightRunner = lazy(() =>
   import("./pages/TestManagement/Playwright").then((m) => ({
     default: m.PlaywrightRunner,
-  }))
+  })),
 );
 
 const PlaywrightPreview = lazy(() =>
   import("./pages/TestManagement/Playwright").then((m) => ({
     default: m.PlaywrightPreview,
-  }))
+  })),
 );
 
 function Loader() {
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-white dark:bg-gray-900">
-  {/* <div className="relative">
-    <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-lg animate-pulse" />
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-lg animate-pulse" />
 
-    <div className="w-10 h-10 border-2 border-gray-300/30 dark:border-white/20 border-t-blue-500 dark:border-t-white rounded-full animate-spin animate-[pulse_2s_ease-in-out_infinite]" />
-  </div> */}
+        <div className="w-10 h-10 rounded-full border-2 border-gray-300/30 dark:border-white/20 border-t-blue-500 dark:border-t-white animate-spin" />
+      </div>
 
-<div className="relative">
-  <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-lg animate-pulse" />
-
-  <div className="w-10 h-10 rounded-full border-2 border-gray-300/30 dark:border-white/20 border-t-blue-500 dark:border-t-white animate-spin" />
-</div>
-
-
-  <p className="mt-4 text-sm tracking-wide text-gray-500 dark:text-gray-400">
-    Loading...
-  </p>
-</div>
+      <p className="mt-4 text-sm tracking-wide text-gray-500 dark:text-gray-400">
+        Loading...
+      </p>
+    </div>
   );
 }
 
@@ -228,43 +134,34 @@ export default function App() {
               <Route path="/projects" element={<Projects />} />
               <Route path="/test-suites" element={<TestSuites />} />
               <Route path="/test-cases" element={<TestCases />} />
-              <Route
-                path="/test-cases/:id"
-                element={<TestCaseDetails />}
-              />
+              <Route path="/test-cases/:id" element={<TestCaseDetails />} />
 
               <Route
-                path="/playwright/recorder"
+                path="/script/recorder"
                 element={<PlaywrightRecorder />}
               />
 
+              <Route path="/script/editor" element={<PlaywrightEditor />} />
+
               <Route
-                path="/playwright/editor"
+                path="/script/editor/:testCaseId"
                 element={<PlaywrightEditor />}
               />
 
-              <Route
-                path="/playwright/editor/:testCaseId"
-                element={<PlaywrightEditor />}
-              />
+              <Route path="/script/runner" element={<PlaywrightRunner />} />
 
               <Route
-                path="/playwright/runner"
+                path="/script/runner/:testCaseId"
                 element={<PlaywrightRunner />}
               />
 
               <Route
-                path="/playwright/runner/:testCaseId"
-                element={<PlaywrightRunner />}
-              />
-
-              <Route
-                path="/playwright/preview"
+                path="/script/preview"
                 element={<PlaywrightPreview />}
               />
 
               <Route
-                path="/playwright/preview/:runId"
+                path="/script/preview/:runId"
                 element={<PlaywrightPreview />}
               />
             </Route>

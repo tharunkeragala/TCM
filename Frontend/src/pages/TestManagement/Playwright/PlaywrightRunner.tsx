@@ -92,7 +92,14 @@ export default function PlaywrightRunner() {
     return () => { if (ws.readyState === WebSocket.OPEN) ws.close(); };
   }, []);
 
-  useEffect(() => { stepsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [liveSteps]);
+useEffect(() => {
+  if (!running || liveSteps.length === 0) return;
+
+  stepsEndRef.current?.scrollIntoView({
+    behavior: "smooth",
+    block: "nearest",
+  });
+}, [liveSteps, running]);
 
   const filteredTests = useMemo(() => {
     const q = filter.toLowerCase();
@@ -107,7 +114,7 @@ export default function PlaywrightRunner() {
   const runTest = async () => {
     if (!selectedCase) return;
     if (!selectedCase.playwright_script?.trim()) {
-      setAlert({ type: "error", message: "No Playwright script found. Open the script editor to add one." });
+      setAlert({ type: "error", message: "No Script found. Open the script editor to add one." });
       return;
     }
     setAlert(null); setRunning(true); setStopping(false); setLiveSteps([]); setLiveFrame(null); setCurrentRun(null);
@@ -137,8 +144,8 @@ export default function PlaywrightRunner() {
 
   return (
     <div>
-      <PageMeta title="Playwright Runner" description="Run automated Playwright tests" />
-      <PageBreadcrumb pageTitle="Playwright Runner" />
+      <PageMeta title="Script Runner" description="Run automated Scripts" />
+      <PageBreadcrumb pageTitle="Script Runner" />
 
       <div className="mt-4 space-y-4">
         {alert && <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />}
@@ -159,11 +166,11 @@ export default function PlaywrightRunner() {
             </div>
 
             <div className="ml-auto flex flex-wrap gap-2">
-              <Link to="/playwright/recorder" className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+              <Link to="/script/recorder" className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
                 <FaVideo className="h-3.5 w-3.5" /> Record
               </Link>
               {selectedCase && (
-                <Link to={`/playwright/editor/${selectedCase.id}`} className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                <Link to={`/script/editor/${selectedCase.id}`} className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
                   <FaCode className="h-3.5 w-3.5" /> Edit Script
                 </Link>
               )}
@@ -182,7 +189,7 @@ export default function PlaywrightRunner() {
                 </button>
               )}
               {currentRun && currentRun.status !== "running" && (
-                <Link to={`/playwright/preview/${currentRun.id}`} className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">
+                <Link to={`/script/preview/${currentRun.id}`} className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">
                   <FaEye className="h-3.5 w-3.5" /> View Report
                 </Link>
               )}
@@ -190,9 +197,9 @@ export default function PlaywrightRunner() {
           </div>
         </div>
 
-        <div className="grid min-h-[680px] gap-4 lg:grid-cols-[300px_1fr_280px]">
+        <div className="grid h-[calc(120dvh-120px)] min-h-0 gap-4 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
           {/* Test list */}
-          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 flex flex-col">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="border-b border-gray-200 p-3 space-y-2 dark:border-gray-700">
               <div className="relative">
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
@@ -234,7 +241,7 @@ export default function PlaywrightRunner() {
                       if (running) return;
                       setSelectedId(String(test.id));
                       setSelectedCase(test);
-                      navigate(`/playwright/runner/${test.id}`);
+                      navigate(`/script/runner/${test.id}`);
                     }}
                     className={`block w-full border-l-4 px-4 py-3 text-left transition ${
                       selectedCase?.id === test.id
@@ -252,7 +259,7 @@ export default function PlaywrightRunner() {
           </div>
 
           {/* Live browser + steps */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Live Browser</h2>
               {running && <span className="flex items-center gap-1.5 text-xs font-semibold text-red-500"><span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> LIVE</span>}
@@ -287,9 +294,9 @@ export default function PlaywrightRunner() {
             </div>
 
             {/* Live step log */}
-            <div className="mt-4">
+            <div className="mt-4 flex min-h-0 flex-1 flex-col">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Step Log</h3>
-              <div className="max-h-[200px] space-y-1.5 overflow-y-auto pr-1">
+              <div className="flex-1 space-y-1.5 overflow-y-auto pr-2">
                 {liveSteps.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm text-gray-500 dark:border-gray-700">Run a test to see live steps.</div>
                 ) : (
@@ -313,12 +320,12 @@ export default function PlaywrightRunner() {
           </div>
 
           {/* Run history */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
               Run History
               {history.length > 0 && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">{history.length}</span>}
             </h3>
-            <div className="max-h-[600px] space-y-2 overflow-y-auto pr-1">
+            <div className="flex-1 space-y-2 overflow-y-auto pr-2">
               {history.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
                   {selectedCase ? "No runs yet for this test." : "Select a test case."}
@@ -327,7 +334,7 @@ export default function PlaywrightRunner() {
                 history.map((run) => (
                   <Link
                     key={run.id}
-                    to={`/playwright/preview/${run.id}`}
+                    to={`/script/preview/${run.id}`}
                     className="block rounded-lg border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 transition"
                   >
                     <div className="flex items-center justify-between">

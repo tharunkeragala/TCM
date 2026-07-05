@@ -105,7 +105,7 @@ export default function PlaywrightEditor() {
       };
       const res = await API.put(`/api/test-cases/update/${selectedCase.id}`, payload, { headers: authHeaders() });
       if (res.data.success) {
-        setAlert({ type: "success", message: "Playwright script saved successfully." });
+        setAlert({ type: "success", message: "Script saved successfully." });
       }
     } catch (err: any) {
       setAlert({ type: "error", message: err.response?.data?.message || "Failed to save script." });
@@ -123,13 +123,13 @@ export default function PlaywrightEditor() {
     setSelectedId(String(tc.id));
     setTestSearch("");
     setShowDropdown(false);
-    navigate(`/playwright/editor/${tc.id}`);
+    navigate(`/script/editor/${tc.id}`);
   };
 
   return (
     <div>
-      <PageMeta title="Playwright Script Editor" description="Edit Playwright automation scripts" />
-      <PageBreadcrumb pageTitle="Playwright Script Editor" />
+      <PageMeta title="Script Editor" description="Edit Script automation scripts" />
+      <PageBreadcrumb pageTitle="Script Editor" />
 
       <div className="mt-4 space-y-4">
         {alert && <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />}
@@ -152,7 +152,7 @@ export default function PlaywrightEditor() {
                   className="flex-1 bg-transparent text-sm text-gray-900 focus:outline-none dark:text-white"
                 />
                 {selectedCase && !showDropdown ? (
-                  <button onClick={(e) => { e.stopPropagation(); setSelectedId(""); setSelectedCase(null); navigate("/playwright/editor"); }}>
+                  <button onClick={(e) => { e.stopPropagation(); setSelectedId(""); setSelectedCase(null); navigate("/script/editor"); }}>
                     <FaTimes className="h-3 w-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" />
                   </button>
                 ) : (
@@ -188,7 +188,7 @@ export default function PlaywrightEditor() {
             {/* Actions */}
             <div className="flex items-center gap-2">
               <Link
-                to="/playwright/recorder"
+                to="/script/recorder"
                 className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <FaVideo className="h-3.5 w-3.5" /> Record
@@ -204,7 +204,7 @@ export default function PlaywrightEditor() {
 
               {selectedCase && (
                 <Link
-                  to={`/playwright/runner/${selectedCase.id}`}
+                  to={`/script/runner/${selectedCase.id}`}
                   className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
                 >
                   <FaPlay className="h-3.5 w-3.5" /> Run
@@ -249,7 +249,7 @@ export default function PlaywrightEditor() {
               onChange={(e) => setScript(e.target.value)}
               spellCheck={false}
               className="h-[600px] w-full resize-none bg-white p-5 font-mono text-sm text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
-              placeholder="Write your Playwright script here…"
+              placeholder="Write your script here…"
             />
           </div>
 
@@ -260,7 +260,7 @@ export default function PlaywrightEditor() {
             </div>
             <div className="max-h-[600px] space-y-2 overflow-y-auto pr-1">
               {steps.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No recognizable Playwright steps.</div>
+                <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No recognizable script steps.</div>
               ) : (
                 steps.map((step, index) => (
                   <div key={`${index}-${step.raw}`} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">

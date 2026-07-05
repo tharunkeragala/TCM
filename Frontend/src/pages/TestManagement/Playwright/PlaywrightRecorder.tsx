@@ -154,7 +154,7 @@ export default function PlaywrightRecorder() {
   const openEditor = () => {
     if (!recordedScript) return;
     localStorage.setItem("recordedPlaywrightScript", recordedScript);
-    navigate("/playwright/editor");
+    navigate("/script/editor");
   };
 
   // When user picks a test case — if script not yet copied, show confirm
@@ -207,8 +207,8 @@ export default function PlaywrightRecorder() {
 
   return (
     <div>
-      <PageMeta title="Playwright Recorder" description="Record browser actions into Playwright scripts" />
-      <PageBreadcrumb pageTitle="Playwright Recorder" />
+      <PageMeta title="Script Recorder" description="Record browser actions into Scripts" />
+      <PageBreadcrumb pageTitle="Script Recorder" />
 
       {/* Confirm modal */}
       {showSaveConfirm && (
@@ -425,14 +425,14 @@ export default function PlaywrightRecorder() {
                   <FaSave className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save Script to Test Case"}
                 </button>
                 <Link
-                  to={`/playwright/editor/${selectedTestId}`}
+                  to={`/script/editor/${selectedTestId}`}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   onClick={() => localStorage.setItem("recordedPlaywrightScript", recordedScript || "")}
                 >
                   <FaCode className="h-3.5 w-3.5" /> Open Editor for This Case
                 </Link>
                 <Link
-                  to={`/playwright/runner/${selectedTestId}`}
+                  to={`/script/runner/${selectedTestId}`}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700"
                 >
                   <FaPlay className="h-3.5 w-3.5" /> Run This Test

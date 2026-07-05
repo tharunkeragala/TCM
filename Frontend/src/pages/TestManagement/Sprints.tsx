@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   FaPlus,
@@ -65,39 +65,76 @@ function SprintFormModal({
     start_date: editing?.start_date ? editing.start_date.slice(0, 10) : "",
     end_date: editing?.end_date ? editing.end_date.slice(0, 10) : "",
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // ✅ ESC + CLICK OUTSIDE CLOSE (ADDED ONLY)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const modal = document.getElementById("sprint-modal");
+      if (modal && e.target === modal) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [onClose]);
 
   const handleSave = async () => {
     if (!formData.sprint_name.trim())
       return setAlert({ type: "error", message: "Sprint name is required." });
+
     if (!formData.project_id)
       return setAlert({ type: "error", message: "Please select a project." });
 
     setSubmitting(true);
     setAlert(null);
+
     try {
       const url = editing ? `/api/sprints/update/${editing.id}` : "/api/sprints/create";
       const method = editing ? API.put : API.post;
+
       const res = await method(url, formData, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       if (res.data.success) {
-        setAlert({ type: "success", message: editing ? "Sprint updated!" : "Sprint created!" });
+        setAlert({
+          type: "success",
+          message: editing ? "Sprint updated!" : "Sprint created!",
+        });
+
         setTimeout(() => {
           onClose();
           onSaved();
         }, 800);
       }
     } catch (err: any) {
-      setAlert({ type: "error", message: err.response?.data?.message || "Operation failed." });
+      setAlert({
+        type: "error",
+        message: err.response?.data?.message || "Operation failed.",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div
+      id="sprint-modal"
+      className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    >
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -176,17 +213,10 @@ function SprintFormModal({
         </div>
 
         <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
-          >
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
-          >
+          <button onClick={handleSave} disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150">
             {submitting ? (editing ? "Updating..." : "Creating...") : editing ? "Update" : "Create"}
           </button>
         </div>
@@ -194,6 +224,7 @@ function SprintFormModal({
     </div>
   );
 }
+
 
 // ─── Delete Confirm ─────────────────────────────────────────────────────────
 function DeleteSprintModal({
@@ -208,37 +239,74 @@ function DeleteSprintModal({
   const [inProgress, setInProgress] = useState(false);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
+  // ✅ ESC + CLICK OUTSIDE CLOSE (ADDED ONLY)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const modal = document.getElementById("delete-sprint-modal");
+      if (modal && e.target === modal) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [onClose]);
+
   const handleConfirm = async () => {
     setInProgress(true);
     setAlert(null);
+
     try {
       await API.delete(`/api/sprints/delete/${sprint.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       setAlert({ type: "success", message: "Sprint deleted." });
-      setTimeout(() => { onClose(); onDeleted(); }, 800);
+
+      setTimeout(() => {
+        onClose();
+        onDeleted();
+      }, 800);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.response?.data?.message || "Failed to delete." });
+      setAlert({
+        type: "error",
+        message: err.response?.data?.message || "Failed to delete.",
+      });
     } finally {
       setInProgress(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div
+      id="delete-sprint-modal"
+      className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    >
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Sprint</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold">&times;</button>
         </div>
+
         {alert && (
           <div className="mb-4">
             <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />
           </div>
         )}
+
         <p className="text-sm text-gray-700 dark:text-gray-300 mb-5">
           Delete <span className="font-semibold text-gray-900 dark:text-white">"{sprint.sprint_name}"</span>? This removes the board and all suite/test-case links from this sprint — the suites and test cases themselves are kept.
         </p>
+
         <div className="flex justify-end gap-3">
           <button onClick={onClose} disabled={inProgress} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg">Cancel</button>
           <button onClick={handleConfirm} disabled={inProgress} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg">

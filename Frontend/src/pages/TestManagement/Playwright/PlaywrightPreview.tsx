@@ -78,8 +78,8 @@ export default function PlaywrightPreview() {
   if (!runId) {
     return (
       <div>
-        <PageMeta title="Playwright Reports" description="Browse Playwright test reports" />
-        <PageBreadcrumb pageTitle="Playwright Reports" />
+        <PageMeta title="Script Reports" description="Browse script test reports" />
+        <PageBreadcrumb pageTitle="Script Reports" />
 
         <div className="mt-4 space-y-4">
           {/* Test case picker */}
@@ -129,7 +129,7 @@ export default function PlaywrightPreview() {
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                   Run History {runs.length > 0 && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">{runs.length}</span>}
                 </h3>
-                <Link to={`/playwright/runner/${selectedTestId}`} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+                <Link to={`/script/runner/${selectedTestId}`} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
                   <FaPlay className="h-3 w-3" /> Run Test
                 </Link>
               </div>
@@ -140,7 +140,7 @@ export default function PlaywrightPreview() {
                   runs.map((r) => (
                     <Link
                       key={r.id}
-                      to={`/playwright/preview/${r.id}`}
+                      to={`/script/preview/${r.id}`}
                       className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
                     >
                       <div>
@@ -169,8 +169,8 @@ export default function PlaywrightPreview() {
   // ── Run detail view ───────────────────────────────────────────────────────────
   return (
     <div>
-      <PageMeta title="Playwright Run Report" description="Playwright execution report" />
-      <PageBreadcrumb pageTitle="Playwright Run Report" />
+      <PageMeta title="Script Run Report" description="Script execution report" />
+      <PageBreadcrumb pageTitle="Script Run Report" />
 
       <div className="mt-4 space-y-4">
         {alert && <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />}
@@ -194,10 +194,10 @@ export default function PlaywrightPreview() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Link to={`/playwright/runner/${run.test_case_id}`} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                <Link to={`/script/runner/${run.test_case_id}`} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
                   <FaRedo className="h-3.5 w-3.5" /> Rerun
                 </Link>
-                <Link to={`/playwright/editor/${run.test_case_id}`} className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300">
+                <Link to={`/script/editor/${run.test_case_id}`} className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300">
                   Edit Script
                 </Link>
               </div>
@@ -219,7 +219,7 @@ export default function PlaywrightPreview() {
               {runs.map((r) => (
                 <Link
                   key={r.id}
-                  to={`/playwright/preview/${r.id}`}
+                  to={`/script/preview/${r.id}`}
                   className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                     String(r.id) === runId
                       ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
