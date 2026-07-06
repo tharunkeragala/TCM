@@ -41,7 +41,8 @@ interface Sprint {
 const STATUS_COLORS: Record<string, string> = {
   Planned: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
   Active: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  Completed: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  Completed:
+    "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
 };
 
 // Accent bar + icon badge colors per status — used for the modernized card treatment
@@ -54,7 +55,8 @@ const STATUS_ACCENT: Record<string, string> = {
 const STATUS_BADGE_BG: Record<string, string> = {
   Planned: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
   Active: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
-  Completed: "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400",
+  Completed:
+    "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400",
 };
 
 // Sort priority: surface what's actionable first, archive what's done last
@@ -66,7 +68,8 @@ const STATUS_PRIORITY: Record<string, number> = {
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
 
-const getToken = () => localStorage.getItem("token") || sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 // ─── Create / Edit Sprint Modal ────────────────────────────────────────────
 function SprintFormModal({
@@ -91,7 +94,10 @@ function SprintFormModal({
   });
 
   const [submitting, setSubmitting] = useState(false);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [alert, setAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ✅ ESC + CLICK OUTSIDE CLOSE (ADDED ONLY)
   useEffect(() => {
@@ -126,7 +132,9 @@ function SprintFormModal({
     setAlert(null);
 
     try {
-      const url = editing ? `/api/sprints/update/${editing.id}` : "/api/sprints/create";
+      const url = editing
+        ? `/api/sprints/update/${editing.id}`
+        : "/api/sprints/create";
       const method = editing ? API.put : API.post;
 
       const res = await method(url, formData, {
@@ -174,7 +182,11 @@ function SprintFormModal({
 
         {alert && (
           <div className="mb-4">
-            <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />
+            <Alert
+              variant={alert.type}
+              title={alert.type === "success" ? "Success" : "Error"}
+              message={alert.message}
+            />
           </div>
         )}
 
@@ -184,13 +196,17 @@ function SprintFormModal({
           </label>
           <select
             value={formData.project_id}
-            onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, project_id: e.target.value })
+            }
             disabled={!!editing}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
           >
             <option value="">-- Select Project --</option>
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.project_name}</option>
+              <option key={p.id} value={p.id}>
+                {p.project_name}
+              </option>
             ))}
           </select>
         </div>
@@ -202,14 +218,18 @@ function SprintFormModal({
           <input
             type="text"
             value={formData.sprint_name}
-            onChange={(e) => setFormData({ ...formData, sprint_name: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, sprint_name: e.target.value })
+            }
             placeholder="e.g. CFP Sprint 1"
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Goal</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Goal
+          </label>
           <textarea
             value={formData.goal}
             onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
@@ -237,18 +257,30 @@ function SprintFormModal({
         </div>
 
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
+          >
             Cancel
           </button>
-          <button onClick={handleSave} disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150">
-            {submitting ? (editing ? "Updating..." : "Creating...") : editing ? "Update" : "Create"}
+          <button
+            onClick={handleSave}
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
+          >
+            {submitting
+              ? editing
+                ? "Updating..."
+                : "Creating..."
+              : editing
+                ? "Update"
+                : "Create"}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
 
 // ─── Delete Confirm ─────────────────────────────────────────────────────────
 function DeleteSprintModal({
@@ -261,7 +293,10 @@ function DeleteSprintModal({
   onDeleted: () => void;
 }) {
   const [inProgress, setInProgress] = useState(false);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [alert, setAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // ✅ ESC + CLICK OUTSIDE CLOSE (ADDED ONLY)
   useEffect(() => {
@@ -317,23 +352,49 @@ function DeleteSprintModal({
     >
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Sprint</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold">&times;</button>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Delete Sprint
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+          >
+            &times;
+          </button>
         </div>
 
         {alert && (
           <div className="mb-4">
-            <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />
+            <Alert
+              variant={alert.type}
+              title={alert.type === "success" ? "Success" : "Error"}
+              message={alert.message}
+            />
           </div>
         )}
 
         <p className="text-sm text-gray-700 dark:text-gray-300 mb-5">
-          Delete <span className="font-semibold text-gray-900 dark:text-white">"{sprint.sprint_name}"</span>? This removes the board and all suite/test-case links from this sprint — the suites and test cases themselves are kept.
+          Delete{" "}
+          <span className="font-semibold text-gray-900 dark:text-white">
+            "{sprint.sprint_name}"
+          </span>
+          ? This removes the board and all suite/test-case links from this
+          sprint — the suites and test cases themselves are kept.
         </p>
 
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} disabled={inProgress} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg">Cancel</button>
-          <button onClick={handleConfirm} disabled={inProgress} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg">
+          <button
+            onClick={onClose}
+            disabled={inProgress}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={inProgress}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg"
+          >
             {inProgress ? "Deleting..." : "Yes, Delete"}
           </button>
         </div>
@@ -355,7 +416,11 @@ function SprintCard({
   onDelete: () => void;
 }) {
   const StatusIcon =
-    sprint.status === "Active" ? FaPlay : sprint.status === "Completed" ? FaCheckCircle : FaCalendarAlt;
+    sprint.status === "Active"
+      ? FaPlay
+      : sprint.status === "Completed"
+        ? FaCheckCircle
+        : FaCalendarAlt;
 
   return (
     <div
@@ -398,18 +463,24 @@ function SprintCard({
 
         <div className="mt-3 ml-[42px] flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
-            <FaLayerGroup className="w-3 h-3 text-purple-400" /> {sprint.suite_count ?? 0} suites
+            <FaLayerGroup className="w-3 h-3 text-purple-400" />{" "}
+            {sprint.suite_count ?? 0} suites
           </span>
           <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
-            <FaClipboardList className="w-3 h-3 text-indigo-400" /> {sprint.case_count ?? 0} cases
+            <FaClipboardList className="w-3 h-3 text-indigo-400" />{" "}
+            {sprint.case_count ?? 0} cases
           </span>
         </div>
 
         {(sprint.start_date || sprint.end_date) && (
           <p className="mt-3 ml-[42px] text-xs text-gray-400 dark:text-gray-500">
-            {sprint.start_date ? new Date(sprint.start_date).toLocaleDateString() : "—"}
+            {sprint.start_date
+              ? new Date(sprint.start_date).toLocaleDateString()
+              : "—"}
             {" → "}
-            {sprint.end_date ? new Date(sprint.end_date).toLocaleDateString() : "—"}
+            {sprint.end_date
+              ? new Date(sprint.end_date).toLocaleDateString()
+              : "—"}
           </p>
         )}
 
@@ -443,7 +514,12 @@ export default function Sprints() {
   const { data: projects } = useFetchWithAuth<Project[]>("/api/projects");
   const [projectFilter, setProjectFilter] = useState("");
 
-  const { data: sprints, loading, error, refetch } = useFetchWithAuth<Sprint[]>(
+  const {
+    data: sprints,
+    loading,
+    error,
+    refetch,
+  } = useFetchWithAuth<Sprint[]>(
     projectFilter ? `/api/sprints?project_id=${projectFilter}` : "/api/sprints",
   );
 
@@ -459,7 +535,10 @@ export default function Sprints() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
 
-  const onRefresh = () => { if (typeof refetch === "function") refetch(); else window.location.reload(); };
+  const onRefresh = () => {
+    if (typeof refetch === "function") refetch();
+    else window.location.reload();
+  };
 
   // ─── SEARCH + FILTER + SORT LOGIC ────────────────────────────────────────
   // Sorted with Active sprints surfaced first, then Planned, then Completed —
@@ -483,7 +562,8 @@ export default function Sprints() {
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
-        const statusDiff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
+        const statusDiff =
+          STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
         if (statusDiff !== 0) return statusDiff;
         const aDate = a.start_date ? new Date(a.start_date).getTime() : 0;
         const bDate = b.start_date ? new Date(b.start_date).getTime() : 0;
@@ -523,7 +603,9 @@ export default function Sprints() {
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = Boolean(searchQuery || projectFilter || filterStatus);
+  const hasActiveFilters = Boolean(
+    searchQuery || projectFilter || filterStatus,
+  );
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -557,68 +639,83 @@ export default function Sprints() {
         {/* Summary */}
         <div className="mb-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {filteredSprints.length} sprint{filteredSprints.length !== 1 ? "s" : ""}
+            {filteredSprints.length} sprint
+            {filteredSprints.length !== 1 ? "s" : ""}
           </p>
         </div>
 
         {/* ── Search & Filters ── */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[220px]">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-            <input
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search sprints…"
-              className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            />
-          </div>
+        <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[220px]">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search sprints…"
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
 
-          {/* Filters */}
-          <select
-            value={projectFilter}
-            onChange={(e) => handleProjectFilterChange(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <option value="">All Projects</option>
-            {projects?.map((p) => (
-              <option key={p.id} value={p.id}>{p.project_name}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterStatus}
-            onChange={(e) => handleFilterStatusChange(e.target.value as "" | Sprint["status"])}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <option value="">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Planned">Planned</option>
-            <option value="Completed">Completed</option>
-          </select>
-
-          {hasActiveFilters && (
-            <button
-              onClick={handleClearFilters}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+            {/* Filters */}
+            <select
+              value={projectFilter}
+              onChange={(e) => handleProjectFilterChange(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
-              <FaTimes className="h-3 w-3" /> Clear
-            </button>
-          )}
+              <option value="">All Projects</option>
+              {projects?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.project_name}
+                </option>
+              ))}
+            </select>
 
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                handleFilterStatusChange(
+                  e.target.value as "" | Sprint["status"],
+                )
+              }
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
-              <FaPlus className="h-3.5 w-3.5" /> Create
-            </button>
+              <option value="">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Planned">Planned</option>
+              <option value="Completed">Completed</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+              >
+                <FaTimes className="h-3 w-3" /> Clear
+              </button>
+            )}
+
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                <FaPlus className="h-3.5 w-3.5" /> Create
+              </button>
+            </div>
           </div>
         </div>
 
-        {error && <div className="mb-4"><Alert variant="error" title="Error" message={error} /></div>}
+        {error && (
+          <div className="mb-4">
+            <Alert variant="error" title="Error" message={error} />
+          </div>
+        )}
         {loading && !error && (
-          <div className="text-gray-500 dark:text-gray-400 py-8 text-center">Loading sprints...</div>
+          <div className="text-gray-500 dark:text-gray-400 py-8 text-center">
+            Loading sprints...
+          </div>
         )}
 
         {!loading && !error && (
@@ -638,14 +735,20 @@ export default function Sprints() {
             ) : sprints && sprints.length > 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 No sprints match your search or filters.{" "}
-                <button onClick={handleClearFilters} className="text-blue-500 hover:underline">
+                <button
+                  onClick={handleClearFilters}
+                  className="text-blue-500 hover:underline"
+                >
                   Clear filters
                 </button>
               </div>
             ) : (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 No sprints found.{" "}
-                <button onClick={() => setShowCreateModal(true)} className="text-blue-500 hover:underline">
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="text-blue-500 hover:underline"
+                >
                   Create your first sprint
                 </button>
               </div>
@@ -665,7 +768,9 @@ export default function Sprints() {
                 className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {PAGE_SIZE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
               <span>
@@ -684,8 +789,18 @@ export default function Sprints() {
                 className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 title="First page"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
+                  />
                 </svg>
               </button>
 
@@ -696,15 +811,30 @@ export default function Sprints() {
                 className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 title="Previous page"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
               </button>
 
               {/* Page numbers */}
               {getPaginationRange().map((item, i) =>
                 item === "..." ? (
-                  <span key={`ellipsis-${i}`} className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none">…</span>
+                  <span
+                    key={`ellipsis-${i}`}
+                    className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
+                  >
+                    …
+                  </span>
                 ) : (
                   <button
                     key={item}
@@ -727,8 +857,18 @@ export default function Sprints() {
                 className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 title="Next page"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
 
@@ -739,8 +879,18 @@ export default function Sprints() {
                 className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 title="Last page"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 5l7 7-7 7M6 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             </div>

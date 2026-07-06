@@ -63,6 +63,8 @@ const STATUS_COLORS: Record<string, string> = {
   Deprecated: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
 };
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 const emptyStep = (): TestStep => ({
   step_number: 1,
   action: "",
@@ -85,6 +87,10 @@ export default function TestCases() {
   const [priorityFilter, setPriorityFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [scriptFilter, setScriptFilter] = useState<"" | "yes" | "no">("");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Modals
   const [showModal, setShowModal] = useState(false);
@@ -157,13 +163,57 @@ export default function TestCases() {
     scriptFilter,
   ]);
 
-  const hasFilters =
+  const hasFilters = Boolean(
     search ||
     projectFilter ||
     suiteFilter ||
     priorityFilter ||
     statusFilter ||
-    scriptFilter;
+    scriptFilter,
+  );
+
+  // ─── PAGINATION LOGIC ────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredCases.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedCases = filteredCases.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  // Reset to page 1 whenever any filter changes
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
+  const handleProjectFilterChange = (val: string) => {
+    setProjectFilter(val);
+    setCurrentPage(1);
+  };
+  const handleSuiteFilterChange = (val: string) => {
+    setSuiteFilter(val);
+    setCurrentPage(1);
+  };
+  const handlePriorityFilterChange = (val: string) => {
+    setPriorityFilter(val);
+    setCurrentPage(1);
+  };
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val);
+    setCurrentPage(1);
+  };
+  const handleScriptFilterChange = (val: "" | "yes" | "no") => {
+    setScriptFilter(val);
+    setCurrentPage(1);
+  };
 
   const clearFilters = () => {
     setSearch("");
@@ -172,6 +222,23 @@ export default function TestCases() {
     setPriorityFilter("");
     setStatusFilter("");
     setScriptFilter("");
+    setCurrentPage(1);
+  };
+
+  // ─── PAGINATION RANGE ────────────────────────────────────────────────────
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, safePage - delta);
+    const right = Math.min(totalPages - 1, safePage + delta);
+
+    range.push(1);
+    if (left > 2) range.push("...");
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) range.push("...");
+    if (totalPages > 1) range.push(totalPages);
+
+    return range;
   };
 
   const handleAddStep = () =>
@@ -338,6 +405,16 @@ export default function TestCases() {
       <PageBreadcrumb pageTitle="Test Cases" />
 
       <div className="mt-4">
+        {/* Summary */}
+        <div className="mb-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {filteredCases.length} test case
+            {filteredCases.length !== 1 ? "s" : ""} · {allSuites?.length ?? 0}{" "}
+            suite{allSuites?.length !== 1 ? "s" : ""} · {projects?.length ?? 0}{" "}
+            project{projects?.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+
         {/* Toolbar */}
         <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <div className="flex flex-wrap items-center gap-3">
@@ -346,7 +423,7 @@ export default function TestCases() {
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search test cases…"
                 className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
@@ -355,7 +432,7 @@ export default function TestCases() {
             {/* Filters */}
             <select
               value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
+              onChange={(e) => handleProjectFilterChange(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">All Projects</option>
@@ -366,7 +443,7 @@ export default function TestCases() {
 
             <select
               value={suiteFilter}
-              onChange={(e) => setSuiteFilter(e.target.value)}
+              onChange={(e) => handleSuiteFilterChange(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">All Suites</option>
@@ -379,7 +456,7 @@ export default function TestCases() {
 
             <select
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
+              onChange={(e) => handlePriorityFilterChange(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">All Priority</option>
@@ -390,7 +467,7 @@ export default function TestCases() {
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => handleStatusFilterChange(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">All Status</option>
@@ -401,7 +478,7 @@ export default function TestCases() {
 
             <select
               value={scriptFilter}
-              onChange={(e) => setScriptFilter(e.target.value as any)}
+              onChange={(e) => handleScriptFilterChange(e.target.value as any)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">All Scripts</option>
@@ -442,17 +519,6 @@ export default function TestCases() {
               </button>
             </div>
           </div>
-
-          {/* Active filter summary */}
-          {filteredCases.length !== (testCases || []).length && (
-            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Showing{" "}
-              <span className="font-semibold text-gray-900 dark:text-white">
-                {filteredCases.length}
-              </span>{" "}
-              of {(testCases || []).length} test cases
-            </div>
-          )}
         </div>
 
         {error && (
@@ -522,7 +588,7 @@ export default function TestCases() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {filteredCases.map((tc) => (
+                    {paginatedCases.map((tc) => (
                       <tr
                         key={tc.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
@@ -581,7 +647,6 @@ export default function TestCases() {
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
                           {tc.updated_by_name || "—"}
                         </td>
-                        {/* <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{tc.updated_by_name || "—"}</td> */}
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
                           {tc.updated_at
                             ? new Date(tc.updated_at).toLocaleString()
@@ -633,6 +698,147 @@ export default function TestCases() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {!loading && !error && filteredCases.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            {/* Left: page size + info */}
+            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+              <span>Rows per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {PAGE_SIZE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <span>
+                {(safePage - 1) * pageSize + 1}–
+                {Math.min(safePage * pageSize, filteredCases.length)} of{" "}
+                {filteredCases.length}
+              </span>
+            </div>
+
+            {/* Right: page controls */}
+            <div className="flex items-center gap-1">
+              {/* First */}
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={safePage === 1}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="First page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11 19l-7-7 7-7M18 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Prev */}
+              <button
+                onClick={() => handlePageChange(safePage - 1)}
+                disabled={safePage === 1}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Previous page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Page numbers */}
+              {getPaginationRange().map((item, i) =>
+                item === "..." ? (
+                  <span
+                    key={`ellipsis-${i}`}
+                    className="px-2 py-1 text-gray-400 dark:text-gray-500 text-sm select-none"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => handlePageChange(item as number)}
+                    className={`min-w-[32px] px-2 py-1 rounded-md text-sm font-medium transition ${
+                      safePage === item
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+
+              {/* Next */}
+              <button
+                onClick={() => handlePageChange(safePage + 1)}
+                disabled={safePage === totalPages}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Next page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+
+              {/* Last */}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={safePage === totalPages}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Last page"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 5l7 7-7 7M6 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>

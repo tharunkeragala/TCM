@@ -1663,57 +1663,59 @@ export default function Projects() {
         <div className="mb-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {filteredProjects.length} project
-            {filteredProjects.length !== 1 ? "s" : ""} · {allSuites?.length ?? 0}{" "}
-            suite{allSuites?.length !== 1 ? "s" : ""} ·{" "}
+            {filteredProjects.length !== 1 ? "s" : ""} ·{" "}
+            {allSuites?.length ?? 0} suite{allSuites?.length !== 1 ? "s" : ""} ·{" "}
             {allTestCases?.length ?? 0} test case
             {allTestCases?.length !== 1 ? "s" : ""}
           </p>
         </div>
 
         {/* ── Search & Filters ── */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[220px]">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-            <input
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search projects…"
-              className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            />
-          </div>
+        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[220px]">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search projects…"
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
 
-          {/* Filters */}
-          <select
-            value={filterStatus}
-            onChange={(e) =>
-              handleFilterStatusChange(
-                e.target.value as "" | "active" | "inactive",
-              )
-            }
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-
-          {hasActiveFilters && (
-            <button
-              onClick={handleClearFilters}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+            {/* Filters */}
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                handleFilterStatusChange(
+                  e.target.value as "" | "active" | "inactive",
+                )
+              }
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
-              <FaTimes className="h-3 w-3" /> Clear
-            </button>
-          )}
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
 
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setShowCreateProject(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              <FaPlus className="h-3.5 w-3.5" /> Create
-            </button>
+            {hasActiveFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+              >
+                <FaTimes className="h-3 w-3" /> Clear
+              </button>
+            )}
+
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateProject(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                <FaPlus className="h-3.5 w-3.5" /> Create
+              </button>
+            </div>
           </div>
         </div>
 
