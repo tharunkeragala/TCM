@@ -365,8 +365,15 @@ export default function Tasks() {
         </div>
       )}
 
+      {/* ── Summary ────────────────────────────────────────────────────────── */}
+      {/* <div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {pagination.total} task{pagination.total !== 1 ? "s" : ""}
+        </p>
+      </div> */}
+
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
-      <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[220px]">
@@ -463,7 +470,7 @@ export default function Tasks() {
       {!loading && !error && (
         <>
           {/* Result range */}
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          {/* <p className="text-xs text-gray-500 dark:text-gray-400">
             Showing{" "}
             <span className="font-semibold text-gray-700 dark:text-gray-200">
               {startItem}
@@ -477,7 +484,7 @@ export default function Tasks() {
               {pagination.total}
             </span>{" "}
             tasks
-          </p>
+          </p> */}
 
           <div className="space-y-2">
             {tasks.length > 0 ? (

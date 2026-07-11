@@ -18,6 +18,7 @@ import PageMeta from "../../components/common/PageMeta";
 import Alert from "../../components/ui/alert/Alert";
 import useFetchWithAuth from "../../hooks/useFetchWithAuth";
 import API from "../../services/api";
+import ProjectDetailModal from "./ProjectDetailModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Project {
@@ -1187,6 +1188,7 @@ function ProjectAccordion({
   const [editModal, setEditModal] = useState(false);
   const [addSuiteModal, setAddSuiteModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [viewModal, setViewModal] = useState(false);
   const [linkedSuiteCount, setLinkedSuiteCount] = useState(0);
   const [deleteAlert, setDeleteAlert] = useState<{
     type: "success" | "error";
@@ -1311,6 +1313,14 @@ function ProjectAccordion({
             >
               <FaPlus className="w-3.5 h-3.5" />
             </button>
+            {/* View Details */}
+            <button
+              onClick={() => setViewModal(true)}
+              className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="View Details"
+            >
+              <FaEye className="w-3.5 h-3.5" />
+            </button>
             <button
               onClick={() => setEditModal(true)}
               className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1363,6 +1373,18 @@ function ProjectAccordion({
           editing={project}
           onClose={() => setEditModal(false)}
           onSaved={onRefresh}
+        />
+      )}
+
+      {/* Project Detail Modal */}
+      {viewModal && (
+        <ProjectDetailModal
+          project={project}
+          onClose={() => setViewModal(false)}
+          onEdit={() => {
+            setViewModal(false);
+            setEditModal(true);
+          }}
         />
       )}
 

@@ -8,76 +8,116 @@ interface UserPermission {
   path: string;
 }
 
+// Routes that must always be reachable once a user is authenticated,
+// regardless of their menu permissions. Prevents redirect loops.
+const ALWAYS_ALLOWED_PATHS = new Set(["/unauthorized"]);
+
+function normalize(path: string): string {
+  return path.replace(/\/+$/, "") || "/";
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem("token");
+  sessionStorage.removeItem("token");
+}
+
 export default function ProtectedRoute() {
   useSessionTimeout();
   const location = useLocation();
 
   const token =
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("token");
+    localStorage.getItem("token") || sessionStorage.getItem("token");
 
   const [allowedPaths, setAllowedPaths] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-
-  const normalize = (path: string) => path.replace(/\/+$/, "") || "/";
+  const [authInvalid, setAuthInvalid] = useState(false);
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setAuthInvalid(false);
+
     const fetchPermissions = async () => {
       try {
         const res = await API.get("/api/roles/my-permissions");
         const data: UserPermission[] = res.data?.data ?? res.data;
 
+        if (!isMounted) return;
+
         if (Array.isArray(data)) {
           const normalizedPaths = data
             .map((p) => p?.path)
             .filter(Boolean)
-            .map((path) => normalize(path));
+            .map(normalize);
 
           setAllowedPaths(new Set(normalizedPaths));
         } else {
-          setAllowedPaths(new Set()); // deny all if invalid
+          setAllowedPaths(new Set());
         }
-      } catch (err) {
-        console.error("Permission load failed", err);
-        setAllowedPaths(new Set()); // deny all on error
+      } catch (err: any) {
+        if (!isMounted) return;
+
+        // Invalid/expired token -> force back to sign-in, not "unauthorized"
+        if (err?.response?.status === 401) {
+          clearAuthStorage();
+          setAuthInvalid(true);
+        } else {
+          console.error("Permission load failed", err);
+          setAllowedPaths(new Set()); // deny all on unexpected error
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    if (token) {
-      fetchPermissions();
-    } else {
-      setLoading(false);
-    }
+    fetchPermissions();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token]);
 
-  // 🔐 Not logged in
-  if (!token) {
-    return <Navigate to="/signin" replace />;
+  // Not logged in, or token turned out to be invalid
+  if (!token || authInvalid) {
+    return <Navigate to="/signin" replace state={{ from: location }} />;
   }
 
-  // ⏳ Still loading permissions
+  // Still loading permissions
   if (loading) {
-    return <div className="p-10 text-center"></div>;
+    return <div className="p-10 text-center">Loading...</div>;
   }
 
   const currentPath = normalize(location.pathname);
 
-const hasAccess = Array.from(allowedPaths).some((allowedPath) => {
-  const normalizedAllowed = normalize(allowedPath);
+  // Always let authenticated users reach these regardless of permissions
+  if (ALWAYS_ALLOWED_PATHS.has(currentPath)) {
+    return <Outlet />;
+  }
 
-  return (
-    currentPath === normalizedAllowed ||
-    currentPath.startsWith(normalizedAllowed + "/")
-  );
-});
+  const hasAccess = Array.from(allowedPaths).some((allowedPath) => {
+    return (
+      currentPath === allowedPath ||
+      currentPath.startsWith(allowedPath + "/")
+    );
+  });
 
-// 🚫 No access
-if (!hasAccess) {
-  return <Navigate to="/unauthorized" replace />;
-}
+  if (!hasAccess) {
+    return (
+      <Navigate
+        to="/unauthorized"
+        replace
+        state={{
+          noAccessAtAll: allowedPaths.size === 0,
+          attemptedPath: currentPath,
+        }}
+      />
+    );
+  }
 
-  // ✅ Allowed
   return <Outlet />;
 }

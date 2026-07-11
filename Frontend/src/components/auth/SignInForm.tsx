@@ -62,7 +62,7 @@ export default function SignInForm() {
     setAlert({
       variant: "error",
       title: "Login Failed",
-      message: "Invalid email or password.",
+      message: "Invalid user credentials.",
     });
   } finally {
     setLoading(false);
@@ -98,7 +98,7 @@ export default function SignInForm() {
             Sign In
           </h1>
           <p className="text-sm text-gray-500">
-            Enter your Username and password to sign in!
+            Enter your Username and Password to sign in!
           </p>
         </div>
 
@@ -146,9 +146,9 @@ export default function SignInForm() {
                 <Checkbox checked={remember} onChange={setRemember} />
                 <span className="text-sm text-gray-700">Keep me logged in</span>
               </div>
-              <Link to="/reset-password" className="text-sm text-brand-500">
+              {/* <Link to="/reset-password" className="text-sm text-brand-500">
                 Forgot password?
-              </Link>
+              </Link> */}
             </div>
 
             <Button className="w-full" size="sm" disabled={loading}>
