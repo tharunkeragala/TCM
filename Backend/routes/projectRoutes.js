@@ -5,6 +5,7 @@ const checkPermission = require("../middleware/checkPermission");
 const projectController = require("../controllers/projectController");
 const upload = require("../middleware/upload");
 const documentController = require("../controllers/documentController");
+const projectOverviewController = require("../controllers/projectOverviewController");
 
 const MENU = "/projects";
 
@@ -86,6 +87,13 @@ router.put(
     verifyToken,
     checkPermission(MENU, "can_edit"),
     documentController.restoreProjectDocument,
+  );
+
+  router.get(
+    "/:id/overview",
+    verifyToken,
+    checkPermission(MENU, "can_view"),
+    projectOverviewController.getProjectOverview,
   );
 
 module.exports = router;

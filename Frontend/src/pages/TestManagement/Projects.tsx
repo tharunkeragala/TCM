@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { Link } from "react-router";
 import {
   FaEdit,
   FaTrash,
@@ -92,7 +93,7 @@ const getToken = () =>
   localStorage.getItem("token") || sessionStorage.getItem("token");
 
 // ─── Reusable Toggle Switch ───────────────────────────────────────────────────
-function Toggle({
+export function Toggle({
   value,
   onChange,
   size = "sm",
@@ -128,7 +129,7 @@ function Toggle({
 }
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
-function DeleteModal({
+export function DeleteModal({
   title,
   name,
   warning,
@@ -225,7 +226,7 @@ function DeleteModal({
 }
 
 // ─── View Test Case Modal ─────────────────────────────────────────────────────
-function TestCaseViewModal({
+export function TestCaseViewModal({
   tc,
   onClose,
 }: {
@@ -352,7 +353,7 @@ function TestCaseViewModal({
 }
 
 // ─── Test Case Form Modal ─────────────────────────────────────────────────────
-function TestCaseFormModal({
+export function TestCaseFormModal({
   editing,
   suites,
   defaultSuiteId,
@@ -638,7 +639,7 @@ function TestCaseFormModal({
 }
 
 // ─── Suite Form Modal ─────────────────────────────────────────────────────────
-function SuiteFormModal({
+export function SuiteFormModal({
   editing,
   projects,
   defaultProjectId,
@@ -1276,9 +1277,14 @@ function ProjectAccordion({
             ) : (
               <FaFolder className="w-4 h-4 text-amber-500 flex-shrink-0" />
             )}
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+            <Link
+              to={`/projects/${project.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm font-semibold text-gray-900 dark:text-white hover:underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              title="Open project overview"
+            >
               {project.project_name}
-            </span>
+            </Link>
             <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
               {projectSuites.length}{" "}
               {projectSuites.length === 1 ? "suite" : "suites"} ·{" "}

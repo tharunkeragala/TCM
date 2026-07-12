@@ -72,7 +72,7 @@ const getToken = () =>
   localStorage.getItem("token") || sessionStorage.getItem("token");
 
 // ─── Create / Edit Sprint Modal ────────────────────────────────────────────
-function SprintFormModal({
+export function SprintFormModal({
   editing,
   projects,
   defaultProjectId,
@@ -283,7 +283,7 @@ function SprintFormModal({
 }
 
 // ─── Delete Confirm ─────────────────────────────────────────────────────────
-function DeleteSprintModal({
+export function DeleteSprintModal({
   sprint,
   onClose,
   onDeleted,

@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
+import ProjectOverview from "./pages/Projects/ProjectOverview";
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/AuthPages/SignIn"));
@@ -132,6 +133,7 @@ export default function App() {
               <Route path="/tasks/:id" element={<TaskDetails />} />
 
               <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/:id" element={<ProjectOverview />} />
               <Route path="/test-suites" element={<TestSuites />} />
               <Route path="/test-cases" element={<TestCases />} />
               <Route path="/test-cases/:id" element={<TestCaseDetails />} />

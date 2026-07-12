@@ -80,6 +80,7 @@ exports.getTasks = async (req, res) => {
       status,
       priority,
       assigned_to_me,
+      project_id,
       search,
       page = 1,
       limit = 10,
@@ -170,6 +171,11 @@ exports.getTasks = async (req, res) => {
             AND ta.user_id = @me
           )
         `;
+      }
+
+      if (project_id) {
+        request.input("project_id", sql.Int, project_id);
+        where += " AND t.project_id = @project_id";
       }
 
       if (search) {

@@ -127,6 +127,7 @@ app.use("/api/dropdown", require("./routes/dropdownRoute"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/sprints", require("./routes/sprintRoutes"));
+app.use("/api/permissions", require("./routes/permissions.routes"));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "Test Case Manager API" });
