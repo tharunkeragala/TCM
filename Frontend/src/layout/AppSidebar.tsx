@@ -37,37 +37,40 @@ interface UserPermission {
 
 const navItems: NavItem[] = [
   { icon: <GridIcon />, name: "Dashboard", path: "/home" },
+
+  { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
+
+  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+
+  { icon: <ListIcon />, name: "Projects", path: "/projects" },
+
+  { icon: <ListIcon />, name: "Tasks", path: "/tasks" },
+
   {
     name: "Test Repository",
     icon: <ListIcon />,
     subItems: [
-      { name: "Projects", path: "/projects" },
       { name: "Test Suites", path: "/test-suites" },
       { name: "Test Cases", path: "/test-cases" },
-      { name: "Sprint", path: "/sprints" },
+      // { name: "Recording", path: "/recordingengine" },
+      { name: "Recorder", path: "/script/recorder" },
+      { name: "Editor", path: "/script/editor" },
+      { name: "Runner", path: "/script/runner" },
+      { name: "Preview", path: "/script/preview" },
+      { name: "Sprints", path: "/sprints" },
+      // { name: "Sprint Board", path: "/sprintboard" },
     ],
   },
-  { icon: <ListIcon />, name: "Tasks", path: "/tasks" },
-  { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
-  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
-  {
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements" }],
-  },
+
   {
     name: "Reports",
     icon: <ListIcon />,
     subItems: [
-      { name: "User Reports", path: "/reports/users" },
-      { name: "Task Reports", path: "/reports/tasks" },
+      { name: "Users", path: "/reports/users" },
+      { name: "Tasks", path: "/reports/tasks" },
     ],
   },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables" }],
-  },
+
   {
     name: "System Configuration",
     icon: <ListIcon />,
@@ -76,14 +79,6 @@ const navItems: NavItem[] = [
       { name: "Roles", path: "/roles" },
       { name: "Departments", path: "/departments" },
       { name: "Teams", path: "/teams" },
-    ],
-  },
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Blank Page", path: "/blank" },
-      { name: "404 Error", path: "/error-404" },
     ],
   },
 ];

@@ -1085,10 +1085,10 @@ exports.deleteTask = async (req, res) => {
     }
 
     // Soft delete
-    await pool.request()
-  .input("id", sql.Int, id)
-  .input("updated_by", sql.Int, userId)
-  .query(`
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("updated_by", sql.Int, userId).query(`
     UPDATE tasks
     SET is_archived = 1,
         archived_at = GETDATE(),
@@ -1097,11 +1097,9 @@ exports.deleteTask = async (req, res) => {
     WHERE id = @id
   `);
 
-await pool.request()
-  .input("id", sql.Int, id)
-  .query(`
+    await pool.request().input("id", sql.Int, id).query(`
     UPDATE notifications
-    SET is_cancelled = 1
+    SET is_read = 1
     WHERE task_id = @id
   `);
 
