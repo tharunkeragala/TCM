@@ -86,7 +86,7 @@ export default function Home() {
 
   return (
     <div>
-      <PageMeta title="TCM — Dashboard" description="Test Case Manager" />
+      <PageMeta title="QUALTRIX | Dashboard" description="Test Case Manager" />
       <PageBreadcrumb pageTitle="Dashboard" />
 
       <style>{`

@@ -6,7 +6,7 @@ export default function SignIn() {
   return (
     <>
       <PageMeta
-        title="TCM - SignIn"
+        title="QUALTRIX | SignIn"
         description=""
       />
       <AuthLayout>
