@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   FaFilePdf, FaFileWord, FaFileExcel, FaFileImage, FaFileArchive, FaFileAlt,
-  FaDownload, FaTrash,
+  FaDownload, FaTrash, FaStickyNote,
 } from "react-icons/fa";
 import API from "../../services/api";
 import DocumentUploader from "../../components/common/DocumentUploader";
@@ -12,6 +12,15 @@ interface ProjectDoc {
   file_size: number;
   mime_type: string;
   uploaded_by_name?: string;
+  created_at: string;
+}
+
+interface ProjectNote {
+  id: number;
+  project_id: number;
+  note_text: string;
+  created_by?: number;
+  created_by_name?: string;
   created_at: string;
 }
 
@@ -42,10 +51,16 @@ export default function ProjectDetailModal({
   onClose: () => void;
   onEdit: () => void;
 }) {
-  const [tab, setTab] = useState<"overview" | "documents">("overview");
+  const [tab, setTab] = useState<"overview" | "documents" | "notes">("overview");
   const [docs, setDocs] = useState<ProjectDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const [notes, setNotes] = useState<ProjectNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
 
   const fetchDocs = useCallback(async () => {
     setLoadingDocs(true);
@@ -62,6 +77,53 @@ export default function ProjectDetailModal({
   useEffect(() => {
     fetchDocs();
   }, [fetchDocs]);
+
+  const fetchNotes = useCallback(async () => {
+    setLoadingNotes(true);
+    try {
+      const res = await API.get(`/api/projects/${project.id}/notes`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.data.success) setNotes(res.data.data);
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, [project.id]);
+
+  useEffect(() => {
+    if (tab === "notes" && notes.length === 0) fetchNotes();
+  }, [tab, notes.length, fetchNotes]);
+
+  const handleAddNote = async () => {
+    const text = newNote.trim();
+    if (!text) return;
+    setAddingNote(true);
+    try {
+      const res = await API.post(
+        `/api/projects/${project.id}/notes`,
+        { note_text: text },
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      if (res.data.success) {
+        setNotes((prev) => [res.data.data, ...prev]);
+        setNewNote("");
+      }
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (note: ProjectNote) => {
+    setDeletingNoteId(note.id);
+    try {
+      await API.delete(`/api/projects/notes/${note.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
 
   const handleDownload = async (doc: ProjectDoc) => {
     const res = await API.get(`/api/projects/documents/${doc.id}/download`, {
@@ -110,7 +172,7 @@ export default function ProjectDetailModal({
         </div>
 
         <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-gray-700">
-          {(["overview", "documents"] as const).map((t) => (
+          {(["overview", "documents", "notes"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -120,7 +182,11 @@ export default function ProjectDetailModal({
                   : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
               }`}
             >
-              {t === "overview" ? "Overview" : `Documents (${docs.length})`}
+              {t === "overview"
+                ? "Overview"
+                : t === "documents"
+                ? `Documents (${docs.length})`
+                : `Notes (${notes.length})`}
             </button>
           ))}
         </div>
@@ -176,6 +242,67 @@ export default function ProjectDetailModal({
                     <button
                       onClick={() => handleDelete(doc)}
                       disabled={deletingId === doc.id}
+                      className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50"
+                      title="Delete"
+                    >
+                      <FaTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === "notes" && (
+          <div>
+            <div className="flex gap-2">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleAddNote();
+                  }
+                }}
+                placeholder="Jot down a note… (Ctrl/Cmd + Enter to save)"
+                rows={2}
+                className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleAddNote}
+                disabled={addingNote || !newNote.trim()}
+                className="self-end px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg"
+              >
+                {addingNote ? "Adding…" : "Add"}
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {loadingNotes ? (
+                <p className="text-sm text-gray-400 text-center py-4">Loading notes…</p>
+              ) : notes.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4 italic">No notes yet.</p>
+              ) : (
+                notes.map((note) => (
+                  <div
+                    key={note.id}
+                    className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+                  >
+                    <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
+                        {note.note_text}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {note.created_by_name || "Unknown"} ·{" "}
+                        {new Date(note.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteNote(note)}
+                      disabled={deletingNoteId === note.id}
                       className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50"
                       title="Delete"
                     >

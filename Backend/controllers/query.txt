@@ -1,0 +1,16 @@
+-- Run once against test_case_manager
+
+CREATE TABLE test_case_manager.dbo.project_notes (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    project_id  INT NOT NULL,
+    note_text   VARCHAR(MAX) NOT NULL,
+    created_by  INT NULL,
+    created_at  DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_project_notes_project FOREIGN KEY (project_id)
+        REFERENCES test_case_manager.dbo.projects(id) ON DELETE CASCADE,
+    CONSTRAINT FK_project_notes_user FOREIGN KEY (created_by)
+        REFERENCES test_case_manager.dbo.users(id)
+);
+
+CREATE INDEX IX_project_notes_project_id
+    ON test_case_manager.dbo.project_notes(project_id);

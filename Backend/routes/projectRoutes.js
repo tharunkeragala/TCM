@@ -6,6 +6,7 @@ const projectController = require("../controllers/projectController");
 const upload = require("../middleware/upload");
 const documentController = require("../controllers/documentController");
 const projectOverviewController = require("../controllers/projectOverviewController");
+  const projectNotesController = require("../controllers/projectNotesController");
 
 const MENU = "/projects";
 
@@ -95,5 +96,11 @@ router.put(
     checkPermission(MENU, "can_view"),
     projectOverviewController.getProjectOverview,
   );
+
+
+
+router.get("/:id/notes", verifyToken, checkPermission(MENU, "can_view"), projectNotesController.getProjectNotes);
+router.post("/:id/notes", verifyToken, checkPermission(MENU, "can_edit"), projectNotesController.createProjectNote);
+router.delete("/notes/:noteId", verifyToken, checkPermission(MENU, "can_edit"), projectNotesController.deleteProjectNote);
 
 module.exports = router;

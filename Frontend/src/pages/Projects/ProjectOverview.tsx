@@ -21,6 +21,7 @@ import {
   FaPlay,
   FaCheckCircle,
   FaCalendarAlt,
+  FaStickyNote,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -125,6 +126,15 @@ interface ProjectDoc {
   file_size: number;
   mime_type: string;
   uploaded_by_name?: string;
+  created_at: string;
+}
+
+interface ProjectNote {
+  id: number;
+  project_id: number;
+  note_text: string;
+  created_by?: number;
+  created_by_name?: string;
   created_at: string;
 }
 
@@ -363,7 +373,7 @@ export default function ProjectOverview() {
   ) => can("/sprints", a);
 
   // Only the four list sections are tabbed now — stats, breakdown bars,
-  // assignees, and documents stay always-visible as they were.
+  // assignees, documents, and notes stay always-visible as they were.
   const [mainTab, setMainTab] = useState<
     "suites" | "cases" | "sprints" | "tasks"
   >("suites");
@@ -453,6 +463,60 @@ export default function ProjectOverview() {
       fetchOverview();
     } finally {
       setDeletingDocId(null);
+    }
+  };
+
+  // ── Notes (loaded eagerly — right-rail panel, same pattern as Documents) ───
+  const [notes, setNotes] = useState<ProjectNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(true);
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
+
+  const fetchNotes = useCallback(async () => {
+    setLoadingNotes(true);
+    try {
+      const res = await API.get(`/api/projects/${id}/notes`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.data.success) setNotes(res.data.data);
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  const handleAddNote = async () => {
+    const text = newNote.trim();
+    if (!text) return;
+    setAddingNote(true);
+    try {
+      const res = await API.post(
+        `/api/projects/${id}/notes`,
+        { note_text: text },
+        { headers: { Authorization: `Bearer ${getToken()}` } },
+      );
+      if (res.data.success) {
+        setNotes((prev) => [res.data.data, ...prev]);
+        setNewNote("");
+      }
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (note: ProjectNote) => {
+    setDeletingNoteId(note.id);
+    try {
+      await API.delete(`/api/projects/notes/${note.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+    } finally {
+      setDeletingNoteId(null);
     }
   };
 
@@ -1239,6 +1303,74 @@ export default function ProjectOverview() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Notes */}
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
+              <FaStickyNote className="w-3.5 h-3.5" /> Notes ({notes.length})
+            </p>
+
+            <div className="flex gap-2">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleAddNote();
+                  }
+                }}
+                placeholder="Jot down a note… (Ctrl/Cmd + Enter to save)"
+                rows={2}
+                className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleAddNote}
+                disabled={addingNote || !newNote.trim()}
+                className="self-end px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg"
+              >
+                {addingNote ? "Adding…" : "Add"}
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {loadingNotes ? (
+                <p className="text-sm text-gray-400 text-center py-4">
+                  Loading notes…
+                </p>
+              ) : notes.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4 italic">
+                  No notes yet.
+                </p>
+              ) : (
+                notes.map((note) => (
+                  <div
+                    key={note.id}
+                    className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+                  >
+                    <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
+                        {note.note_text}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {note.created_by_name || "Unknown"} ·{" "}
+                        {new Date(note.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteNote(note)}
+                      disabled={deletingNoteId === note.id}
+                      className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
+                      title="Delete"
+                    >
+                      <FaTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           {/* Documents */}
