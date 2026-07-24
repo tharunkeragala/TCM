@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import API from "../services/api";
 
 interface ApiResponse<T> {
   success: boolean;
   data: T;
+  message?: string;
 }
 
 export default function useFetchWithAuth<T>(url: string) {
@@ -11,11 +12,7 @@ export default function useFetchWithAuth<T>(url: string) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  useEffect(() => {
-    fetchData();
-  }, [url]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -26,7 +23,6 @@ export default function useFetchWithAuth<T>(url: string) {
 
       if (!token) {
         setError("User not authenticated");
-        setLoading(false);
         return;
       }
 
@@ -36,17 +32,18 @@ export default function useFetchWithAuth<T>(url: string) {
         },
       });
 
-      // ✅ Handle both formats safely
       const responseData: any = res.data.data;
 
+      // Supports:
+      // { success: true, data: [...] }
+      // { success: true, data: { data: [...] } }
       if (Array.isArray(responseData)) {
         setData(responseData as T);
-      } else if (responseData?.data) {
+      } else if (responseData?.data !== undefined) {
         setData(responseData.data as T);
       } else {
         setData(responseData as T);
       }
-
     } catch (err: any) {
       console.error(`Error fetching ${url}:`, err);
 
@@ -55,12 +52,24 @@ export default function useFetchWithAuth<T>(url: string) {
       } else if (err.response?.status === 401) {
         setError("Unauthorized. Please login again.");
       } else {
-        setError("Failed to load data.");
+        setError(
+          err.response?.data?.message ||
+            "Failed to load data.",
+        );
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [url]);
 
-  return { data, loading, error, refetch: fetchData };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return {
+    data,
+    loading,
+    error,
+    refetch: fetchData,
+  };
 }

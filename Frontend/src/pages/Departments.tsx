@@ -14,18 +14,29 @@ interface Department {
   department_head_name?: string;
 }
 
+interface User {
+  id: number;
+  username?: string;
+  full_name?: string;
+  email?: string;
+}
+
 export default function Departments() {
   const {
     data: departments,
     loading,
     error,
+    refetch: refetchDepartments,
   } = useFetchWithAuth<Department[]>("/api/departments");
 
-    const { data: users } = useFetchWithAuth<any[]>("/api/dropdown/users");
-  
+  const {
+    data: users,
+    refetch: refetchUsers,
+  } = useFetchWithAuth<User[]>("/api/dropdown/users");
 
   const [showModal, setShowModal] = useState(false);
-  const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [editingDept, setEditingDept] =
+    useState<Department | null>(null);
 
   const [formData, setFormData] = useState({
     department_name: "",
@@ -40,20 +51,78 @@ export default function Departments() {
     message: string;
   } | null>(null);
 
-  // ✅ DELETE CONFIRMATION MODAL STATE
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletingDept, setDeletingDept] = useState<Department | null>(null);
+  const [showDeleteModal, setShowDeleteModal] =
+    useState(false);
+
+  const [deletingDept, setDeletingDept] =
+    useState<Department | null>(null);
+
   const [deleteAlert, setDeleteAlert] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const [assignedUserCount, setAssignedUserCount] = useState<number>(0);
-  const [deletingInProgress, setDeletingInProgress] = useState(false);
 
-  // ✅ CREATE / UPDATE
+  const [assignedUserCount, setAssignedUserCount] =
+    useState<number>(0);
+
+  const [deletingInProgress, setDeletingInProgress] =
+    useState(false);
+
+  const [togglingDepartmentId, setTogglingDepartmentId] =
+    useState<number | null>(null);
+
+  const getToken = () => {
+    return (
+      localStorage.getItem("token") ||
+      sessionStorage.getItem("token")
+    );
+  };
+
+  const handleOpenCreateModal = () => {
+    setEditingDept(null);
+
+    setFormData({
+      department_name: "",
+      is_active: true,
+      department_head_id: "",
+    });
+
+    setFormAlert(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingDept(null);
+
+    setFormData({
+      department_name: "",
+      is_active: true,
+      department_head_id: "",
+    });
+
+    setFormAlert(null);
+  };
+
+  // CREATE / UPDATE
   const handleSave = async () => {
     if (!formData.department_name.trim()) {
-      setFormAlert({ type: "error", message: "Department name is required." });
+      setFormAlert({
+        type: "error",
+        message: "Department name is required.",
+      });
+
+      return;
+    }
+
+    const token = getToken();
+
+    if (!token) {
+      setFormAlert({
+        type: "error",
+        message: "User not authenticated.",
+      });
+
       return;
     }
 
@@ -61,26 +130,31 @@ export default function Departments() {
     setFormAlert(null);
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-
       const url = editingDept
         ? `/api/departments/update/${editingDept.id}`
         : "/api/departments/create";
 
-      const method = editingDept ? API.put : API.post;
-
       const payload = {
-        ...formData,
+        department_name:
+          formData.department_name.trim(),
+        is_active: formData.is_active,
         department_head_id:
           formData.department_head_id === ""
             ? null
             : formData.department_head_id,
       };
 
-      const res = await method(url, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = editingDept
+        ? await API.put(url, payload, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        : await API.post(url, payload, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
 
       if (res.data.success) {
         setFormAlert({
@@ -90,138 +164,234 @@ export default function Departments() {
             : "Department created successfully!",
         });
 
+        // Reload only API data, not the page
+        await Promise.all([
+          refetchDepartments(),
+          refetchUsers(),
+        ]);
+
         setTimeout(() => {
           handleCloseModal();
-          window.location.reload();
-        }, 1200);
+        }, 1000);
+      } else {
+        setFormAlert({
+          type: "error",
+          message:
+            res.data.message || "Operation failed.",
+        });
       }
     } catch (err: any) {
-      const message = err.response?.data?.message || "Operation failed.";
-      setFormAlert({ type: "error", message });
+      const message =
+        err.response?.data?.message ||
+        "Operation failed.";
+
+      setFormAlert({
+        type: "error",
+        message,
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ✅ EDIT
+  // EDIT
   const handleEdit = (dept: Department) => {
     setEditingDept(dept);
+
     setFormData({
       department_name: dept.department_name,
       is_active: dept.is_active,
-      department_head_id: dept.department_head_id ?? "",
+      department_head_id:
+        dept.department_head_id ?? "",
     });
+
+    setFormAlert(null);
     setShowModal(true);
   };
 
-  // ✅ OPEN DELETE CONFIRMATION MODAL
-  const handleDeleteClick = async (dept: Department) => {
+  // OPEN DELETE MODAL
+  const handleDeleteClick = async (
+    dept: Department,
+  ) => {
     setDeletingDept(dept);
     setDeleteAlert(null);
     setAssignedUserCount(0);
+    setShowDeleteModal(true);
+
+    const token = getToken();
+
+    if (!token) {
+      setDeleteAlert({
+        type: "error",
+        message: "User not authenticated.",
+      });
+
+      return;
+    }
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-
-      const res = await API.get(`/api/departments/${dept.id}/assigned-users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await API.get(
+        `/api/departments/${dept.id}/assigned-users`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
       if (res.data.success) {
         setAssignedUserCount(res.data.count ?? 0);
       }
-    } catch {
+    } catch (err) {
+      console.error(
+        "Failed to retrieve assigned user count:",
+        err,
+      );
+
       setAssignedUserCount(0);
     }
-
-    setShowDeleteModal(true);
   };
 
-  // ✅ CONFIRM DELETE
+  // CONFIRM DELETE
   const handleConfirmDelete = async () => {
-    if (!deletingDept) return;
+    if (!deletingDept) {
+      return;
+    }
+
+    const token = getToken();
+
+    if (!token) {
+      setDeleteAlert({
+        type: "error",
+        message: "User not authenticated.",
+      });
+
+      return;
+    }
 
     setDeletingInProgress(true);
     setDeleteAlert(null);
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await API.delete(
+        `/api/departments/delete/${deletingDept.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-      await API.delete(`/api/departments/delete/${deletingDept.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (res.data.success === false) {
+        setDeleteAlert({
+          type: "error",
+          message:
+            res.data.message ||
+            "Failed to delete department.",
+        });
+
+        return;
+      }
 
       setDeleteAlert({
         type: "success",
         message: "Department deleted successfully.",
       });
 
+      // Reload only department and user data
+      await Promise.all([
+        refetchDepartments(),
+        refetchUsers(),
+      ]);
+
       setTimeout(() => {
-        setShowDeleteModal(false);
-        setDeletingDept(null);
-        setDeleteAlert(null);
-        window.location.reload();
-      }, 1200);
+        handleCloseDeleteModal();
+      }, 1000);
     } catch (err: any) {
       const message =
-        err.response?.data?.message || "Failed to delete department.";
-      setDeleteAlert({ type: "error", message });
+        err.response?.data?.message ||
+        "Failed to delete department.";
+
+      setDeleteAlert({
+        type: "error",
+        message,
+      });
     } finally {
       setDeletingInProgress(false);
     }
   };
 
   const handleCloseDeleteModal = () => {
+    if (deletingInProgress) {
+      return;
+    }
+
     setShowDeleteModal(false);
     setDeletingDept(null);
     setDeleteAlert(null);
     setAssignedUserCount(0);
   };
 
-  // ✅ TOGGLE ACTIVE
-  const handleToggleStatus = async (dept: Department) => {
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
+  // TOGGLE ACTIVE STATUS
+  const handleToggleStatus = async (
+    dept: Department,
+  ) => {
+    const token = getToken();
 
-      await API.put(
+    if (!token || togglingDepartmentId !== null) {
+      return;
+    }
+
+    setTogglingDepartmentId(dept.id);
+
+    try {
+      const res = await API.put(
         `/api/departments/toggle/${dept.id}`,
-        { is_active: !dept.is_active },
-        { headers: { Authorization: `Bearer ${token}` } },
+        {
+          is_active: !dept.is_active,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
 
-      window.location.reload();
-    } catch {
-      // no-op
-    }
-  };
+      if (res.data.success === false) {
+        console.error(
+          res.data.message ||
+            "Failed to update department status.",
+        );
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingDept(null);
-    setFormData({
-      department_name: "",
-      is_active: true,
-      department_head_id: "",
-    });
-    setFormAlert(null);
+        return;
+      }
+
+      // Reload only department data
+      await refetchDepartments();
+    } catch (err) {
+      console.error(
+        "Failed to update department status:",
+        err,
+      );
+    } finally {
+      setTogglingDepartmentId(null);
+    }
   };
 
   return (
     <div>
-      <PageMeta title="Departments" description="Departments page" />
+      <PageMeta
+        title="Departments"
+        description="Departments page"
+      />
+
       <PageBreadcrumb pageTitle="Departments" />
 
       <div className="mt-4">
-        {/* Top bar */}
         <div className="flex justify-end mb-4">
           <button
-            onClick={() => {
-              setEditingDept(null);
-              setShowModal(true);
-            }}
+            type="button"
+            onClick={handleOpenCreateModal}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-150"
           >
             + Create Department
@@ -230,7 +400,11 @@ export default function Departments() {
 
         {error && (
           <div className="mb-4">
-            <Alert variant="error" title="Error" message={error} />
+            <Alert
+              variant="error"
+              title="Error"
+              message={error}
+            />
           </div>
         )}
 
@@ -246,81 +420,131 @@ export default function Departments() {
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-5 py-3">#</th>
-                  <th className="px-5 py-3">Department Name</th>
+                  <th className="px-5 py-3">
+                    Department Name
+                  </th>
                   <th className="px-5 py-3">Head</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Active</th>
-                  <th className="px-5 py-3">Actions</th>
+                  <th className="px-5 py-3">
+                    Status
+                  </th>
+                  <th className="px-5 py-3">
+                    Active
+                  </th>
+                  <th className="px-5 py-3">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
-                {departments && departments.length > 0 ? (
-                  departments.map((dept, index) => (
-                    <tr
-                      key={dept.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
-                    >
-                      <td className="px-5 py-3">{index + 1}</td>
+                {departments &&
+                departments.length > 0 ? (
+                  departments.map(
+                    (dept, index) => {
+                      const isToggling =
+                        togglingDepartmentId ===
+                        dept.id;
 
-                      <td className="px-5 py-3">{dept.department_name}</td>
-
-                      {/* Department Head */}
-                      <td className="px-5 py-3">
-                        {dept.department_head_name || (
-                          <span className="text-gray-400 text-xs">
-                            Not assigned
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Status Badge */}
-                      <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            dept.is_active
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                          }`}
+                      return (
+                        <tr
+                          key={dept.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
                         >
-                          {dept.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
+                          <td className="px-5 py-3">
+                            {index + 1}
+                          </td>
 
-                      {/* Toggle Column */}
-                      <td className="px-5 py-3">
-                        <button
-                          onClick={() => handleToggleStatus(dept)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                            dept.is_active
-                              ? "bg-blue-600"
-                              : "bg-gray-300 dark:bg-gray-600"
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                              dept.is_active ? "translate-x-6" : "translate-x-1"
-                            }`}
-                          />
-                        </button>
-                      </td>
+                          <td className="px-5 py-3">
+                            {dept.department_name}
+                          </td>
 
-                      {/* Actions Column */}
-                      <td className="px-5 py-3 flex gap-3 items-center">
-                        <FaEdit
-                          className="cursor-pointer text-blue-600"
-                          onClick={() => handleEdit(dept)}
-                        />
-                        <FaTrash
-                          className="cursor-pointer text-red-600"
-                          onClick={() => handleDeleteClick(dept)}
-                        />
-                      </td>
-                    </tr>
-                  ))
+                          <td className="px-5 py-3">
+                            {dept.department_head_name || (
+                              <span className="text-gray-400 text-xs">
+                                Not assigned
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-5 py-3">
+                            <span
+                              className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                dept.is_active
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                  : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                              }`}
+                            >
+                              {dept.is_active
+                                ? "Active"
+                                : "Inactive"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-3">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={
+                                dept.is_active
+                              }
+                              aria-label={`Toggle ${dept.department_name} status`}
+                              disabled={isToggling}
+                              onClick={() =>
+                                handleToggleStatus(
+                                  dept,
+                                )
+                              }
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                                dept.is_active
+                                  ? "bg-blue-600"
+                                  : "bg-gray-300 dark:bg-gray-600"
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                                  dept.is_active
+                                    ? "translate-x-6"
+                                    : "translate-x-1"
+                                }`}
+                              />
+                            </button>
+                          </td>
+
+                          <td className="px-5 py-3">
+                            <div className="flex gap-3 items-center">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEdit(dept)
+                                }
+                                aria-label={`Edit ${dept.department_name}`}
+                              >
+                                <FaEdit className="cursor-pointer text-blue-600" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteClick(
+                                    dept,
+                                  )
+                                }
+                                aria-label={`Delete ${dept.department_name}`}
+                              >
+                                <FaTrash className="cursor-pointer text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    },
+                  )
                 ) : (
                   <tr>
-                    <td colSpan={6} className="text-center py-5 text-gray-500">
+                    <td
+                      colSpan={6}
+                      className="text-center py-5 text-gray-500"
+                    >
                       No departments found
                     </td>
                   </tr>
@@ -331,17 +555,22 @@ export default function Departments() {
         )}
       </div>
 
-      {/* ✅ CREATE / EDIT MODAL */}
+      {/* CREATE / EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {editingDept ? "Edit Department" : "Create Department"}
+                {editingDept
+                  ? "Edit Department"
+                  : "Create Department"}
               </h2>
+
               <button
+                type="button"
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+                disabled={submitting}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold disabled:opacity-50"
               >
                 &times;
               </button>
@@ -351,7 +580,11 @@ export default function Departments() {
               <div className="mb-4">
                 <Alert
                   variant={formAlert.type}
-                  title={formAlert.type === "success" ? "Success" : "Error"}
+                  title={
+                    formAlert.type === "success"
+                      ? "Success"
+                      : "Error"
+                  }
                   message={formAlert.message}
                 />
               </div>
@@ -359,16 +592,25 @@ export default function Departments() {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Department Name <span className="text-red-500">*</span>
+                Department Name{" "}
+                <span className="text-red-500">
+                  *
+                </span>
               </label>
+
               <input
                 type="text"
                 value={formData.department_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, department_name: e.target.value })
+                disabled={submitting}
+                onChange={(event) =>
+                  setFormData((previous) => ({
+                    ...previous,
+                    department_name:
+                      event.target.value,
+                  }))
                 }
                 placeholder="e.g. Engineering"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
             </div>
 
@@ -378,22 +620,36 @@ export default function Departments() {
               </label>
 
               <select
-                value={formData.department_head_id}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    department_head_id: e.target.value
-                      ? Number(e.target.value)
-                      : "",
-                  })
+                value={
+                  formData.department_head_id
                 }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                disabled={submitting}
+                onChange={(event) =>
+                  setFormData((previous) => ({
+                    ...previous,
+                    department_head_id:
+                      event.target.value
+                        ? Number(
+                            event.target.value,
+                          )
+                        : "",
+                  }))
+                }
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm disabled:opacity-60"
               >
-                <option value="">-- Select Head --</option>
+                <option value="">
+                  -- Select Head --
+                </option>
 
                 {users?.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.username || user.full_name || user.email}
+                  <option
+                    key={user.id}
+                    value={user.id}
+                  >
+                    {user.username ||
+                      user.full_name ||
+                      user.email ||
+                      `User ${user.id}`}
                   </option>
                 ))}
               </select>
@@ -403,36 +659,53 @@ export default function Departments() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Active
               </span>
+
               <button
+                type="button"
+                role="switch"
+                aria-checked={formData.is_active}
+                disabled={submitting}
                 onClick={() =>
-                  setFormData({ ...formData, is_active: !formData.is_active })
+                  setFormData((previous) => ({
+                    ...previous,
+                    is_active:
+                      !previous.is_active,
+                  }))
                 }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full ${
+                className={`relative inline-flex h-6 w-11 items-center rounded-full disabled:opacity-60 ${
                   formData.is_active
                     ? "bg-blue-600"
                     : "bg-gray-300 dark:bg-gray-600"
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white ${
-                    formData.is_active ? "translate-x-6" : "translate-x-1"
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.is_active
+                      ? "translate-x-6"
+                      : "translate-x-1"
                   }`}
                 />
               </button>
+
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                {formData.is_active ? "Active" : "Inactive"}
+                {formData.is_active
+                  ? "Active"
+                  : "Inactive"}
               </span>
             </div>
 
             <div className="flex justify-end gap-3">
               <button
+                type="button"
                 onClick={handleCloseModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
+                disabled={submitting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150 disabled:opacity-60"
               >
                 Cancel
               </button>
 
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={submitting}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
@@ -450,35 +723,42 @@ export default function Departments() {
         </div>
       )}
 
-      {/* ✅ DELETE CONFIRMATION MODAL — matches Roles style exactly */}
+      {/* DELETE MODAL */}
       {showDeleteModal && deletingDept && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-            {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Delete Department
               </h2>
+
               <button
-                onClick={handleCloseDeleteModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+                type="button"
+                onClick={
+                  handleCloseDeleteModal
+                }
+                disabled={deletingInProgress}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold disabled:opacity-50"
               >
                 &times;
               </button>
             </div>
 
-            {/* Alert (success or error) */}
             {deleteAlert && (
               <div className="mb-4">
                 <Alert
                   variant={deleteAlert.type}
-                  title={deleteAlert.type === "success" ? "Success" : "Error"}
+                  title={
+                    deleteAlert.type ===
+                    "success"
+                      ? "Success"
+                      : "Error"
+                  }
                   message={deleteAlert.message}
                 />
               </div>
             )}
 
-            {/* Warning icon + message — same structure as Roles delete modal */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
                 <svg
@@ -495,51 +775,70 @@ export default function Departments() {
                   />
                 </svg>
               </div>
+
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Are you sure you want to delete department{" "}
+                  Are you sure you want to delete
+                  department{" "}
                   <span className="font-semibold text-gray-900 dark:text-white">
-                    {deletingDept.department_name}
+                    {
+                      deletingDept.department_name
+                    }
                   </span>
-                  ? This will also remove all its associations and cannot be
+                  ? This will also remove all its
+                  associations and cannot be
                   undone.
                 </p>
 
-                {/* ✅ Assigned users warning */}
                 {assignedUserCount > 0 && (
                   <div className="mt-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700">
                     <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
                       ⚠️ {assignedUserCount} user
-                      {assignedUserCount > 1 ? "s are" : " is"} currently
-                      assigned to this department.
+                      {assignedUserCount > 1
+                        ? "s are"
+                        : " is"}{" "}
+                      currently assigned to this
+                      department.
                     </p>
+
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                       Proceeding will detach{" "}
-                      {assignedUserCount > 1 ? "these users" : "this user"} from
-                      the department. You will need to reassign them to another
-                      department afterwards.
+                      {assignedUserCount > 1
+                        ? "these users"
+                        : "this user"}{" "}
+                      from the department. You will
+                      need to reassign{" "}
+                      {assignedUserCount > 1
+                        ? "them"
+                        : "the user"}{" "}
+                      afterwards.
                     </p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Footer buttons */}
             <div className="flex justify-end gap-3">
               <button
-                onClick={handleCloseDeleteModal}
+                type="button"
+                onClick={
+                  handleCloseDeleteModal
+                }
                 disabled={deletingInProgress}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150 disabled:opacity-60"
               >
                 Cancel
               </button>
 
               <button
+                type="button"
                 onClick={handleConfirmDelete}
                 disabled={deletingInProgress}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg transition duration-150"
               >
-                {deletingInProgress ? "Deleting..." : "Yes, Delete"}
+                {deletingInProgress
+                  ? "Deleting..."
+                  : "Yes, Delete"}
               </button>
             </div>
           </div>

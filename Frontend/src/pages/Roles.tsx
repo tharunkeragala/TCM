@@ -47,7 +47,7 @@ export default function Roles() {
     data: roles,
     loading,
     error,
-    refetch,
+    refetch: refetchRoles,
   } = useFetchWithAuth<Role[]>("/api/roles");
 
   // ─── Permissions State ────────────────────────────────────────────────────
@@ -299,20 +299,35 @@ export default function Roles() {
       setCreateAlert({ type: "error", message: "Role name is required." });
       return;
     }
+
     setCreating(true);
     setCreateAlert(null);
+
     try {
-      await API.post("/api/roles/create", { role_name: createName.trim() });
+      const res = await API.post("/api/roles/create", {
+        role_name: createName.trim(),
+      });
+
+      if (res.data.success === false) {
+        setCreateAlert({
+          type: "error",
+          message: res.data.message || "Failed to create role.",
+        });
+        return;
+      }
+
       setCreateAlert({
         type: "success",
         message: "Role created successfully.",
       });
+
+      await refetchRoles();
+
       setTimeout(() => {
         setShowCreateModal(false);
         setCreateName("");
         setCreateAlert(null);
-        refetch();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setCreateAlert({
         type: "error",
@@ -332,24 +347,39 @@ export default function Roles() {
   };
 
   const handleEdit = async () => {
+    if (!editRole) return;
+
     if (!editName.trim()) {
       setEditAlert({ type: "error", message: "Role name is required." });
       return;
     }
+
     setEditing(true);
     setEditAlert(null);
+
     try {
-      await API.put(`/api/roles/${editRole?.id}`, {
+      const res = await API.put(`/api/roles/${editRole.id}`, {
         role_name: editName.trim(),
       });
+
+      if (res.data.success === false) {
+        setEditAlert({
+          type: "error",
+          message: res.data.message || "Failed to update role.",
+        });
+        return;
+      }
+
       setEditAlert({ type: "success", message: "Role updated successfully." });
+
+      await refetchRoles();
+
       setTimeout(() => {
         setShowEditModal(false);
         setEditRole(null);
         setEditName("");
         setEditAlert(null);
-        refetch();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setEditAlert({
         type: "error",
@@ -380,22 +410,41 @@ export default function Roles() {
 
   // ─── Confirm Delete ───────────────────────────────────────────────────────
   const handleDelete = async () => {
+    if (!deleteRole) return;
+
     setDeleting(true);
     setDeleteAlert(null);
+
     try {
-      await API.delete(`/api/roles/${deleteRole?.id}`);
+      const deletedRoleId = deleteRole.id;
+      const res = await API.delete(`/api/roles/${deletedRoleId}`);
+
+      if (res.data.success === false) {
+        setDeleteAlert({
+          type: "error",
+          message: res.data.message || "Failed to delete role.",
+        });
+        return;
+      }
+
       setDeleteAlert({
         type: "success",
         message: "Role deleted successfully.",
       });
+
+      if (selectedRoleId === deletedRoleId) {
+        setSelectedRoleId(null);
+        setPermissions({});
+      }
+
+      await refetchRoles();
+
       setTimeout(() => {
         setShowDeleteModal(false);
         setDeleteRole(null);
         setDeleteAlert(null);
         setAssignedUserCount(0);
-        if (selectedRoleId === deleteRole?.id) setSelectedRoleId(null);
-        refetch();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setDeleteAlert({
         type: "error",

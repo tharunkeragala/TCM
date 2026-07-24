@@ -25,10 +25,12 @@ export default function Teams() {
     data: teams,
     loading,
     error,
+    refetch: refetchTeams,
   } = useFetchWithAuth<Team[]>("/api/teams");
 
   const {
     data: departments,
+    refetch: refetchDepartments,
   } = useFetchWithAuth<Department[]>("/api/dropdown/departments");
 
   const [showModal, setShowModal] = useState(false);
@@ -47,25 +49,75 @@ export default function Teams() {
     message: string;
   } | null>(null);
 
-  // ✅ DELETE CONFIRMATION MODAL STATE
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null);
+
   const [deleteAlert, setDeleteAlert] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const [assignedUserCount, setAssignedUserCount] = useState<number>(0);
+
+  const [assignedUserCount, setAssignedUserCount] = useState(0);
   const [deletingInProgress, setDeletingInProgress] = useState(false);
 
-  // ✅ CREATE / UPDATE
+  const [togglingTeamId, setTogglingTeamId] = useState<number | null>(null);
+
+  const getToken = () =>
+    localStorage.getItem("token") || sessionStorage.getItem("token");
+
+  const handleOpenCreateModal = () => {
+    setEditingTeam(null);
+
+    setFormData({
+      team_name: "",
+      department_id: 0,
+      is_active: true,
+    });
+
+    setFormAlert(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingTeam(null);
+
+    setFormData({
+      team_name: "",
+      department_id: 0,
+      is_active: true,
+    });
+
+    setFormAlert(null);
+  };
+
   const handleSave = async () => {
     if (!formData.team_name.trim()) {
-      setFormAlert({ type: "error", message: "Team name is required." });
+      setFormAlert({
+        type: "error",
+        message: "Team name is required.",
+      });
+
       return;
     }
 
     if (!formData.department_id) {
-      setFormAlert({ type: "error", message: "Department is required." });
+      setFormAlert({
+        type: "error",
+        message: "Department is required.",
+      });
+
+      return;
+    }
+
+    const token = getToken();
+
+    if (!token) {
+      setFormAlert({
+        type: "error",
+        message: "User not authenticated.",
+      });
+
       return;
     }
 
@@ -73,18 +125,27 @@ export default function Teams() {
     setFormAlert(null);
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-
       const url = editingTeam
         ? `/api/teams/update/${editingTeam.id}`
         : "/api/teams/create";
 
-      const method = editingTeam ? API.put : API.post;
+      const payload = {
+        team_name: formData.team_name.trim(),
+        department_id: formData.department_id,
+        is_active: formData.is_active,
+      };
 
-      const res = await method(url, formData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = editingTeam
+        ? await API.put(url, payload, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        : await API.post(url, payload, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
 
       if (res.data.success) {
         setFormAlert({
@@ -94,119 +155,195 @@ export default function Teams() {
             : "Team created successfully!",
         });
 
+        await Promise.all([
+          refetchTeams(),
+          refetchDepartments(),
+        ]);
+
         setTimeout(() => {
           handleCloseModal();
-          window.location.reload();
-        }, 1200);
+        }, 1000);
+      } else {
+        setFormAlert({
+          type: "error",
+          message: res.data.message || "Operation failed.",
+        });
       }
     } catch (err: any) {
-      const message = err.response?.data?.message || "Operation failed.";
-      setFormAlert({ type: "error", message });
+      const message =
+        err.response?.data?.message || "Operation failed.";
+
+      setFormAlert({
+        type: "error",
+        message,
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ✅ EDIT
   const handleEdit = (team: Team) => {
     setEditingTeam(team);
+
     setFormData({
       team_name: team.team_name,
       department_id: team.department_id,
       is_active: team.is_active,
     });
+
+    setFormAlert(null);
     setShowModal(true);
   };
 
-  // ✅ OPEN DELETE CONFIRMATION MODAL
   const handleDeleteClick = async (team: Team) => {
     setDeletingTeam(team);
     setDeleteAlert(null);
     setAssignedUserCount(0);
+    setShowDeleteModal(true);
+
+    const token = getToken();
+
+    if (!token) {
+      setDeleteAlert({
+        type: "error",
+        message: "User not authenticated.",
+      });
+
+      return;
+    }
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-
-      const res = await API.get(`/api/teams/${team.id}/assigned-users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await API.get(
+        `/api/teams/${team.id}/assigned-users`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
       if (res.data.success) {
         setAssignedUserCount(res.data.count ?? 0);
       }
-    } catch {
+    } catch (err) {
+      console.error("Failed to load assigned user count:", err);
       setAssignedUserCount(0);
     }
-
-    setShowDeleteModal(true);
   };
 
-  // ✅ CONFIRM DELETE
   const handleConfirmDelete = async () => {
-    if (!deletingTeam) return;
+    if (!deletingTeam) {
+      return;
+    }
+
+    const token = getToken();
+
+    if (!token) {
+      setDeleteAlert({
+        type: "error",
+        message: "User not authenticated.",
+      });
+
+      return;
+    }
 
     setDeletingInProgress(true);
     setDeleteAlert(null);
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await API.delete(
+        `/api/teams/delete/${deletingTeam.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-      await API.delete(`/api/teams/delete/${deletingTeam.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (res.data.success === false) {
+        setDeleteAlert({
+          type: "error",
+          message:
+            res.data.message || "Failed to delete team.",
+        });
+
+        return;
+      }
 
       setDeleteAlert({
         type: "success",
         message: "Team deleted successfully.",
       });
 
+      await refetchTeams();
+
       setTimeout(() => {
         setShowDeleteModal(false);
         setDeletingTeam(null);
         setDeleteAlert(null);
-        window.location.reload();
-      }, 1200);
+        setAssignedUserCount(0);
+      }, 1000);
     } catch (err: any) {
       const message =
-        err.response?.data?.message || "Failed to delete team.";
-      setDeleteAlert({ type: "error", message });
+        err.response?.data?.message ||
+        "Failed to delete team.";
+
+      setDeleteAlert({
+        type: "error",
+        message,
+      });
     } finally {
       setDeletingInProgress(false);
     }
   };
 
   const handleCloseDeleteModal = () => {
+    if (deletingInProgress) {
+      return;
+    }
+
     setShowDeleteModal(false);
     setDeletingTeam(null);
     setDeleteAlert(null);
     setAssignedUserCount(0);
   };
 
-  // ✅ TOGGLE ACTIVE
   const handleToggleStatus = async (team: Team) => {
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
+    const token = getToken();
 
-      await API.put(
+    if (!token || togglingTeamId !== null) {
+      return;
+    }
+
+    setTogglingTeamId(team.id);
+
+    try {
+      const res = await API.put(
         `/api/teams/toggle/${team.id}`,
-        { is_active: !team.is_active },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          is_active: !team.is_active,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
 
-      window.location.reload();
-    } catch {
-      // no-op
-    }
-  };
+      if (res.data.success === false) {
+        console.error(
+          res.data.message || "Failed to update team status.",
+        );
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingTeam(null);
-    setFormData({ team_name: "", department_id: 0, is_active: true });
-    setFormAlert(null);
+        return;
+      }
+
+      await refetchTeams();
+    } catch (err) {
+      console.error("Failed to update team status:", err);
+    } finally {
+      setTogglingTeamId(null);
+    }
   };
 
   return (
@@ -215,13 +352,10 @@ export default function Teams() {
       <PageBreadcrumb pageTitle="Teams" />
 
       <div className="mt-4">
-        {/* Top bar */}
         <div className="flex justify-end mb-4">
           <button
-            onClick={() => {
-              setEditingTeam(null);
-              setShowModal(true);
-            }}
+            type="button"
+            onClick={handleOpenCreateModal}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-150"
           >
             + Create Team
@@ -230,7 +364,11 @@ export default function Teams() {
 
         {error && (
           <div className="mb-4">
-            <Alert variant="error" title="Error" message={error} />
+            <Alert
+              variant="error"
+              title="Error"
+              message={error}
+            />
           </div>
         )}
 
@@ -256,66 +394,97 @@ export default function Teams() {
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
                 {teams && teams.length > 0 ? (
-                  teams.map((team, index) => (
-                    <tr
-                      key={team.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
-                    >
-                      <td className="px-5 py-3">{index + 1}</td>
+                  teams.map((team, index) => {
+                    const isToggling =
+                      togglingTeamId === team.id;
 
-                      <td className="px-5 py-3">{team.team_name}</td>
+                    return (
+                      <tr
+                        key={team.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150"
+                      >
+                        <td className="px-5 py-3">
+                          {index + 1}
+                        </td>
 
-                      <td className="px-5 py-3">{team.department_name}</td>
+                        <td className="px-5 py-3">
+                          {team.team_name}
+                        </td>
 
-                      {/* Status Badge */}
-                      <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            team.is_active
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                          }`}
-                        >
-                          {team.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
+                        <td className="px-5 py-3">
+                          {team.department_name}
+                        </td>
 
-                      {/* Toggle Column */}
-                      <td className="px-5 py-3">
-                        <button
-                          onClick={() => handleToggleStatus(team)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                            team.is_active
-                              ? "bg-blue-600"
-                              : "bg-gray-300 dark:bg-gray-600"
-                          }`}
-                        >
+                        <td className="px-5 py-3">
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
                               team.is_active
-                                ? "translate-x-6"
-                                : "translate-x-1"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                             }`}
-                          />
-                        </button>
-                      </td>
+                          >
+                            {team.is_active
+                              ? "Active"
+                              : "Inactive"}
+                          </span>
+                        </td>
 
-                      {/* Actions Column */}
-                      <td className="px-5 py-3 flex gap-3 items-center">
-                        <FaEdit
-                          className="cursor-pointer text-blue-600"
-                          onClick={() => handleEdit(team)}
-                        />
-                        <FaTrash
-                          className="cursor-pointer text-red-600"
-                          onClick={() => handleDeleteClick(team)}
-                        />
-                      </td>
-                    </tr>
-                  ))
+                        <td className="px-5 py-3">
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={team.is_active}
+                            aria-label={`Toggle ${team.team_name} status`}
+                            disabled={isToggling}
+                            onClick={() =>
+                              handleToggleStatus(team)
+                            }
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                              team.is_active
+                                ? "bg-blue-600"
+                                : "bg-gray-300 dark:bg-gray-600"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                                team.is_active
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <div className="flex gap-3 items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(team)}
+                              aria-label={`Edit ${team.team_name}`}
+                            >
+                              <FaEdit className="cursor-pointer text-blue-600" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeleteClick(team)
+                              }
+                              aria-label={`Delete ${team.team_name}`}
+                            >
+                              <FaTrash className="cursor-pointer text-red-600" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="text-center py-5 text-gray-500">
+                    <td
+                      colSpan={6}
+                      className="text-center py-5 text-gray-500"
+                    >
                       No teams found
                     </td>
                   </tr>
@@ -326,7 +495,6 @@ export default function Teams() {
         )}
       </div>
 
-      {/* ✅ CREATE / EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -334,9 +502,12 @@ export default function Teams() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingTeam ? "Edit Team" : "Create Team"}
               </h2>
+
               <button
+                type="button"
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+                disabled={submitting}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold disabled:opacity-50"
               >
                 &times;
               </button>
@@ -346,7 +517,11 @@ export default function Teams() {
               <div className="mb-4">
                 <Alert
                   variant={formAlert.type}
-                  title={formAlert.type === "success" ? "Success" : "Error"}
+                  title={
+                    formAlert.type === "success"
+                      ? "Success"
+                      : "Error"
+                  }
                   message={formAlert.message}
                 />
               </div>
@@ -354,44 +529,63 @@ export default function Teams() {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Team Name <span className="text-red-500">*</span>
+                Team Name{" "}
+                <span className="text-red-500">*</span>
               </label>
+
               <input
                 type="text"
                 value={formData.team_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, team_name: e.target.value })
+                disabled={submitting}
+                onChange={(event) =>
+                  setFormData((previous) => ({
+                    ...previous,
+                    team_name: event.target.value,
+                  }))
                 }
                 placeholder="e.g. Frontend"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
             </div>
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Department <span className="text-red-500">*</span>
+                Department{" "}
+                <span className="text-red-500">*</span>
               </label>
+
               <select
                 value={formData.department_id}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    department_id: Number(e.target.value),
-                  })
+                disabled={submitting}
+                onChange={(event) =>
+                  setFormData((previous) => ({
+                    ...previous,
+                    department_id: Number(
+                      event.target.value,
+                    ),
+                  }))
                 }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               >
                 <option value={0} disabled>
                   Select a department
                 </option>
-                {departments &&
-                  departments
-                    .filter((d) => d.is_active)
-                    .map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.department_name}
-                      </option>
-                    ))}
+
+                {departments
+                  ?.filter(
+                    (department) =>
+                      department.is_active ||
+                      department.id ===
+                        editingTeam?.department_id,
+                  )
+                  .map((department) => (
+                    <option
+                      key={department.id}
+                      value={department.id}
+                    >
+                      {department.department_name}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -399,36 +593,52 @@ export default function Teams() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Active
               </span>
+
               <button
+                type="button"
+                role="switch"
+                aria-checked={formData.is_active}
+                disabled={submitting}
                 onClick={() =>
-                  setFormData({ ...formData, is_active: !formData.is_active })
+                  setFormData((previous) => ({
+                    ...previous,
+                    is_active: !previous.is_active,
+                  }))
                 }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full ${
+                className={`relative inline-flex h-6 w-11 items-center rounded-full disabled:opacity-60 ${
                   formData.is_active
                     ? "bg-blue-600"
                     : "bg-gray-300 dark:bg-gray-600"
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white ${
-                    formData.is_active ? "translate-x-6" : "translate-x-1"
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.is_active
+                      ? "translate-x-6"
+                      : "translate-x-1"
                   }`}
                 />
               </button>
+
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                {formData.is_active ? "Active" : "Inactive"}
+                {formData.is_active
+                  ? "Active"
+                  : "Inactive"}
               </span>
             </div>
 
             <div className="flex justify-end gap-3">
               <button
+                type="button"
                 onClick={handleCloseModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
+                disabled={submitting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150 disabled:opacity-60"
               >
                 Cancel
               </button>
 
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={submitting}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
@@ -438,43 +648,46 @@ export default function Teams() {
                     ? "Updating..."
                     : "Creating..."
                   : editingTeam
-                  ? "Update"
-                  : "Create"}
+                    ? "Update"
+                    : "Create"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ DELETE CONFIRMATION MODAL */}
       {showDeleteModal && deletingTeam && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-            {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Delete Team
               </h2>
+
               <button
+                type="button"
                 onClick={handleCloseDeleteModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+                disabled={deletingInProgress}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold disabled:opacity-50"
               >
                 &times;
               </button>
             </div>
 
-            {/* Alert (success or error) */}
             {deleteAlert && (
               <div className="mb-4">
                 <Alert
                   variant={deleteAlert.type}
-                  title={deleteAlert.type === "success" ? "Success" : "Error"}
+                  title={
+                    deleteAlert.type === "success"
+                      ? "Success"
+                      : "Error"
+                  }
                   message={deleteAlert.message}
                 />
               </div>
             )}
 
-            {/* Warning icon + message */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
                 <svg
@@ -491,51 +704,63 @@ export default function Teams() {
                   />
                 </svg>
               </div>
+
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   Are you sure you want to delete team{" "}
                   <span className="font-semibold text-gray-900 dark:text-white">
                     {deletingTeam.team_name}
                   </span>
-                  ? This will also remove all its associations and cannot be
-                  undone.
+                  ? This will also remove all its
+                  associations and cannot be undone.
                 </p>
 
-                {/* ✅ Assigned users warning */}
                 {assignedUserCount > 0 && (
                   <div className="mt-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700">
                     <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
                       ⚠️ {assignedUserCount} user
-                      {assignedUserCount > 1 ? "s are" : " is"} currently
-                      assigned to this team.
+                      {assignedUserCount > 1
+                        ? "s are"
+                        : " is"}{" "}
+                      currently assigned to this team.
                     </p>
+
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                       Proceeding will detach{" "}
-                      {assignedUserCount > 1 ? "these users" : "this user"}{" "}
-                      from the team. You will need to reassign them to another
-                      team afterwards.
+                      {assignedUserCount > 1
+                        ? "these users"
+                        : "this user"}{" "}
+                      from the team. You will need to
+                      reassign{" "}
+                      {assignedUserCount > 1
+                        ? "them"
+                        : "the user"}{" "}
+                      afterwards.
                     </p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Footer buttons */}
             <div className="flex justify-end gap-3">
               <button
+                type="button"
                 onClick={handleCloseDeleteModal}
                 disabled={deletingInProgress}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150 disabled:opacity-60"
               >
                 Cancel
               </button>
 
               <button
+                type="button"
                 onClick={handleConfirmDelete}
                 disabled={deletingInProgress}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg transition duration-150"
               >
-                {deletingInProgress ? "Deleting..." : "Yes, Delete"}
+                {deletingInProgress
+                  ? "Deleting..."
+                  : "Yes, Delete"}
               </button>
             </div>
           </div>

@@ -376,7 +376,7 @@ export default function ProjectOverview() {
   // assignees, documents, and notes stay always-visible as they were.
   const [mainTab, setMainTab] = useState<
     "suites" | "cases" | "sprints" | "tasks"
-  >("suites");
+  >("tasks");
 
   // ── Overview data ──────────────────────────────────────────────────────────
   const [overview, setOverview] = useState<OverviewData | null>(null);
@@ -836,72 +836,206 @@ export default function ProjectOverview() {
           <FaArrowLeft className="w-3 h-3" /> Back to Projects
         </button>
 
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {project.project_name}
-              </h1>
-              <span
-                className={`px-2 py-0.5 text-xs font-semibold rounded-full ${ACTIVE_COLORS[String(project.is_active)]}`}
-              >
-                {project.is_active ? "Active" : "Inactive"}
-              </span>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] gap-4">
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-900/60 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {project.project_name}
+                  </h1>
+                  <span
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-full ${ACTIVE_COLORS[String(project.is_active)]}`}
+                  >
+                    {project.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    Project Description
+                  </p>
+
+                  <div
+                    className="mt-1 max-h-24 overflow-y-auto pr-2 pb-1
+    shadow-[inset_0_-12px_12px_-12px_rgba(0,0,0,0.25)]
+    dark:shadow-[inset_0_-12px_12px_-12px_rgba(255,255,255,0.12)]"
+                  >
+                    <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                      {project.description ||
+                        "No description has been added for this project."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 text-xs text-gray-400 dark:text-gray-500">
+                  <span>
+                    Created by {project.created_by_name || "—"}
+                    {project.created_at
+                      ? ` · ${new Date(project.created_at).toLocaleDateString()}`
+                      : ""}
+                  </span>
+                  {project.updated_at && (
+                    <span>
+                      Updated by {project.updated_by_name || "—"} ·{" "}
+                      {new Date(project.updated_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {canProjects("can_edit") && (
+                <button
+                  onClick={() => navigate("/projects")}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-xl transition-colors flex-shrink-0"
+                  title="Edit from the Projects list"
+                >
+                  <FaEdit className="w-3.5 h-3.5" /> Edit
+                </button>
+              )}
             </div>
-            {project.description && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
-                {project.description}
+
+            <div className="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
+                <FaUsers className="w-3.5 h-3.5" /> Project Assignees (
+                {assignees.length})
               </p>
-            )}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-400 dark:text-gray-500">
-              <span>
-                Created by {project.created_by_name || "—"}
-                {project.created_at
-                  ? ` · ${new Date(project.created_at).toLocaleDateString()}`
-                  : ""}
-              </span>
-              {project.updated_at && (
-                <span>
-                  Last updated by {project.updated_by_name || "—"} ·{" "}
-                  {new Date(project.updated_at).toLocaleDateString()}
-                </span>
+              {assignees.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">
+                  No assignees are linked to project tasks yet.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {assignees.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold">
+                        {a.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                        {a.username}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
 
-          {canProjects("can_edit") && (
-            <button
-              onClick={() => navigate("/projects")}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors"
-              title="Edit from the Projects list"
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                <FaStickyNote className="w-3.5 h-3.5" /> Notes
+              </p>
+
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                {notes.length}
+              </span>
+            </div>
+
+            {/* Add Note */}
+            <div className="flex gap-2">
+              <div className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 overflow-hidden">
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleAddNote();
+                    }
+                  }}
+                  placeholder="Add a project note…"
+                  rows={1}
+                  className="w-full min-h-[42px] max-h-48 resize-y overflow-y-auto border-0 bg-transparent px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-0"
+                />
+              </div>
+
+              <button
+                onClick={handleAddNote}
+                disabled={addingNote || !newNote.trim()}
+                className="h-[42px] px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl flex items-center justify-center"
+              >
+                {addingNote ? "Adding…" : "Add"}
+              </button>
+            </div>
+
+            {/* Scrollable Notes */}
+            <div
+              className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2
+    shadow-[inset_0_-14px_14px_-14px_rgba(0,0,0,0.25)]
+    dark:shadow-[inset_0_-14px_14px_-14px_rgba(255,255,255,0.12)]"
             >
-              <FaEdit className="w-3.5 h-3.5" /> Edit Project
-            </button>
-          )}
+              {loadingNotes ? (
+                <p className="text-sm text-gray-400 text-center py-4">
+                  Loading notes…
+                </p>
+              ) : notes.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4 italic">
+                  No notes yet.
+                </p>
+              ) : (
+                notes.map((note) => (
+                  <div
+                    key={note.id}
+                    className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50 px-3 py-2"
+                  >
+                    <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
+
+                    <div className="min-n0 flex-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
+                        {note.note_text}
+                      </p>
+
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {note.created_by_name || "Unknown"} ·{" "}
+                        {new Date(note.created_at).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteNote(note)}
+                      disabled={deletingNoteId === note.id}
+                      className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
+                      title="Delete"
+                    >
+                      <FaTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Stat tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
-          <StatTile
-            label="Suites"
-            value={stats.suite_count}
-            icon={<FaLayerGroup className="w-4 h-4" />}
-          />
-          <StatTile
-            label="Test Cases"
-            value={stats.test_case_count}
-            icon={<FaClipboardList className="w-4 h-4" />}
-          />
-          <StatTile
-            label="Sprints"
-            value={stats.sprint_count}
-            icon={<FaBolt className="w-4 h-4" />}
-          />
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mt-5">
           <StatTile
             label="Tasks"
             value={stats.task_count}
             icon={<FaTasks className="w-4 h-4" />}
           />
+
+          <StatTile
+            label="Suites"
+            value={stats.suite_count}
+            icon={<FaLayerGroup className="w-4 h-4" />}
+          />
+
+          <StatTile
+            label="Test Cases"
+            value={stats.test_case_count}
+            icon={<FaClipboardList className="w-4 h-4" />}
+          />
+
+          <StatTile
+            label="Sprints"
+            value={stats.sprint_count}
+            icon={<FaBolt className="w-4 h-4" />}
+          />
+
           <StatTile
             label="Documents"
             value={stats.document_count}
@@ -940,6 +1074,11 @@ export default function ProjectOverview() {
           <div className="flex gap-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pt-2 overflow-x-auto">
             {[
               {
+                key: "tasks" as const,
+                label: `Tasks (${stats.task_count})`,
+                icon: <FaTasks className="w-3.5 h-3.5" />,
+              },
+              {
                 key: "suites" as const,
                 label: `Suites (${stats.suite_count})`,
                 icon: <FaLayerGroup className="w-3.5 h-3.5" />,
@@ -953,11 +1092,6 @@ export default function ProjectOverview() {
                 key: "sprints" as const,
                 label: `Sprints (${stats.sprint_count})`,
                 icon: <FaBolt className="w-3.5 h-3.5" />,
-              },
-              {
-                key: "tasks" as const,
-                label: `Tasks (${stats.task_count})`,
-                icon: <FaTasks className="w-3.5 h-3.5" />,
               },
             ].map((t) => (
               <button
@@ -1277,102 +1411,6 @@ export default function ProjectOverview() {
 
         {/* Right rail */}
         <div className="space-y-4">
-          {/* Assignees */}
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
-              <FaUsers className="w-3.5 h-3.5" /> Assignees ({assignees.length})
-            </p>
-            {assignees.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">
-                No one is assigned to tasks in this project yet.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {assignees.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold">
-                      {a.username.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                      {a.username}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Notes */}
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
-              <FaStickyNote className="w-3.5 h-3.5" /> Notes ({notes.length})
-            </p>
-
-            <div className="flex gap-2">
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    handleAddNote();
-                  }
-                }}
-                placeholder="Jot down a note… (Ctrl/Cmd + Enter to save)"
-                rows={2}
-                className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={handleAddNote}
-                disabled={addingNote || !newNote.trim()}
-                className="self-end px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg"
-              >
-                {addingNote ? "Adding…" : "Add"}
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {loadingNotes ? (
-                <p className="text-sm text-gray-400 text-center py-4">
-                  Loading notes…
-                </p>
-              ) : notes.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4 italic">
-                  No notes yet.
-                </p>
-              ) : (
-                notes.map((note) => (
-                  <div
-                    key={note.id}
-                    className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
-                  >
-                    <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
-                        {note.note_text}
-                      </p>
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        {note.created_by_name || "Unknown"} ·{" "}
-                        {new Date(note.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteNote(note)}
-                      disabled={deletingNoteId === note.id}
-                      className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
-                      title="Delete"
-                    >
-                      <FaTrash className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
           {/* Documents */}
           <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
@@ -1380,7 +1418,12 @@ export default function ProjectOverview() {
               {stats.document_count})
             </p>
 
-            <div className="mt-4 space-y-2">
+            {/* Scrollable document list */}
+            <div
+              className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2
+      shadow-[inset_0_-14px_14px_-14px_rgba(0,0,0,0.25)]
+      dark:shadow-[inset_0_-14px_14px_-14px_rgba(255,255,255,0.12)]"
+            >
               {loadingDocs ? (
                 <p className="text-sm text-gray-400 text-center py-4">
                   Loading documents…
@@ -1398,16 +1441,19 @@ export default function ProjectOverview() {
                     <span className="text-lg flex-shrink-0">
                       {fileIcon(doc.mime_type)}
                     </span>
+
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                         {doc.original_name}
                       </p>
+
                       <p className="text-[11px] text-gray-400">
                         {formatBytes(doc.file_size)} ·{" "}
                         {doc.uploaded_by_name || "Unknown"} ·{" "}
                         {new Date(doc.created_at).toLocaleDateString()}
                       </p>
                     </div>
+
                     <button
                       onClick={() => handleDownloadDoc(doc)}
                       className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 flex-shrink-0"
@@ -1415,6 +1461,7 @@ export default function ProjectOverview() {
                     >
                       <FaDownload className="w-3.5 h-3.5" />
                     </button>
+
                     {canProjects("can_delete") && (
                       <button
                         onClick={() => handleDeleteDoc(doc)}
@@ -1428,7 +1475,11 @@ export default function ProjectOverview() {
                   </div>
                 ))
               )}
-              {canProjects("can_edit") && (
+            </div>
+
+            {/* Upload stays outside scroll */}
+            {canProjects("can_edit") && (
+              <div className="mt-3">
                 <DocumentUploader
                   projectId={project.id}
                   onUploaded={() => {
@@ -1436,8 +1487,8 @@ export default function ProjectOverview() {
                     fetchOverview();
                   }}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

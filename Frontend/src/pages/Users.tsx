@@ -82,6 +82,7 @@ export default function Users() {
     data: users,
     loading,
     error,
+    refetch: refetchUsers,
   } = useFetchWithAuth<User[]>("/api/users");
 
   // ✅ Fetch roles & departments — now using dropdown endpoints
@@ -136,6 +137,7 @@ export default function Users() {
     message: string;
   } | null>(null);
   const [deletingInProgress, setDeletingInProgress] = useState(false);
+  const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
 
   // ─── HELPERS ─────────────────────────────────────────────────────────────
   const getToken = () =>
@@ -194,6 +196,8 @@ export default function Users() {
   };
 
   const handleCloseDeleteModal = () => {
+    if (deletingInProgress) return;
+
     setShowDeleteModal(false);
     setDeletingUser(null);
     setDeleteAlert(null);
@@ -337,10 +341,11 @@ export default function Users() {
             : "User created successfully!",
         });
 
+        await refetchUsers();
+
         setTimeout(() => {
           handleCloseModal();
-          window.location.reload();
-        }, 1200);
+        }, 1000);
       }
     } catch (err: any) {
       const message = err.response?.data?.message || "Operation failed.";
@@ -375,12 +380,13 @@ export default function Users() {
         message: "User deleted successfully.",
       });
 
+      await refetchUsers();
+
       setTimeout(() => {
         setShowDeleteModal(false);
         setDeletingUser(null);
         setDeleteAlert(null);
-        window.location.reload();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       const message = err.response?.data?.message || "Failed to delete user.";
       setDeleteAlert({ type: "error", message });
@@ -391,18 +397,33 @@ export default function Users() {
 
   // ─── TOGGLE ACTIVE ───────────────────────────────────────────────────────
   const handleToggleStatus = async (user: User) => {
-    try {
-      const token = getToken();
+    if (togglingUserId !== null) return;
 
-      await API.put(
+    const token = getToken();
+    if (!token) {
+      console.error("User not authenticated.");
+      return;
+    }
+
+    setTogglingUserId(user.id);
+
+    try {
+      const res = await API.put(
         `/api/users/toggle/${user.id}`,
         { is_active: !user.is_active },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      window.location.reload();
-    } catch {
-      // silent
+      if (res.data.success === false) {
+        console.error(res.data.message || "Failed to update user status.");
+        return;
+      }
+
+      await refetchUsers();
+    } catch (err) {
+      console.error("Failed to update user status:", err);
+    } finally {
+      setTogglingUserId(null);
     }
   };
 
@@ -783,8 +804,13 @@ export default function Users() {
 
                         <td className="px-5 py-3">
                           <button
+                            type="button"
+                            role="switch"
+                            aria-checked={user.is_active}
+                            aria-label={`Toggle ${user.username} status`}
+                            disabled={togglingUserId === user.id}
                             onClick={() => handleToggleStatus(user)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
                               user.is_active
                                 ? "bg-blue-600"
                                 : "bg-gray-300 dark:bg-gray-600"
