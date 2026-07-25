@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   FaArrowLeft,
@@ -347,6 +347,58 @@ function Section({
         </p>
       ) : (
         children
+      )}
+    </div>
+  );
+}
+
+// ─── Scroll fade wrapper ────────────────────────────────────────────────────
+// Shows a soft shadow only on the edge(s) that still have hidden content,
+// instead of a static shadow that stays visible even when nothing is
+// scrollable or the list is already scrolled all the way down.
+function ScrollFade({
+  className = "",
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const updateFade = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setCanScrollUp(el.scrollTop > 1);
+    setCanScrollDown(
+      el.scrollHeight - el.scrollTop - el.clientHeight > 1,
+    );
+  }, []);
+
+  useEffect(() => {
+    updateFade();
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateFade, children]);
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onScroll={updateFade}
+        className={className}
+      >
+        {children}
+      </div>
+      {canScrollUp && (
+        <div className="pointer-events-none absolute top-0 left-0 right-0 h-3 bg-gradient-to-b from-white dark:from-gray-900 to-transparent rounded-t-xl" />
+      )}
+      {canScrollDown && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent rounded-b-xl" />
       )}
     </div>
   );
@@ -856,16 +908,12 @@ export default function ProjectOverview() {
                     Project Description
                   </p>
 
-                  <div
-                    className="mt-1 max-h-24 overflow-y-auto pr-2 pb-1
-    shadow-[inset_0_-12px_12px_-12px_rgba(0,0,0,0.25)]
-    dark:shadow-[inset_0_-12px_12px_-12px_rgba(255,255,255,0.12)]"
-                  >
+                  <ScrollFade className="mt-1 max-h-24 overflow-y-auto pr-2 pb-1">
                     <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
                       {project.description ||
                         "No description has been added for this project."}
                     </p>
-                  </div>
+                  </ScrollFade>
                 </div>
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 text-xs text-gray-400 dark:text-gray-500">
@@ -963,11 +1011,7 @@ export default function ProjectOverview() {
             </div>
 
             {/* Scrollable Notes */}
-            <div
-              className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2
-    shadow-[inset_0_-14px_14px_-14px_rgba(0,0,0,0.25)]
-    dark:shadow-[inset_0_-14px_14px_-14px_rgba(255,255,255,0.12)]"
-            >
+            <ScrollFade className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2">
               {loadingNotes ? (
                 <p className="text-sm text-gray-400 text-center py-4">
                   Loading notes…
@@ -984,7 +1028,7 @@ export default function ProjectOverview() {
                   >
                     <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
 
-                    <div className="min-n0 flex-1">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
                         {note.note_text}
                       </p>
@@ -1006,7 +1050,7 @@ export default function ProjectOverview() {
                   </div>
                 ))
               )}
-            </div>
+            </ScrollFade>
           </div>
         </div>
 
@@ -1419,11 +1463,7 @@ export default function ProjectOverview() {
             </p>
 
             {/* Scrollable document list */}
-            <div
-              className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2
-      shadow-[inset_0_-14px_14px_-14px_rgba(0,0,0,0.25)]
-      dark:shadow-[inset_0_-14px_14px_-14px_rgba(255,255,255,0.12)]"
-            >
+            <ScrollFade className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2">
               {loadingDocs ? (
                 <p className="text-sm text-gray-400 text-center py-4">
                   Loading documents…
@@ -1475,7 +1515,7 @@ export default function ProjectOverview() {
                   </div>
                 ))
               )}
-            </div>
+            </ScrollFade>
 
             {/* Upload stays outside scroll */}
             {canProjects("can_edit") && (
@@ -1605,6 +1645,7 @@ export default function ProjectOverview() {
         users={users}
         onClose={() => setShowTaskModal(false)}
         onSave={handleSaveTask}
+        lockProject
       />
 
       <TaskDeleteModal

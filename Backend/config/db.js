@@ -14,29 +14,29 @@ const sql = require("mssql");
 // };
 
 // Home PC
-// const config = {
-//   user: "app_user",
-//   password: "password123",
-//   server: "DESKTOP-NF8MTUG",
-//   database: "test_case_manager",
-//   options: {
-//     instanceName: "SQLEXPRESS02",
-//     encrypt: true,
-//     trustServerCertificate: true
-//   }
-// };
-
-// Ofc PC
 const config = {
-  user: "tharun",
-  password: "tharun",
-  server: "LKSSWDEVS1",
+  user: "app_user",
+  password: "password123",
+  server: "DESKTOP-NF8MTUG",
   database: "test_case_manager",
   options: {
+    instanceName: "SQLEXPRESS02",
     encrypt: true,
-    trustServerCertificate: true,
-  },
+    trustServerCertificate: true
+  }
 };
+
+// Ofc PC
+// const config = {
+//   user: "tharun",
+//   password: "tharun",
+//   server: "LKSSWDEVS1",
+//   database: "test_case_manager",
+//   options: {
+//     encrypt: true,
+//     trustServerCertificate: true,
+//   },
+// };
 
 const poolPromise = sql
   .connect(config)

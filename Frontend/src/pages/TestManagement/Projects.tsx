@@ -1280,7 +1280,7 @@ function ProjectAccordion({
             <Link
               to={`/projects/${project.id}`}
               onClick={(e) => e.stopPropagation()}
-              className="text-sm font-semibold text-gray-900 dark:text-white hover:underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              className="text-sm font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               title="Open project overview"
             >
               {project.project_name}

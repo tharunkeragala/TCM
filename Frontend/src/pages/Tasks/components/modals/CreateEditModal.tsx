@@ -22,7 +22,8 @@ const INPUT_CLS =
   "focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 " +
   "transition-colors duration-150";
 
-const LABEL_CLS = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5";
+const LABEL_CLS =
+  "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5";
 
 interface Props {
   showModal: boolean;
@@ -40,6 +41,14 @@ interface Props {
   users: User[] | null;
   onClose: () => void;
   onSave: () => void;
+  /**
+   * When true, the "Link to Project" field is rendered as a fixed, read-only
+   * label instead of a select. Use this when the modal is opened from a
+   * context that is already scoped to a single project (e.g. the Project
+   * Overview page), so the field can't visually appear editable while
+   * silently doing nothing.
+   */
+  lockProject?: boolean;
 }
 
 export default function CreateEditModal({
@@ -58,14 +67,9 @@ export default function CreateEditModal({
   users,
   onClose,
   onSave,
+  lockProject = false,
 }: Props) {
   if (!showModal) return null;
-
-  const filteredSuites = allSuites?.filter((s) =>
-    selectedProjectFilter
-      ? String(s.project_id) === selectedProjectFilter
-      : true,
-  );
 
   return (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
@@ -104,7 +108,9 @@ export default function CreateEditModal({
             <input
               type="text"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               placeholder="e.g. Fix login bug on mobile"
               className={INPUT_CLS}
             />
@@ -201,62 +207,46 @@ export default function CreateEditModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LABEL_CLS}>Link to Project</label>
-              <select
-                value={selectedProjectFilter}
-                onChange={(e) => {
-                  setSelectedProjectFilter(e.target.value);
-                  setFormData({
-                    ...formData,
-                    project_id: e.target.value,
-                    suite_id: "",
-                  });
-                }}
-                className={INPUT_CLS}
-              >
-                <option value="">— None —</option>
-                {projects?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_name}
-                  </option>
-                ))}
-              </select>
+              {lockProject ? (
+                <div
+                  className={`${INPUT_CLS} flex items-center bg-gray-50 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 cursor-not-allowed`}
+                  title="This task is scoped to the current project"
+                >
+                  {projects?.find((p) => String(p.id) === selectedProjectFilter)
+                    ?.project_name || "— None —"}
+                </div>
+              ) : (
+                <select
+                  value={selectedProjectFilter}
+                  onChange={(e) => {
+                    setSelectedProjectFilter(e.target.value);
+                    setFormData({
+                      ...formData,
+                      project_id: e.target.value,
+                      suite_id: "",
+                    });
+                  }}
+                  className={INPUT_CLS}
+                >
+                  <option value="">— None —</option>
+                  {projects?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.project_name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
-              {/* <label className={LABEL_CLS}>Link to Suite</label>
-              <select
-                value={formData.suite_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, suite_id: e.target.value })
-                }
-                className={INPUT_CLS}
-              >
-                <option value="">— None —</option>
-                {filteredSuites?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.suite_name}
-                  </option>
-                ))}
-              </select> */}
-              {/* Assignees */}
               <UserMultiSelect
-              label="Assignees"
-              users={users || []}
-              selected={assignees}
-              onChange={setAssignees}
-            />
+                label="Assignees"
+                users={users || []}
+                selected={assignees}
+                onChange={setAssignees}
+              />
             </div>
           </div>
-
-          {/* Assignees */}
-          {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <UserMultiSelect
-              label="Assignees"
-              users={users || []}
-              selected={assignees}
-              onChange={setAssignees}
-            />
-          </div> */}
 
           {/* Tags */}
           <div>
