@@ -34,7 +34,7 @@ const Tasks = lazy(() => import("./pages/Tasks/Tasks"));
 const TaskDetails = lazy(() => import("./pages/Tasks/TaskDetails"));
 
 // Test Management
-const Projects = lazy(() => import("./pages/TestManagement/Projects"));
+const Projects = lazy(() => import("./pages/Projects/Projects"));
 const TestSuites = lazy(() => import("./pages/TestManagement/TestSuites"));
 const TestCases = lazy(() => import("./pages/TestManagement/TestCases"));
 const TestCaseDetails = lazy(

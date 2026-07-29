@@ -38,7 +38,7 @@ import {
   SuiteFormModal,
   TestCaseFormModal,
   TestCaseViewModal,
-} from "../TestManagement/Projects";
+} from "./Projects";
 
 // Reused as-is from the Tasks feature.
 import CreateEditModal from "../Tasks/components/modals/CreateEditModal";
@@ -353,9 +353,9 @@ function Section({
 }
 
 // ─── Scroll fade wrapper ────────────────────────────────────────────────────
-// Shows a soft shadow only on the edge(s) that still have hidden content,
-// instead of a static shadow that stays visible even when nothing is
-// scrollable or the list is already scrolled all the way down.
+// Uses the application-wide scrollbar rules from global CSS. The wrapper
+// only controls scrolling and edge fades; it does not override scrollbar
+// colors, widths, tracks, or hover styles locally.
 function ScrollFade({
   className = "",
   children,
@@ -363,42 +363,72 @@ function ScrollFade({
   className?: string;
   children: React.ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
 
   const updateFade = useCallback(() => {
-    const el = ref.current;
+    const el = scrollRef.current;
     if (!el) return;
-    setCanScrollUp(el.scrollTop > 1);
-    setCanScrollDown(
-      el.scrollHeight - el.scrollTop - el.clientHeight > 1,
-    );
+
+    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setCanScrollUp(el.scrollTop > 2);
+    setCanScrollDown(remaining > 2);
   }, []);
 
   useEffect(() => {
+    const scrollEl = scrollRef.current;
+    const contentEl = contentRef.current;
+    if (!scrollEl || !contentEl) return;
+
     updateFade();
-    const el = ref.current;
-    if (!el) return;
-    const observer = new ResizeObserver(updateFade);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [updateFade, children]);
+
+    const resizeObserver = new ResizeObserver(updateFade);
+    resizeObserver.observe(scrollEl);
+    resizeObserver.observe(contentEl);
+
+    const mutationObserver = new MutationObserver(updateFade);
+    mutationObserver.observe(contentEl, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    window.addEventListener("resize", updateFade);
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener("resize", updateFade);
+    };
+  }, [updateFade]);
 
   return (
-    <div className="relative">
+    <div className="relative isolate min-w-0">
       <div
-        ref={ref}
+        ref={scrollRef}
         onScroll={updateFade}
-        className={className}
+        style={{ scrollbarGutter: "stable" }}
+        className={`overscroll-contain rounded-none ${className}`}
       >
-        {children}
+        <div ref={contentRef} className="min-w-0">
+          {children}
+        </div>
       </div>
+
       {canScrollUp && (
-        <div className="pointer-events-none absolute top-0 left-0 right-0 h-3 bg-gradient-to-b from-white dark:from-gray-900 to-transparent rounded-t-xl" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 right-[7px] top-0 z-10 h-4 rounded-none bg-gradient-to-b from-white via-white/80 to-transparent dark:from-gray-900 dark:via-gray-900/80"
+        />
       )}
+
       {canScrollDown && (
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent rounded-b-xl" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 left-0 right-[7px] z-10 h-4 rounded-none bg-gradient-to-t from-white via-white/80 to-transparent dark:from-gray-900 dark:via-gray-900/80"
+        />
       )}
     </div>
   );
@@ -908,7 +938,7 @@ export default function ProjectOverview() {
                     Project Description
                   </p>
 
-                  <ScrollFade className="mt-1 max-h-24 overflow-y-auto pr-2 pb-1">
+                  <ScrollFade className="mt-1 max-h-24 overflow-y-auto pr-2 py-1">
                     <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
                       {project.description ||
                         "No description has been added for this project."}
@@ -1011,7 +1041,7 @@ export default function ProjectOverview() {
             </div>
 
             {/* Scrollable Notes */}
-            <ScrollFade className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2">
+            <ScrollFade className="mt-4 max-h-60 overflow-y-auto pr-1 py-1">
               {loadingNotes ? (
                 <p className="text-sm text-gray-400 text-center py-4">
                   Loading notes…
@@ -1021,34 +1051,36 @@ export default function ProjectOverview() {
                   No notes yet.
                 </p>
               ) : (
-                notes.map((note) => (
-                  <div
-                    key={note.id}
-                    className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50 px-3 py-2"
-                  >
-                    <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
-                        {note.note_text}
-                      </p>
-
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        {note.created_by_name || "Unknown"} ·{" "}
-                        {new Date(note.created_at).toLocaleString()}
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => handleDeleteNote(note)}
-                      disabled={deletingNoteId === note.id}
-                      className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
-                      title="Delete"
+                <div className="space-y-2">
+                  {notes.map((note) => (
+                    <div
+                      key={note.id}
+                      className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50 px-3 py-2"
                     >
-                      <FaTrash className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))
+                      <FaStickyNote className="text-amber-400 mt-1 flex-shrink-0" />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
+                          {note.note_text}
+                        </p>
+
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          {note.created_by_name || "Unknown"} ·{" "}
+                          {new Date(note.created_at).toLocaleString()}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteNote(note)}
+                        disabled={deletingNoteId === note.id}
+                        className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
+                        title="Delete"
+                      >
+                        <FaTrash className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </ScrollFade>
           </div>
@@ -1170,59 +1202,61 @@ export default function ProjectOverview() {
                 )
               }
             >
-              <div className="space-y-2">
-                {suites.map((suite) => (
-                  <div
-                    key={suite.id}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FaLayerGroup className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                        {suite.suite_name}
-                      </span>
-                      <span className="text-xs text-gray-400 flex-shrink-0">
-                        {suite.case_count}{" "}
-                        {suite.case_count === 1 ? "case" : "cases"}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${ACTIVE_COLORS[String(suite.is_active)]}`}
-                      >
-                        {suite.is_active ? "Active" : "Inactive"}
-                      </span>
+              <ScrollFade className="max-h-[325px] overflow-y-auto pr-1 py-1">
+                <div className="space-y-2">
+                  {suites.map((suite) => (
+                    <div
+                      key={suite.id}
+                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FaLayerGroup className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                          {suite.suite_name}
+                        </span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {suite.case_count}{" "}
+                          {suite.case_count === 1 ? "case" : "cases"}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${ACTIVE_COLORS[String(suite.is_active)]}`}
+                        >
+                          {suite.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {canCases("can_create") && (
+                          <button
+                            onClick={() => setAddCaseSuiteId(suite.id)}
+                            className="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600"
+                            title="Add Test Case"
+                          >
+                            <FaPlus className="w-3 h-3" />
+                          </button>
+                        )}
+                        {canSuites("can_edit") && (
+                          <button
+                            onClick={() => setEditSuite(suite)}
+                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                            title="Edit Suite"
+                          >
+                            <FaEdit className="w-3 h-3" />
+                          </button>
+                        )}
+                        {canSuites("can_delete") && (
+                          <button
+                            onClick={() => openDeleteSuite(suite)}
+                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                            title="Delete Suite"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {canCases("can_create") && (
-                        <button
-                          onClick={() => setAddCaseSuiteId(suite.id)}
-                          className="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600"
-                          title="Add Test Case"
-                        >
-                          <FaPlus className="w-3 h-3" />
-                        </button>
-                      )}
-                      {canSuites("can_edit") && (
-                        <button
-                          onClick={() => setEditSuite(suite)}
-                          className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
-                          title="Edit Suite"
-                        >
-                          <FaEdit className="w-3 h-3" />
-                        </button>
-                      )}
-                      {canSuites("can_delete") && (
-                        <button
-                          onClick={() => openDeleteSuite(suite)}
-                          className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                          title="Delete Suite"
-                        >
-                          <FaTrash className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollFade>
             </Section>
           )}
 
@@ -1245,58 +1279,60 @@ export default function ProjectOverview() {
                 )
               }
             >
-              <div className="space-y-2">
-                {projectTestCases.map((tc) => (
-                  <div
-                    key={tc.id}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FaClipboardList className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                        {tc.title}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${PRIORITY_COLORS[tc.priority]}`}
-                      >
-                        {tc.priority}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[tc.status]}`}
-                      >
-                        {tc.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => openViewCase(tc)}
-                        className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
-                        title="View"
-                      >
-                        <FaEye className="w-3 h-3" />
-                      </button>
-                      {canCases("can_edit") && (
-                        <button
-                          onClick={() => openEditCase(tc)}
-                          className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
-                          title="Edit"
+              <ScrollFade className="max-h-[325px] overflow-y-auto pr-1 py-1">
+                <div className="space-y-2">
+                  {projectTestCases.map((tc) => (
+                    <div
+                      key={tc.id}
+                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FaClipboardList className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                          {tc.title}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${PRIORITY_COLORS[tc.priority]}`}
                         >
-                          <FaEdit className="w-3 h-3" />
-                        </button>
-                      )}
-                      {canCases("can_delete") && (
-                        <button
-                          onClick={() => setDeleteCase(tc)}
-                          className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                          title="Delete"
+                          {tc.priority}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[tc.status]}`}
                         >
-                          <FaTrash className="w-3 h-3" />
+                          {tc.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => openViewCase(tc)}
+                          className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
+                          title="View"
+                        >
+                          <FaEye className="w-3 h-3" />
                         </button>
-                      )}
+                        {canCases("can_edit") && (
+                          <button
+                            onClick={() => openEditCase(tc)}
+                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                            title="Edit"
+                          >
+                            <FaEdit className="w-3 h-3" />
+                          </button>
+                        )}
+                        {canCases("can_delete") && (
+                          <button
+                            onClick={() => setDeleteCase(tc)}
+                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                            title="Delete"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollFade>
             </Section>
           )}
 
@@ -1318,57 +1354,59 @@ export default function ProjectOverview() {
                 )
               }
             >
-              <div className="space-y-2">
-                {sprints.map((sprint) => {
-                  const StatusIcon = sprintStatusIcon(sprint.status);
-                  return (
-                    <div
-                      key={sprint.id}
-                      onClick={() => navigate(`/sprints/${sprint.id}`)}
-                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <StatusIcon className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                          {sprint.sprint_name}
-                        </span>
-                        <span className="text-xs text-gray-400 flex-shrink-0">
-                          {sprint.suite_count ?? 0} suites ·{" "}
-                          {sprint.case_count ?? 0} cases
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[sprint.status]}`}
-                        >
-                          {sprint.status}
-                        </span>
-                      </div>
+              <ScrollFade className="max-h-[325px] overflow-y-auto pr-1 py-1">
+                <div className="space-y-2">
+                  {sprints.map((sprint) => {
+                    const StatusIcon = sprintStatusIcon(sprint.status);
+                    return (
                       <div
-                        className="flex items-center gap-2 flex-shrink-0"
-                        onClick={(e) => e.stopPropagation()}
+                        key={sprint.id}
+                        onClick={() => navigate(`/sprints/${sprint.id}`)}
+                        className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
                       >
-                        {canSprints("can_edit") && (
-                          <button
-                            onClick={() => setEditSprint(sprint)}
-                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
-                            title="Edit Sprint"
+                        <div className="flex items-center gap-3 min-w-0">
+                          <StatusIcon className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                            {sprint.sprint_name}
+                          </span>
+                          <span className="text-xs text-gray-400 flex-shrink-0">
+                            {sprint.suite_count ?? 0} suites ·{" "}
+                            {sprint.case_count ?? 0} cases
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[sprint.status]}`}
                           >
-                            <FaEdit className="w-3 h-3" />
-                          </button>
-                        )}
-                        {canSprints("can_delete") && (
-                          <button
-                            onClick={() => setDeleteSprint(sprint)}
-                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                            title="Delete Sprint"
-                          >
-                            <FaTrash className="w-3 h-3" />
-                          </button>
-                        )}
+                            {sprint.status}
+                          </span>
+                        </div>
+                        <div
+                          className="flex items-center gap-2 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {canSprints("can_edit") && (
+                            <button
+                              onClick={() => setEditSprint(sprint)}
+                              className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                              title="Edit Sprint"
+                            >
+                              <FaEdit className="w-3 h-3" />
+                            </button>
+                          )}
+                          {canSprints("can_delete") && (
+                            <button
+                              onClick={() => setDeleteSprint(sprint)}
+                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                              title="Delete Sprint"
+                            >
+                              <FaTrash className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              </ScrollFade>
             </Section>
           )}
 
@@ -1390,65 +1428,67 @@ export default function ProjectOverview() {
                 )
               }
             >
-              <div className="space-y-2">
-                {(tasks as any[]).map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-mono text-[10px] flex-shrink-0">
-                        {task.task_code}
-                      </span>
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                        {task.title}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${PRIORITY_COLORS[task.priority]}`}
-                      >
-                        {task.priority}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[task.status] || ""}`}
-                      >
-                        {task.status}
-                      </span>
-                      {task.assignees && (
-                        <span className="text-xs text-gray-400 flex-shrink-0 truncate max-w-[160px]">
-                          {task.assignees}
+              <ScrollFade className="max-h-[325px] overflow-y-auto pr-1 py-1">
+                <div className="space-y-2">
+                  {(tasks as any[]).map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-mono text-[10px] flex-shrink-0">
+                          {task.task_code}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => openViewTask(task)}
-                        className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
-                        title="View"
-                      >
-                        <FaEye className="w-3 h-3" />
-                      </button>
-                      {canTasks("can_edit") && (
-                        <button
-                          onClick={() => openEditTask(task)}
-                          className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
-                          title="Edit"
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                          {task.title}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${PRIORITY_COLORS[task.priority]}`}
                         >
-                          <FaEdit className="w-3 h-3" />
-                        </button>
-                      )}
-                      {canTasks("can_delete") && (
-                        <button
-                          onClick={() => setDeletingTask(task)}
-                          className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                          title="Delete"
+                          {task.priority}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[task.status] || ""}`}
                         >
-                          <FaTrash className="w-3 h-3" />
+                          {task.status}
+                        </span>
+                        {task.assignees && (
+                          <span className="text-xs text-gray-400 flex-shrink-0 truncate max-w-[160px]">
+                            {task.assignees}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => openViewTask(task)}
+                          className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
+                          title="View"
+                        >
+                          <FaEye className="w-3 h-3" />
                         </button>
-                      )}
+                        {canTasks("can_edit") && (
+                          <button
+                            onClick={() => openEditTask(task)}
+                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                            title="Edit"
+                          >
+                            <FaEdit className="w-3 h-3" />
+                          </button>
+                        )}
+                        {canTasks("can_delete") && (
+                          <button
+                            onClick={() => setDeletingTask(task)}
+                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                            title="Delete"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollFade>
             </Section>
           )}
         </div>
@@ -1463,7 +1503,7 @@ export default function ProjectOverview() {
             </p>
 
             {/* Scrollable document list */}
-            <ScrollFade className="mt-4 max-h-60 overflow-y-auto space-y-2 pr-1 pb-2">
+            <ScrollFade className="mt-4 max-h-60 overflow-y-auto pr-1 py-1">
               {loadingDocs ? (
                 <p className="text-sm text-gray-400 text-center py-4">
                   Loading documents…
@@ -1473,47 +1513,49 @@ export default function ProjectOverview() {
                   No documents uploaded yet.
                 </p>
               ) : (
-                docs.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
-                  >
-                    <span className="text-lg flex-shrink-0">
-                      {fileIcon(doc.mime_type)}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                        {doc.original_name}
-                      </p>
-
-                      <p className="text-[11px] text-gray-400">
-                        {formatBytes(doc.file_size)} ·{" "}
-                        {doc.uploaded_by_name || "Unknown"} ·{" "}
-                        {new Date(doc.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => handleDownloadDoc(doc)}
-                      className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 flex-shrink-0"
-                      title="Download"
+                <div className="space-y-2">
+                  {docs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
                     >
-                      <FaDownload className="w-3.5 h-3.5" />
-                    </button>
+                      <span className="text-lg flex-shrink-0">
+                        {fileIcon(doc.mime_type)}
+                      </span>
 
-                    {canProjects("can_delete") && (
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                          {doc.original_name}
+                        </p>
+
+                        <p className="text-[11px] text-gray-400">
+                          {formatBytes(doc.file_size)} ·{" "}
+                          {doc.uploaded_by_name || "Unknown"} ·{" "}
+                          {new Date(doc.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+
                       <button
-                        onClick={() => handleDeleteDoc(doc)}
-                        disabled={deletingDocId === doc.id}
-                        className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
-                        title="Archive"
+                        onClick={() => handleDownloadDoc(doc)}
+                        className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 flex-shrink-0"
+                        title="Download"
                       >
-                        <FaTrash className="w-3.5 h-3.5" />
+                        <FaDownload className="w-3.5 h-3.5" />
                       </button>
-                    )}
-                  </div>
-                ))
+
+                      {canProjects("can_delete") && (
+                        <button
+                          onClick={() => handleDeleteDoc(doc)}
+                          disabled={deletingDocId === doc.id}
+                          className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 flex-shrink-0"
+                          title="Archive"
+                        >
+                          <FaTrash className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </ScrollFade>
 
