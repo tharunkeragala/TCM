@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import API from "../../services/api";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { FaPlus, FaSearch, FaUser, FaBell, FaTimes } from "react-icons/fa";
 
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";

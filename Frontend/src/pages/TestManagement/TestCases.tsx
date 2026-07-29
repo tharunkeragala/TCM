@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import {
   FaEdit,
   FaTrash,
@@ -1203,3 +1203,4 @@ export default function TestCases() {
     </div>
   );
 }
+

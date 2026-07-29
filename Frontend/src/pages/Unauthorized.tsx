@@ -1,5 +1,5 @@
 import GridShape from "../components/common/GridShape";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import PageMeta from "../components/common/PageMeta";
 
 interface UnauthorizedState {

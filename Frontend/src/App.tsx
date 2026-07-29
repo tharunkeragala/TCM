@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -176,3 +176,4 @@ export default function App() {
     </Router>
   );
 }
+
