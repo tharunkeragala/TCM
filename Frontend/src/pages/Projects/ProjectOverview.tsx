@@ -22,6 +22,7 @@ import {
   FaCheckCircle,
   FaCalendarAlt,
   FaStickyNote,
+  FaProjectDiagram,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -30,6 +31,7 @@ import API from "../../services/api";
 import useFetchWithAuth from "../../hooks/useFetchWithAuth";
 import { usePermissions } from "../../hooks/usePermissions";
 import DocumentUploader from "../../components/common/DocumentUploader";
+import DiagramOverviewCard from "../../components/projects/DiagramOverviewCard";
 
 // Reused as-is from Projects.tsx — same suite/test-case create/edit/delete
 // UI the Projects page already uses.
@@ -457,7 +459,7 @@ export default function ProjectOverview() {
   // Only the four list sections are tabbed now — stats, breakdown bars,
   // assignees, documents, and notes stay always-visible as they were.
   const [mainTab, setMainTab] = useState<
-    "suites" | "cases" | "sprints" | "tasks"
+    "suites" | "cases" | "sprints" | "tasks" | "diagram"
   >("tasks");
 
   // ── Overview data ──────────────────────────────────────────────────────────
@@ -1169,6 +1171,11 @@ export default function ProjectOverview() {
                 label: `Sprints (${stats.sprint_count})`,
                 icon: <FaBolt className="w-3.5 h-3.5" />,
               },
+              {
+                key: "diagram" as const,
+                label: `Diagram`,
+                icon: <FaProjectDiagram className="w-3.5 h-3.5" />,
+              },
             ].map((t) => (
               <button
                 key={t.key}
@@ -1491,10 +1498,26 @@ export default function ProjectOverview() {
               </ScrollFade>
             </Section>
           )}
+
+          {/* Diagram */}
+          {mainTab === "diagram" && (
+            <Section
+              title="Flow Diagram"
+              icon={<FaProjectDiagram className="w-3.5 h-3.5 text-cyan-500" />}
+              isEmpty={false}
+              emptyText=""
+            >
+              <DiagramOverviewCard
+                projectId={String(project.id)}
+                projectName={project.project_name}
+              />
+            </Section>
+          )}
         </div>
 
         {/* Right rail */}
         <div className="space-y-4">
+          {/* <DiagramOverviewCard projectId={String(project.id)} projectName={project.project_name} /> */}
           {/* Documents */}
           <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">

@@ -43,6 +43,9 @@ const TestCaseDetails = lazy(
 const Sprintboard = lazy(() => import("./pages/TestManagement/Sprintboard"));
 const Sprints = lazy(() => import("./pages/TestManagement/Sprints"));
 
+// Flow Diagrams
+const FlowDiagramEditor = lazy(() => import("./pages/Projects/FlowDiagramEditor"));
+
 // Playwright
 const PlaywrightRecorder = lazy(() =>
   import("./pages/TestManagement/Playwright").then((m) => ({
@@ -134,6 +137,7 @@ export default function App() {
 
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/:id" element={<ProjectOverview />} />
+              <Route path="/projects/:id/diagram" element={<FlowDiagramEditor />} />
               <Route path="/test-suites" element={<TestSuites />} />
               <Route path="/test-cases" element={<TestCases />} />
               <Route path="/test-cases/:id" element={<TestCaseDetails />} />
@@ -176,4 +180,3 @@ export default function App() {
     </Router>
   );
 }
-

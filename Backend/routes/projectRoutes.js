@@ -7,6 +7,7 @@ const upload = require("../middleware/upload");
 const documentController = require("../controllers/documentController");
 const projectOverviewController = require("../controllers/projectOverviewController");
   const projectNotesController = require("../controllers/projectNotesController");
+  const projectDiagramController = require("../controllers/projectDiagramController");
 
 const MENU = "/projects";
 
@@ -102,5 +103,19 @@ router.put(
 router.get("/:id/notes", verifyToken, checkPermission(MENU, "can_view"), projectNotesController.getProjectNotes);
 router.post("/:id/notes", verifyToken, checkPermission(MENU, "can_edit"), projectNotesController.createProjectNote);
 router.delete("/notes/:noteId", verifyToken, checkPermission(MENU, "can_edit"), projectNotesController.deleteProjectNote);
+
+// ── Flow diagrams ────────────────────────────────────────────────────────
+// One diagram (draft) per project + an explicit, immutable version history.
+router.get("/:id/diagram", verifyToken, checkPermission(MENU, "can_view"), projectDiagramController.getDiagram);
+router.put("/:id/diagram", verifyToken, checkPermission(MENU, "can_edit"), projectDiagramController.saveDraft);
+router.get("/:id/diagram/versions", verifyToken, checkPermission(MENU, "can_view"), projectDiagramController.listVersions);
+router.post("/:id/diagram/versions", verifyToken, checkPermission(MENU, "can_edit"), projectDiagramController.createVersion);
+
+// Note: these two are keyed by version id, not project id, so they sit
+// outside the "/:id/..." project-scoped block above (same pattern as the
+// existing "/documents/:docId" routes).
+router.get("/diagram-versions/:versionId", verifyToken, checkPermission(MENU, "can_view"), projectDiagramController.getVersion);
+router.post("/diagram-versions/:versionId/restore", verifyToken, checkPermission(MENU, "can_edit"), projectDiagramController.restoreVersion);
+router.delete("/diagram-versions/:versionId", verifyToken, checkPermission(MENU, "can_delete"), projectDiagramController.deleteVersion);
 
 module.exports = router;
