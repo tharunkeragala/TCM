@@ -80,8 +80,12 @@ const formatDatePlain = (dateStr: string | null): string => {
 
 const isOverdue = (dueDate: string | null, status: string) => {
   if (!dueDate) return false;
-  if (["done", "closed", "cancelled"].includes(status.toLowerCase()))
-    return false;
+
+  const normalizedStatus = status.trim().toLowerCase();
+  const completedStatuses = ["completed", "done", "closed", "cancelled"];
+
+  if (completedStatuses.includes(normalizedStatus)) return false;
+
   return new Date(dueDate) < new Date();
 };
 
