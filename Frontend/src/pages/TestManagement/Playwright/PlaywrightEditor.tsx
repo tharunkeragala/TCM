@@ -1,12 +1,51 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { FaCode, FaPlay, FaSave, FaVideo, FaSearch, FaTimes, FaChevronDown } from "react-icons/fa";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import {
+  FaBrain,
+  FaChevronDown,
+  FaCode,
+  FaDatabase,
+  FaExchangeAlt,
+  FaLightbulb,
+  FaPlay,
+  FaProjectDiagram,
+  FaSave,
+  FaSearch,
+  FaServer,
+  FaTimes,
+  FaVideo,
+} from "react-icons/fa";
+
 import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import PageMeta from "../../../components/common/PageMeta";
 import Alert from "../../../components/ui/alert/Alert";
 import API from "../../../services/api";
-import { authHeaders, formatSelector } from "./helpers";
-import type { ParsedStep, TestCase } from "./types";
+
+import {
+  authHeaders,
+  formatSelector,
+} from "./helpers";
+
+import type {
+  ParsedStep,
+  TestCase,
+} from "./types";
+
+import DataDrivenTestConfig from "../../../components/DataDrivenTestConfig";
+import ConditionalBlockBuilder from "../../../components/ConditionalBlockBuilder";
+import KeywordScriptEditor from "../../../components/KeywordScriptEditor";
+import DataTransformationBuilder from "../../../components/DataTransformationBuilder";
+import APITestingBuilder from "../../../components/APITestingBuilder";
+import AISuggestions from "../../../components/AISuggestions";
 
 const SAMPLE_SCRIPT = `// Navigate to page
 await page.goto('https://example.com');
@@ -19,187 +58,614 @@ await page.waitForSelector('h1');
 // await page.fill('[name="username"]', 'demo');
 `;
 
+type AdvancedTab =
+  | "data-driven"
+  | "api-testing"
+  | "conditional"
+  | "keywords"
+  | "transformation"
+  | "ai";
+
+interface AdvancedTabDefinition {
+  id: AdvancedTab;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{
+    className?: string;
+  }>;
+}
+
+const ADVANCED_TABS: AdvancedTabDefinition[] = [
+  {
+    id: "data-driven",
+    label: "Data-Driven",
+    description:
+      "Upload datasets and execute parameterized tests.",
+    icon: FaDatabase,
+  },
+  {
+    id: "api-testing",
+    label: "API Testing",
+    description:
+      "Configure and execute API requests.",
+    icon: FaServer,
+  },
+  {
+    id: "conditional",
+    label: "Conditional",
+    description:
+      "Create conditional and looping execution flows.",
+    icon: FaProjectDiagram,
+  },
+  {
+    id: "keywords",
+    label: "Keywords",
+    description:
+      "Write or convert keyword-driven test scripts.",
+    icon: FaCode,
+  },
+  {
+    id: "transformation",
+    label: "Transformation",
+    description:
+      "Test JSONPath, JMESPath, XPath, regex, and JavaScript transformations.",
+    icon: FaExchangeAlt,
+  },
+  {
+    id: "ai",
+    label: "AI Suggestions",
+    description:
+      "Generate assertion and refactoring recommendations.",
+    icon: FaLightbulb,
+  },
+];
+
 export default function PlaywrightEditor() {
   const { testCaseId } = useParams();
   const navigate = useNavigate();
 
   const [tests, setTests] = useState<TestCase[]>([]);
-  const [testSearch, setTestSearch] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedId, setSelectedId] = useState<string>(testCaseId || "");
-  const [selectedCase, setSelectedCase] = useState<TestCase | null>(null);
-  const [script, setScript] = useState(SAMPLE_SCRIPT);
-  const [steps, setSteps] = useState<ParsedStep[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [testSearch, setTestSearch] =
+    useState("");
+  const [showDropdown, setShowDropdown] =
+    useState(false);
+
+  const [selectedId, setSelectedId] =
+    useState<string>(testCaseId || "");
+
+  const [selectedCase, setSelectedCase] =
+    useState<TestCase | null>(null);
+
+  const [script, setScript] =
+    useState(SAMPLE_SCRIPT);
+
+  const [steps, setSteps] = useState<
+    ParsedStep[]
+  >([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [activeAdvancedTab, setActiveAdvancedTab] =
+    useState<AdvancedTab>("data-driven");
+
+  const [alert, setAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
-    API.get("/api/test-cases", { headers: authHeaders() })
-      .then((res) => setTests(res.data.data || []))
-      .catch(() => setTests([]));
+    API.get("/api/test-cases", {
+      headers: authHeaders(),
+    })
+      .then((response) => {
+        setTests(response.data.data || []);
+      })
+      .catch(() => {
+        setTests([]);
+      });
   }, []);
 
   useEffect(() => {
-    const recorded = localStorage.getItem("recordedPlaywrightScript");
-    if (recorded) {
-      setScript(recorded);
-      localStorage.removeItem("recordedPlaywrightScript");
+    const recordedScript =
+      localStorage.getItem(
+        "recordedPlaywrightScript",
+      );
+
+    if (recordedScript) {
+      setScript(recordedScript);
+
+      localStorage.removeItem(
+        "recordedPlaywrightScript",
+      );
     }
   }, []);
 
-  const loadCase = useCallback(async (id: string) => {
-    if (!id) { setSelectedCase(null); return; }
-    setLoading(true);
-    setAlert(null);
-    try {
-      const res = await API.get(`/api/test-cases/${id}`, { headers: authHeaders() });
-      if (res.data.success) {
-        const tc: TestCase = res.data.data;
-        setSelectedCase(tc);
-        setScript((current) => {
-          const recorded = localStorage.getItem("recordedPlaywrightScript");
-          if (recorded) return recorded;
-          if (current !== SAMPLE_SCRIPT && !testCaseId) return current;
-          return tc.playwright_script || SAMPLE_SCRIPT;
-        });
+  const loadCase = useCallback(
+    async (id: string) => {
+      if (!id) {
+        setSelectedCase(null);
+        return;
       }
-    } catch (err: any) {
-      setAlert({ type: "error", message: err.response?.data?.message || "Failed to load test case." });
-    } finally {
-      setLoading(false);
-    }
-  }, [testCaseId]);
+
+      setLoading(true);
+      setAlert(null);
+
+      try {
+        const response = await API.get(
+          `/api/test-cases/${id}`,
+          {
+            headers: authHeaders(),
+          },
+        );
+
+        if (response.data.success) {
+          const testCase: TestCase =
+            response.data.data;
+
+          setSelectedCase(testCase);
+
+          setScript((currentScript) => {
+            const recordedScript =
+              localStorage.getItem(
+                "recordedPlaywrightScript",
+              );
+
+            if (recordedScript) {
+              return recordedScript;
+            }
+
+            if (
+              currentScript !== SAMPLE_SCRIPT &&
+              !testCaseId
+            ) {
+              return currentScript;
+            }
+
+            return (
+              testCase.playwright_script ||
+              SAMPLE_SCRIPT
+            );
+          });
+        }
+      } catch (error: any) {
+        setAlert({
+          type: "error",
+          message:
+            error.response?.data?.message ||
+            "Failed to load test case.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [testCaseId],
+  );
 
   useEffect(() => {
-    if (selectedId) loadCase(selectedId);
+    if (selectedId) {
+      loadCase(selectedId);
+    }
   }, [selectedId, loadCase]);
 
-  const parseSteps = useCallback(async (value: string) => {
-    try {
-      const res = await API.post("/api/playwright/parse-steps", { script: value }, { headers: authHeaders() });
-      setSteps(res.data.data || []);
-    } catch { setSteps([]); }
-  }, []);
+  const parseSteps = useCallback(
+    async (value: string) => {
+      try {
+        const response = await API.post(
+          "/api/playwright/parse-steps",
+          {
+            script: value,
+          },
+          {
+            headers: authHeaders(),
+          },
+        );
+
+        setSteps(response.data.data || []);
+      } catch {
+        setSteps([]);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    const t = setTimeout(() => parseSteps(script), 250);
-    return () => clearTimeout(t);
+    const timeout = window.setTimeout(() => {
+      parseSteps(script);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
   }, [script, parseSteps]);
 
-  const canSave = useMemo(() => Boolean(selectedCase && script.trim()), [selectedCase, script]);
+  const canSave = useMemo(
+    () =>
+      Boolean(
+        selectedCase &&
+          script.trim(),
+      ),
+    [selectedCase, script],
+  );
+
+  const filteredTests = useMemo(
+    () =>
+      tests.filter((test) =>
+        `${test.title} ${
+          test.project_name || ""
+        } ${test.suite_name || ""}`
+          .toLowerCase()
+          .includes(
+            testSearch.toLowerCase(),
+          ),
+      ),
+    [tests, testSearch],
+  );
+
+  const selectedAdvancedTab =
+    useMemo(
+      () =>
+        ADVANCED_TABS.find(
+          (tab) =>
+            tab.id === activeAdvancedTab,
+        ),
+      [activeAdvancedTab],
+    );
 
   const saveScript = async () => {
-    if (!selectedCase) { setAlert({ type: "error", message: "Select a test case before saving." }); return; }
+    if (!selectedCase) {
+      setAlert({
+        type: "error",
+        message:
+          "Select a test case before saving.",
+      });
+
+      return;
+    }
+
     setSaving(true);
     setAlert(null);
+
     try {
       const payload = {
         suite_id: selectedCase.suite_id,
         title: selectedCase.title,
-        preconditions: selectedCase.preconditions || "",
-        priority: selectedCase.priority || "Medium",
-        status: selectedCase.status || "Draft",
+        preconditions:
+          selectedCase.preconditions || "",
+        priority:
+          selectedCase.priority || "Medium",
+        status:
+          selectedCase.status || "Draft",
         steps: selectedCase.steps || [],
         playwright_script: script,
       };
-      const res = await API.put(`/api/test-cases/update/${selectedCase.id}`, payload, { headers: authHeaders() });
-      if (res.data.success) {
-        setAlert({ type: "success", message: "Script saved successfully." });
+
+      const response = await API.put(
+        `/api/test-cases/update/${selectedCase.id}`,
+        payload,
+        {
+          headers: authHeaders(),
+        },
+      );
+
+      if (response.data.success) {
+        setSelectedCase((current) =>
+          current
+            ? {
+                ...current,
+                playwright_script: script,
+              }
+            : current,
+        );
+
+        setAlert({
+          type: "success",
+          message:
+            "Script saved successfully.",
+        });
       }
-    } catch (err: any) {
-      setAlert({ type: "error", message: err.response?.data?.message || "Failed to save script." });
+    } catch (error: any) {
+      setAlert({
+        type: "error",
+        message:
+          error.response?.data?.message ||
+          "Failed to save script.",
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const filteredTests = useMemo(() =>
-    tests.filter((t) =>
-      `${t.title} ${t.project_name || ""} ${t.suite_name || ""}`.toLowerCase().includes(testSearch.toLowerCase())
-    ), [tests, testSearch]);
+  const selectTest = (
+    testCase: TestCase,
+  ) => {
+    setSelectedId(
+      String(testCase.id),
+    );
 
-  const selectTest = (tc: TestCase) => {
-    setSelectedId(String(tc.id));
     setTestSearch("");
     setShowDropdown(false);
-    navigate(`/script/editor/${tc.id}`);
+
+    navigate(
+      `/script/editor/${testCase.id}`,
+    );
+  };
+
+  const clearSelectedTest = () => {
+    setSelectedId("");
+    setSelectedCase(null);
+    setScript(SAMPLE_SCRIPT);
+    setSteps([]);
+    setTestSearch("");
+    setShowDropdown(false);
+    setActiveAdvancedTab("data-driven");
+
+    navigate("/script/editor");
+  };
+
+  const handleKeywordConversion = (
+    convertedCode: string,
+  ) => {
+    setScript(convertedCode);
+
+    setAlert({
+      type: "success",
+      message:
+        "Keyword script converted and loaded into the editor.",
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const renderAdvancedContent = () => {
+    if (!selectedCase) {
+      return null;
+    }
+
+    const selectedTestCaseId =
+      selectedCase.id;
+
+    switch (activeAdvancedTab) {
+      case "data-driven":
+        return (
+          <DataDrivenTestConfig
+            testCaseId={
+              selectedTestCaseId
+            }
+          />
+        );
+
+      case "api-testing":
+        return (
+          <APITestingBuilder
+            testCaseId={
+              selectedTestCaseId
+            }
+          />
+        );
+
+      case "conditional":
+        return (
+          <ConditionalBlockBuilder
+            testCaseId={
+              selectedTestCaseId
+            }
+          />
+        );
+
+      case "keywords":
+        return (
+          <KeywordScriptEditor
+            testCaseId={
+              selectedTestCaseId
+            }
+            onConvert={
+              handleKeywordConversion
+            }
+          />
+        );
+
+      case "transformation":
+        return (
+          <DataTransformationBuilder />
+        );
+
+      case "ai":
+        return (
+          <AISuggestions
+            testCaseId={
+              selectedTestCaseId
+            }
+            script={script}
+          />
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
     <div>
-      <PageMeta title="Script Editor" description="Edit Script automation scripts" />
-      <PageBreadcrumb pageTitle="Script Editor" />
+      <PageMeta
+        title="Script Editor"
+        description="Edit Playwright automation scripts"
+      />
+
+      <PageBreadcrumb
+        pageTitle="Script Editor"
+      />
 
       <div className="mt-4 space-y-4">
-        {alert && <Alert variant={alert.type} title={alert.type === "success" ? "Success" : "Error"} message={alert.message} />}
+        {alert && (
+          <Alert
+            variant={alert.type}
+            title={
+              alert.type === "success"
+                ? "Success"
+                : "Error"
+            }
+            message={alert.message}
+          />
+        )}
 
         {/* Top bar */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <div className="flex flex-wrap items-center gap-3">
             {/* Test case picker */}
-            <div className="relative flex-1 min-w-[280px]">
+            <div className="relative min-w-[280px] flex-1">
               <div
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 cursor-pointer dark:border-gray-600 dark:bg-gray-800"
-                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+                onClick={() =>
+                  setShowDropdown(
+                    (current) => !current,
+                  )
+                }
               >
-                <FaSearch className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                <FaSearch className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+
                 <input
-                  value={showDropdown ? testSearch : (selectedCase ? `#${selectedCase.id} — ${selectedCase.title}` : "")}
-                  onChange={(e) => { setTestSearch(e.target.value); setShowDropdown(true); }}
-                  onFocus={() => { setTestSearch(""); setShowDropdown(true); }}
+                  value={
+                    showDropdown
+                      ? testSearch
+                      : selectedCase
+                        ? `#${selectedCase.id} — ${selectedCase.title}`
+                        : ""
+                  }
+                  onChange={(event) => {
+                    setTestSearch(
+                      event.target.value,
+                    );
+
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => {
+                    setTestSearch("");
+                    setShowDropdown(true);
+                  }}
                   placeholder="Search and select a test case…"
                   className="flex-1 bg-transparent text-sm text-gray-900 focus:outline-none dark:text-white"
                 />
-                {selectedCase && !showDropdown ? (
-                  <button onClick={(e) => { e.stopPropagation(); setSelectedId(""); setSelectedCase(null); navigate("/script/editor"); }}>
+
+                {selectedCase &&
+                !showDropdown ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      clearSelectedTest();
+                    }}
+                    aria-label="Clear selected test case"
+                  >
                     <FaTimes className="h-3 w-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" />
                   </button>
                 ) : (
-                  <FaChevronDown className={`h-3 w-3 text-gray-400 transition-transform ${showDropdown ? "rotate-180" : ""}`} />
+                  <FaChevronDown
+                    className={`h-3 w-3 text-gray-400 transition-transform ${
+                      showDropdown
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
                 )}
               </div>
+
               {showDropdown && (
-                <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 max-h-64 overflow-y-auto">
-                  {filteredTests.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-sm text-gray-500">No test cases found.</div>
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                  {filteredTests.length ===
+                  0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-gray-500">
+                      No test cases found.
+                    </div>
                   ) : (
-                    filteredTests.map((tc) => (
-                      <button
-                        key={tc.id}
-                        onClick={() => selectTest(tc)}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-100 dark:border-gray-700/50 last:border-0"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">#{tc.id} — {tc.title}</span>
-                          {!tc.playwright_script && <span className="text-xs text-amber-500 flex-shrink-0">No script</span>}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {tc.project_name || "—"} / {tc.suite_name || "—"}
-                        </div>
-                      </button>
-                    ))
+                    filteredTests.map(
+                      (testCase) => (
+                        <button
+                          type="button"
+                          key={
+                            testCase.id
+                          }
+                          onClick={() =>
+                            selectTest(
+                              testCase,
+                            )
+                          }
+                          className="w-full border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-gray-50 dark:border-gray-700/50 dark:hover:bg-gray-800"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                              #
+                              {
+                                testCase.id
+                              }{" "}
+                              —{" "}
+                              {
+                                testCase.title
+                              }
+                            </span>
+
+                            {!testCase.playwright_script && (
+                              <span className="flex-shrink-0 text-xs text-amber-500">
+                                No script
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            {testCase.project_name ||
+                              "—"}{" "}
+                            /{" "}
+                            {testCase.suite_name ||
+                              "—"}
+                          </div>
+                        </button>
+                      ),
+                    )
                   )}
                 </div>
               )}
-              {showDropdown && <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />}
+
+              {showDropdown && (
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() =>
+                    setShowDropdown(false)
+                  }
+                />
+              )}
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
                 to="/script/recorder"
                 className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
-                <FaVideo className="h-3.5 w-3.5" /> Record
+                <FaVideo className="h-3.5 w-3.5" />
+                Record
               </Link>
 
               <button
+                type="button"
                 onClick={saveScript}
-                disabled={!canSave || saving || loading}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                disabled={
+                  !canSave ||
+                  saving ||
+                  loading
+                }
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <FaSave className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+                <FaSave className="h-3.5 w-3.5" />
+
+                {saving
+                  ? "Saving…"
+                  : "Save"}
               </button>
 
               {selectedCase && (
@@ -207,7 +673,8 @@ export default function PlaywrightEditor() {
                   to={`/script/runner/${selectedCase.id}`}
                   className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
                 >
-                  <FaPlay className="h-3.5 w-3.5" /> Run
+                  <FaPlay className="h-3.5 w-3.5" />
+                  Run
                 </Link>
               )}
             </div>
@@ -217,64 +684,258 @@ export default function PlaywrightEditor() {
           {selectedCase && (
             <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                <span className="font-medium text-gray-700 dark:text-gray-300">{selectedCase.project_name || "—"}</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {selectedCase.project_name ||
+                    "—"}
+                </span>
+
                 {" / "}
-                <span className="font-medium text-gray-700 dark:text-gray-300">{selectedCase.suite_name || "—"}</span>
+
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {selectedCase.suite_name ||
+                    "—"}
+                </span>
               </span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                { Low: "bg-gray-100 text-gray-600", Medium: "bg-blue-100 text-blue-700", High: "bg-orange-100 text-orange-700", Critical: "bg-red-100 text-red-700" }[selectedCase.priority] || ""
-              }`}>{selectedCase.priority}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                { Draft: "bg-yellow-100 text-yellow-700", Ready: "bg-green-100 text-green-700", Deprecated: "bg-gray-100 text-gray-500" }[selectedCase.status] || ""
-              }`}>{selectedCase.status}</span>
-              <Link to={`/test-cases/${selectedCase.id}`} className="ml-auto text-xs text-blue-600 hover:underline dark:text-blue-400">View Details →</Link>
+
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  {
+                    Low: "bg-gray-100 text-gray-600",
+                    Medium:
+                      "bg-blue-100 text-blue-700",
+                    High: "bg-orange-100 text-orange-700",
+                    Critical:
+                      "bg-red-100 text-red-700",
+                  }[
+                    selectedCase.priority
+                  ] || ""
+                }`}
+              >
+                {selectedCase.priority}
+              </span>
+
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  {
+                    Draft:
+                      "bg-yellow-100 text-yellow-700",
+                    Ready:
+                      "bg-green-100 text-green-700",
+                    Deprecated:
+                      "bg-gray-100 text-gray-500",
+                  }[
+                    selectedCase.status
+                  ] || ""
+                }`}
+              >
+                {selectedCase.status}
+              </span>
+
+              <Link
+                to={`/test-cases/${selectedCase.id}`}
+                className="ml-auto text-xs text-blue-600 hover:underline dark:text-blue-400"
+              >
+                View Details →
+              </Link>
             </div>
           )}
         </div>
 
-        {/* Editor + parsed steps */}
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        {/* Editor and parsed steps */}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-gray-700">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                <FaCode className="text-blue-500" /> Script
+                <FaCode className="text-blue-500" />
+                Script
               </h2>
+
               <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                <span>{script.split("\n").length} lines</span>
-                {loading && <span className="text-blue-500">Loading…</span>}
+                <span>
+                  {
+                    script.split("\n")
+                      .length
+                  }{" "}
+                  lines
+                </span>
+
+                {loading && (
+                  <span className="text-blue-500">
+                    Loading…
+                  </span>
+                )}
               </div>
             </div>
+
             <textarea
               value={script}
-              onChange={(e) => setScript(e.target.value)}
+              onChange={(event) =>
+                setScript(
+                  event.target.value,
+                )
+              }
               spellCheck={false}
               className="h-[600px] w-full resize-none bg-white p-5 font-mono text-sm text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
               placeholder="Write your script here…"
             />
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Parsed Steps</h3>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">{steps.length}</span>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Parsed Steps
+              </h3>
+
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                {steps.length}
+              </span>
             </div>
+
             <div className="max-h-[600px] space-y-2 overflow-y-auto pr-1">
               {steps.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No recognizable script steps.</div>
+                <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  No recognizable script
+                  steps.
+                </div>
               ) : (
-                steps.map((step, index) => (
-                  <div key={`${index}-${step.raw}`} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-300">{index + 1}. {step.action}</span>
-                      {step.value && <span className="max-w-[120px] truncate text-xs text-green-600 dark:text-green-400">{step.value}</span>}
+                steps.map(
+                  (step, index) => (
+                    <div
+                      key={`${index}-${step.raw}`}
+                      className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-300">
+                          {index + 1}.{" "}
+                          {step.action}
+                        </span>
+
+                        {step.value && (
+                          <span
+                            title={String(
+                              step.value,
+                            )}
+                            className="max-w-[120px] truncate text-xs text-green-600 dark:text-green-400"
+                          >
+                            {
+                              step.value
+                            }
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="break-all font-mono text-xs text-gray-500 dark:text-gray-400">
+                        {formatSelector(
+                          step.selector,
+                        ) ||
+                          step.raw ||
+                          "—"}
+                      </div>
                     </div>
-                    <div className="break-all font-mono text-xs text-gray-500 dark:text-gray-400">{formatSelector(step.selector) || step.raw || "—"}</div>
-                  </div>
-                ))
+                  ),
+                )
               )}
             </div>
           </div>
         </div>
+
+        {/* Advanced automation tools */}
+        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="border-b border-gray-200 px-4 py-4 sm:px-5 dark:border-gray-700">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-purple-100 p-2 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300">
+                <FaBrain />
+              </div>
+
+              <div>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                  Advanced Automation
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Configure data-driven,
+                  API, conditional,
+                  keyword-driven, transformation,
+                  and AI-assisted test
+                  capabilities.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {!selectedCase ? (
+            <div className="p-6">
+              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800/50">
+                <FaBrain className="mx-auto mb-3 text-2xl text-gray-400" />
+
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Select a test case to use
+                  the advanced automation
+                  tools.
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  The selected test case ID
+                  and current editor script
+                  will be passed to the
+                  relevant module.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-700">
+                <div className="flex min-w-max gap-1 p-2">
+                  {ADVANCED_TABS.map(
+                    (tab) => {
+                      const Icon =
+                        tab.icon;
+
+                      const isActive =
+                        activeAdvancedTab ===
+                        tab.id;
+
+                      return (
+                        <button
+                          type="button"
+                          key={tab.id}
+                          onClick={() =>
+                            setActiveAdvancedTab(
+                              tab.id,
+                            )
+                          }
+                          title={
+                            tab.description
+                          }
+                          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {tab.label}
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+              </div>
+
+              <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {
+                    selectedAdvancedTab?.description
+                  }
+                </p>
+              </div>
+
+              <div className="p-4 sm:p-5">
+                {renderAdvancedContent()}
+              </div>
+            </>
+          )}
+        </section>
       </div>
     </div>
   );
