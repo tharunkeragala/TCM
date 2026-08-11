@@ -1,14 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   FaBrain,
   FaChevronDown,
@@ -30,15 +21,9 @@ import PageMeta from "../../../components/common/PageMeta";
 import Alert from "../../../components/ui/alert/Alert";
 import API from "../../../services/api";
 
-import {
-  authHeaders,
-  formatSelector,
-} from "./helpers";
+import { authHeaders, formatSelector } from "./helpers";
 
-import type {
-  ParsedStep,
-  TestCase,
-} from "./types";
+import type { ParsedStep, TestCase } from "./types";
 
 import DataDrivenTestConfig from "../../../components/DataDrivenTestConfig";
 import ConditionalBlockBuilder from "../../../components/ConditionalBlockBuilder";
@@ -79,29 +64,25 @@ const ADVANCED_TABS: AdvancedTabDefinition[] = [
   {
     id: "data-driven",
     label: "Data-Driven",
-    description:
-      "Upload datasets and execute parameterized tests.",
+    description: "Upload datasets and execute parameterized tests.",
     icon: FaDatabase,
   },
   {
     id: "api-testing",
     label: "API Testing",
-    description:
-      "Configure and execute API requests.",
+    description: "Configure and execute API requests.",
     icon: FaServer,
   },
   {
     id: "conditional",
     label: "Conditional",
-    description:
-      "Create conditional and looping execution flows.",
+    description: "Create conditional and looping execution flows.",
     icon: FaProjectDiagram,
   },
   {
     id: "keywords",
     label: "Keywords",
-    description:
-      "Write or convert keyword-driven test scripts.",
+    description: "Write or convert keyword-driven test scripts.",
     icon: FaCode,
   },
   {
@@ -114,8 +95,7 @@ const ADVANCED_TABS: AdvancedTabDefinition[] = [
   {
     id: "ai",
     label: "AI Suggestions",
-    description:
-      "Generate assertion and refactoring recommendations.",
+    description: "Generate assertion and refactoring recommendations.",
     icon: FaLightbulb,
   },
 ];
@@ -125,29 +105,20 @@ export default function PlaywrightEditor() {
   const navigate = useNavigate();
 
   const [tests, setTests] = useState<TestCase[]>([]);
-  const [testSearch, setTestSearch] =
-    useState("");
-  const [showDropdown, setShowDropdown] =
-    useState(false);
+  const [testSearch, setTestSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
-  const [selectedId, setSelectedId] =
-    useState<string>(testCaseId || "");
+  const [selectedId, setSelectedId] = useState<string>(testCaseId || "");
 
-  const [selectedCase, setSelectedCase] =
-    useState<TestCase | null>(null);
+  const [selectedCase, setSelectedCase] = useState<TestCase | null>(null);
 
-  const [script, setScript] =
-    useState(SAMPLE_SCRIPT);
+  const [script, setScript] = useState(SAMPLE_SCRIPT);
 
-  const [steps, setSteps] = useState<
-    ParsedStep[]
-  >([]);
+  const [steps, setSteps] = useState<ParsedStep[]>([]);
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [activeAdvancedTab, setActiveAdvancedTab] =
     useState<AdvancedTab>("data-driven");
@@ -170,17 +141,12 @@ export default function PlaywrightEditor() {
   }, []);
 
   useEffect(() => {
-    const recordedScript =
-      localStorage.getItem(
-        "recordedPlaywrightScript",
-      );
+    const recordedScript = localStorage.getItem("recordedPlaywrightScript");
 
     if (recordedScript) {
       setScript(recordedScript);
 
-      localStorage.removeItem(
-        "recordedPlaywrightScript",
-      );
+      localStorage.removeItem("recordedPlaywrightScript");
     }
   }, []);
 
@@ -195,48 +161,35 @@ export default function PlaywrightEditor() {
       setAlert(null);
 
       try {
-        const response = await API.get(
-          `/api/test-cases/${id}`,
-          {
-            headers: authHeaders(),
-          },
-        );
+        const response = await API.get(`/api/test-cases/${id}`, {
+          headers: authHeaders(),
+        });
 
         if (response.data.success) {
-          const testCase: TestCase =
-            response.data.data;
+          const testCase: TestCase = response.data.data;
 
           setSelectedCase(testCase);
 
           setScript((currentScript) => {
-            const recordedScript =
-              localStorage.getItem(
-                "recordedPlaywrightScript",
-              );
+            const recordedScript = localStorage.getItem(
+              "recordedPlaywrightScript",
+            );
 
             if (recordedScript) {
               return recordedScript;
             }
 
-            if (
-              currentScript !== SAMPLE_SCRIPT &&
-              !testCaseId
-            ) {
+            if (currentScript !== SAMPLE_SCRIPT && !testCaseId) {
               return currentScript;
             }
 
-            return (
-              testCase.playwright_script ||
-              SAMPLE_SCRIPT
-            );
+            return testCase.playwright_script || SAMPLE_SCRIPT;
           });
         }
       } catch (error: any) {
         setAlert({
           type: "error",
-          message:
-            error.response?.data?.message ||
-            "Failed to load test case.",
+          message: error.response?.data?.message || "Failed to load test case.",
         });
       } finally {
         setLoading(false);
@@ -251,26 +204,23 @@ export default function PlaywrightEditor() {
     }
   }, [selectedId, loadCase]);
 
-  const parseSteps = useCallback(
-    async (value: string) => {
-      try {
-        const response = await API.post(
-          "/api/playwright/parse-steps",
-          {
-            script: value,
-          },
-          {
-            headers: authHeaders(),
-          },
-        );
+  const parseSteps = useCallback(async (value: string) => {
+    try {
+      const response = await API.post(
+        "/api/playwright/parse-steps",
+        {
+          script: value,
+        },
+        {
+          headers: authHeaders(),
+        },
+      );
 
-        setSteps(response.data.data || []);
-      } catch {
-        setSteps([]);
-      }
-    },
-    [],
-  );
+      setSteps(response.data.data || []);
+    } catch {
+      setSteps([]);
+    }
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -283,44 +233,30 @@ export default function PlaywrightEditor() {
   }, [script, parseSteps]);
 
   const canSave = useMemo(
-    () =>
-      Boolean(
-        selectedCase &&
-          script.trim(),
-      ),
+    () => Boolean(selectedCase && script.trim()),
     [selectedCase, script],
   );
 
   const filteredTests = useMemo(
     () =>
       tests.filter((test) =>
-        `${test.title} ${
-          test.project_name || ""
-        } ${test.suite_name || ""}`
+        `${test.title} ${test.project_name || ""} ${test.suite_name || ""}`
           .toLowerCase()
-          .includes(
-            testSearch.toLowerCase(),
-          ),
+          .includes(testSearch.toLowerCase()),
       ),
     [tests, testSearch],
   );
 
-  const selectedAdvancedTab =
-    useMemo(
-      () =>
-        ADVANCED_TABS.find(
-          (tab) =>
-            tab.id === activeAdvancedTab,
-        ),
-      [activeAdvancedTab],
-    );
+  const selectedAdvancedTab = useMemo(
+    () => ADVANCED_TABS.find((tab) => tab.id === activeAdvancedTab),
+    [activeAdvancedTab],
+  );
 
   const saveScript = async () => {
     if (!selectedCase) {
       setAlert({
         type: "error",
-        message:
-          "Select a test case before saving.",
+        message: "Select a test case before saving.",
       });
 
       return;
@@ -333,12 +269,9 @@ export default function PlaywrightEditor() {
       const payload = {
         suite_id: selectedCase.suite_id,
         title: selectedCase.title,
-        preconditions:
-          selectedCase.preconditions || "",
-        priority:
-          selectedCase.priority || "Medium",
-        status:
-          selectedCase.status || "Draft",
+        preconditions: selectedCase.preconditions || "",
+        priority: selectedCase.priority || "Medium",
+        status: selectedCase.status || "Draft",
         steps: selectedCase.steps || [],
         playwright_script: script,
       };
@@ -363,35 +296,26 @@ export default function PlaywrightEditor() {
 
         setAlert({
           type: "success",
-          message:
-            "Script saved successfully.",
+          message: "Script saved successfully.",
         });
       }
     } catch (error: any) {
       setAlert({
         type: "error",
-        message:
-          error.response?.data?.message ||
-          "Failed to save script.",
+        message: error.response?.data?.message || "Failed to save script.",
       });
     } finally {
       setSaving(false);
     }
   };
 
-  const selectTest = (
-    testCase: TestCase,
-  ) => {
-    setSelectedId(
-      String(testCase.id),
-    );
+  const selectTest = (testCase: TestCase) => {
+    setSelectedId(String(testCase.id));
 
     setTestSearch("");
     setShowDropdown(false);
 
-    navigate(
-      `/script/editor/${testCase.id}`,
-    );
+    navigate(`/script/editor/${testCase.id}`);
   };
 
   const clearSelectedTest = () => {
@@ -406,15 +330,12 @@ export default function PlaywrightEditor() {
     navigate("/script/editor");
   };
 
-  const handleKeywordConversion = (
-    convertedCode: string,
-  ) => {
+  const handleKeywordConversion = (convertedCode: string) => {
     setScript(convertedCode);
 
     setAlert({
       type: "success",
-      message:
-        "Keyword script converted and loaded into the editor.",
+      message: "Keyword script converted and loaded into the editor.",
     });
 
     window.scrollTo({
@@ -428,62 +349,32 @@ export default function PlaywrightEditor() {
       return null;
     }
 
-    const selectedTestCaseId =
-      selectedCase.id;
+    const selectedTestCaseId = selectedCase.id;
 
     switch (activeAdvancedTab) {
       case "data-driven":
-        return (
-          <DataDrivenTestConfig
-            testCaseId={
-              selectedTestCaseId
-            }
-          />
-        );
+        return <DataDrivenTestConfig testCaseId={selectedTestCaseId} />;
 
       case "api-testing":
-        return (
-          <APITestingBuilder
-            testCaseId={
-              selectedTestCaseId
-            }
-          />
-        );
+        return <APITestingBuilder testCaseId={selectedTestCaseId} />;
 
       case "conditional":
-        return (
-          <ConditionalBlockBuilder
-            testCaseId={
-              selectedTestCaseId
-            }
-          />
-        );
+        return <ConditionalBlockBuilder testCaseId={selectedTestCaseId} />;
 
       case "keywords":
         return (
           <KeywordScriptEditor
-            testCaseId={
-              selectedTestCaseId
-            }
-            onConvert={
-              handleKeywordConversion
-            }
+            testCaseId={selectedTestCaseId}
+            onConvert={handleKeywordConversion}
           />
         );
 
       case "transformation":
-        return (
-          <DataTransformationBuilder />
-        );
+        return <DataTransformationBuilder />;
 
       case "ai":
         return (
-          <AISuggestions
-            testCaseId={
-              selectedTestCaseId
-            }
-            script={script}
-          />
+          <AISuggestions testCaseId={selectedTestCaseId} script={script} />
         );
 
       default:
@@ -498,19 +389,13 @@ export default function PlaywrightEditor() {
         description="Edit Playwright automation scripts"
       />
 
-      <PageBreadcrumb
-        pageTitle="Script Editor"
-      />
+      <PageBreadcrumb pageTitle="Script Editor" />
 
       <div className="mt-4 space-y-4">
         {alert && (
           <Alert
             variant={alert.type}
-            title={
-              alert.type === "success"
-                ? "Success"
-                : "Error"
-            }
+            title={alert.type === "success" ? "Success" : "Error"}
             message={alert.message}
           />
         )}
@@ -522,11 +407,7 @@ export default function PlaywrightEditor() {
             <div className="relative min-w-[280px] flex-1">
               <div
                 className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-                onClick={() =>
-                  setShowDropdown(
-                    (current) => !current,
-                  )
-                }
+                onClick={() => setShowDropdown((current) => !current)}
               >
                 <FaSearch className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
 
@@ -539,9 +420,7 @@ export default function PlaywrightEditor() {
                         : ""
                   }
                   onChange={(event) => {
-                    setTestSearch(
-                      event.target.value,
-                    );
+                    setTestSearch(event.target.value);
 
                     setShowDropdown(true);
                   }}
@@ -553,8 +432,7 @@ export default function PlaywrightEditor() {
                   className="flex-1 bg-transparent text-sm text-gray-900 focus:outline-none dark:text-white"
                 />
 
-                {selectedCase &&
-                !showDropdown ? (
+                {selectedCase && !showDropdown ? (
                   <button
                     type="button"
                     onClick={(event) => {
@@ -568,9 +446,7 @@ export default function PlaywrightEditor() {
                 ) : (
                   <FaChevronDown
                     className={`h-3 w-3 text-gray-400 transition-transform ${
-                      showDropdown
-                        ? "rotate-180"
-                        : ""
+                      showDropdown ? "rotate-180" : ""
                     }`}
                   />
                 )}
@@ -578,55 +454,36 @@ export default function PlaywrightEditor() {
 
               {showDropdown && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-                  {filteredTests.length ===
-                  0 ? (
+                  {filteredTests.length === 0 ? (
                     <div className="px-4 py-6 text-center text-sm text-gray-500">
                       No test cases found.
                     </div>
                   ) : (
-                    filteredTests.map(
-                      (testCase) => (
-                        <button
-                          type="button"
-                          key={
-                            testCase.id
-                          }
-                          onClick={() =>
-                            selectTest(
-                              testCase,
-                            )
-                          }
-                          className="w-full border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-gray-50 dark:border-gray-700/50 dark:hover:bg-gray-800"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                              #
-                              {
-                                testCase.id
-                              }{" "}
-                              —{" "}
-                              {
-                                testCase.title
-                              }
+                    filteredTests.map((testCase) => (
+                      <button
+                        type="button"
+                        key={testCase.id}
+                        onClick={() => selectTest(testCase)}
+                        className="w-full border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-gray-50 dark:border-gray-700/50 dark:hover:bg-gray-800"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                            #{testCase.id} — {testCase.title}
+                          </span>
+
+                          {!testCase.playwright_script && (
+                            <span className="flex-shrink-0 text-xs text-amber-500">
+                              No script
                             </span>
+                          )}
+                        </div>
 
-                            {!testCase.playwright_script && (
-                              <span className="flex-shrink-0 text-xs text-amber-500">
-                                No script
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                            {testCase.project_name ||
-                              "—"}{" "}
-                            /{" "}
-                            {testCase.suite_name ||
-                              "—"}
-                          </div>
-                        </button>
-                      ),
-                    )
+                        <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          {testCase.project_name || "—"} /{" "}
+                          {testCase.suite_name || "—"}
+                        </div>
+                      </button>
+                    ))
                   )}
                 </div>
               )}
@@ -634,9 +491,7 @@ export default function PlaywrightEditor() {
               {showDropdown && (
                 <div
                   className="fixed inset-0 z-40"
-                  onClick={() =>
-                    setShowDropdown(false)
-                  }
+                  onClick={() => setShowDropdown(false)}
                 />
               )}
             </div>
@@ -654,18 +509,12 @@ export default function PlaywrightEditor() {
               <button
                 type="button"
                 onClick={saveScript}
-                disabled={
-                  !canSave ||
-                  saving ||
-                  loading
-                }
+                disabled={!canSave || saving || loading}
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <FaSave className="h-3.5 w-3.5" />
 
-                {saving
-                  ? "Saving…"
-                  : "Save"}
+                {saving ? "Saving…" : "Save"}
               </button>
 
               {selectedCase && (
@@ -685,15 +534,13 @@ export default function PlaywrightEditor() {
             <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 dark:border-gray-700">
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 <span className="font-medium text-gray-700 dark:text-gray-300">
-                  {selectedCase.project_name ||
-                    "—"}
+                  {selectedCase.project_name || "—"}
                 </span>
 
                 {" / "}
 
                 <span className="font-medium text-gray-700 dark:text-gray-300">
-                  {selectedCase.suite_name ||
-                    "—"}
+                  {selectedCase.suite_name || "—"}
                 </span>
               </span>
 
@@ -701,14 +548,10 @@ export default function PlaywrightEditor() {
                 className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                   {
                     Low: "bg-gray-100 text-gray-600",
-                    Medium:
-                      "bg-blue-100 text-blue-700",
+                    Medium: "bg-blue-100 text-blue-700",
                     High: "bg-orange-100 text-orange-700",
-                    Critical:
-                      "bg-red-100 text-red-700",
-                  }[
-                    selectedCase.priority
-                  ] || ""
+                    Critical: "bg-red-100 text-red-700",
+                  }[selectedCase.priority] || ""
                 }`}
               >
                 {selectedCase.priority}
@@ -717,15 +560,10 @@ export default function PlaywrightEditor() {
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                   {
-                    Draft:
-                      "bg-yellow-100 text-yellow-700",
-                    Ready:
-                      "bg-green-100 text-green-700",
-                    Deprecated:
-                      "bg-gray-100 text-gray-500",
-                  }[
-                    selectedCase.status
-                  ] || ""
+                    Draft: "bg-yellow-100 text-yellow-700",
+                    Ready: "bg-green-100 text-green-700",
+                    Deprecated: "bg-gray-100 text-gray-500",
+                  }[selectedCase.status] || ""
                 }`}
               >
                 {selectedCase.status}
@@ -743,7 +581,8 @@ export default function PlaywrightEditor() {
 
         {/* Editor and parsed steps */}
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          {/* Script */}
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-gray-700">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
                 <FaCode className="text-blue-500" />
@@ -751,37 +590,41 @@ export default function PlaywrightEditor() {
               </h2>
 
               <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                <span>
-                  {
-                    script.split("\n")
-                      .length
-                  }{" "}
-                  lines
-                </span>
+                <span>{script.split("\n").length} lines</span>
 
-                {loading && (
-                  <span className="text-blue-500">
-                    Loading…
-                  </span>
-                )}
+                {loading && <span className="text-blue-500">Loading…</span>}
               </div>
             </div>
 
-            <textarea
-              value={script}
-              onChange={(event) =>
-                setScript(
-                  event.target.value,
-                )
-              }
-              spellCheck={false}
-              className="h-[600px] w-full resize-none bg-white p-5 font-mono text-sm text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
-              placeholder="Write your script here…"
-            />
+            <div className="h-[360px] overflow-auto">
+              <textarea
+                value={script}
+                onChange={(event) => setScript(event.target.value)}
+                spellCheck={false}
+                placeholder="Write your script here…"
+                className="
+          block
+          h-full
+          min-h-full
+          w-full
+          resize-none
+          overflow-auto
+          bg-white
+          p-5
+          font-mono
+          text-sm
+          text-gray-900
+          outline-none
+          dark:bg-gray-900
+          dark:text-gray-100
+        "
+              />
+            </div>
           </div>
 
-          <div className="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <div className="mb-3 flex items-center justify-between">
+          {/* Parsed Steps */}
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex h-[49px] items-center justify-between border-b border-gray-200 px-5 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                 Parsed Steps
               </h3>
@@ -791,49 +634,39 @@ export default function PlaywrightEditor() {
               </span>
             </div>
 
-            <div className="max-h-[600px] space-y-2 overflow-y-auto pr-1">
+            <div className="h-[360px] overflow-y-auto overflow-x-hidden p-4">
               {steps.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                  No recognizable script
-                  steps.
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  No recognizable script steps.
                 </div>
               ) : (
-                steps.map(
-                  (step, index) => (
+                <div className="space-y-2">
+                  {steps.map((step, index) => (
                     <div
                       key={`${index}-${step.raw}`}
                       className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
                     >
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-300">
-                          {index + 1}.{" "}
-                          {step.action}
+                          {index + 1}. {step.action}
                         </span>
 
                         {step.value && (
                           <span
-                            title={String(
-                              step.value,
-                            )}
+                            title={String(step.value)}
                             className="max-w-[120px] truncate text-xs text-green-600 dark:text-green-400"
                           >
-                            {
-                              step.value
-                            }
+                            {step.value}
                           </span>
                         )}
                       </div>
 
                       <div className="break-all font-mono text-xs text-gray-500 dark:text-gray-400">
-                        {formatSelector(
-                          step.selector,
-                        ) ||
-                          step.raw ||
-                          "—"}
+                        {formatSelector(step.selector) || step.raw || "—"}
                       </div>
                     </div>
-                  ),
-                )
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -853,11 +686,8 @@ export default function PlaywrightEditor() {
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Configure data-driven,
-                  API, conditional,
-                  keyword-driven, transformation,
-                  and AI-assisted test
-                  capabilities.
+                  Configure data-driven, API, conditional, keyword-driven,
+                  transformation, and AI-assisted test capabilities.
                 </p>
               </div>
             </div>
@@ -869,16 +699,12 @@ export default function PlaywrightEditor() {
                 <FaBrain className="mx-auto mb-3 text-2xl text-gray-400" />
 
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Select a test case to use
-                  the advanced automation
-                  tools.
+                  Select a test case to use the advanced automation tools.
                 </p>
 
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  The selected test case ID
-                  and current editor script
-                  will be passed to the
-                  relevant module.
+                  The selected test case ID and current editor script will be
+                  passed to the relevant module.
                 </p>
               </div>
             </div>
@@ -886,53 +712,38 @@ export default function PlaywrightEditor() {
             <>
               <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-700">
                 <div className="flex min-w-max gap-1 p-2">
-                  {ADVANCED_TABS.map(
-                    (tab) => {
-                      const Icon =
-                        tab.icon;
+                  {ADVANCED_TABS.map((tab) => {
+                    const Icon = tab.icon;
 
-                      const isActive =
-                        activeAdvancedTab ===
-                        tab.id;
+                    const isActive = activeAdvancedTab === tab.id;
 
-                      return (
-                        <button
-                          type="button"
-                          key={tab.id}
-                          onClick={() =>
-                            setActiveAdvancedTab(
-                              tab.id,
-                            )
-                          }
-                          title={
-                            tab.description
-                          }
-                          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                            isActive
-                              ? "bg-blue-600 text-white shadow-sm"
-                              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                          }`}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                          {tab.label}
-                        </button>
-                      );
-                    },
-                  )}
+                    return (
+                      <button
+                        type="button"
+                        key={tab.id}
+                        onClick={() => setActiveAdvancedTab(tab.id)}
+                        title={tab.description}
+                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/40">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {
-                    selectedAdvancedTab?.description
-                  }
+                  {selectedAdvancedTab?.description}
                 </p>
               </div>
 
-              <div className="p-4 sm:p-5">
-                {renderAdvancedContent()}
-              </div>
+              <div className="p-4 sm:p-5">{renderAdvancedContent()}</div>
             </>
           )}
         </section>
