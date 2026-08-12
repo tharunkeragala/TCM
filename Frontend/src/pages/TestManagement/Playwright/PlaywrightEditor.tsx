@@ -4,14 +4,9 @@ import {
   FaBrain,
   FaChevronDown,
   FaCode,
-  FaDatabase,
-  FaExchangeAlt,
-  FaLightbulb,
   FaPlay,
-  FaProjectDiagram,
   FaSave,
   FaSearch,
-  FaServer,
   FaTimes,
   FaVideo,
 } from "react-icons/fa";
@@ -25,13 +20,6 @@ import { authHeaders, formatSelector } from "./helpers";
 
 import type { ParsedStep, TestCase } from "./types";
 
-import DataDrivenTestConfig from "../../../components/DataDrivenTestConfig";
-import ConditionalBlockBuilder from "../../../components/ConditionalBlockBuilder";
-import KeywordScriptEditor from "../../../components/KeywordScriptEditor";
-import DataTransformationBuilder from "../../../components/DataTransformationBuilder";
-import APITestingBuilder from "../../../components/APITestingBuilder";
-import AISuggestions from "../../../components/AISuggestions";
-
 const SAMPLE_SCRIPT = `// Navigate to page
 await page.goto('https://example.com');
 
@@ -42,63 +30,6 @@ await page.waitForSelector('h1');
 // await page.click('#login');
 // await page.fill('[name="username"]', 'demo');
 `;
-
-type AdvancedTab =
-  | "data-driven"
-  | "api-testing"
-  | "conditional"
-  | "keywords"
-  | "transformation"
-  | "ai";
-
-interface AdvancedTabDefinition {
-  id: AdvancedTab;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{
-    className?: string;
-  }>;
-}
-
-const ADVANCED_TABS: AdvancedTabDefinition[] = [
-  {
-    id: "data-driven",
-    label: "Data-Driven",
-    description: "Upload datasets and execute parameterized tests.",
-    icon: FaDatabase,
-  },
-  {
-    id: "api-testing",
-    label: "API Testing",
-    description: "Configure and execute API requests.",
-    icon: FaServer,
-  },
-  {
-    id: "conditional",
-    label: "Conditional",
-    description: "Create conditional and looping execution flows.",
-    icon: FaProjectDiagram,
-  },
-  {
-    id: "keywords",
-    label: "Keywords",
-    description: "Write or convert keyword-driven test scripts.",
-    icon: FaCode,
-  },
-  {
-    id: "transformation",
-    label: "Transformation",
-    description:
-      "Test JSONPath, JMESPath, XPath, regex, and JavaScript transformations.",
-    icon: FaExchangeAlt,
-  },
-  {
-    id: "ai",
-    label: "AI Suggestions",
-    description: "Generate assertion and refactoring recommendations.",
-    icon: FaLightbulb,
-  },
-];
 
 export default function PlaywrightEditor() {
   const { testCaseId } = useParams();
@@ -119,9 +50,6 @@ export default function PlaywrightEditor() {
   const [loading, setLoading] = useState(false);
 
   const [saving, setSaving] = useState(false);
-
-  const [activeAdvancedTab, setActiveAdvancedTab] =
-    useState<AdvancedTab>("data-driven");
 
   const [alert, setAlert] = useState<{
     type: "success" | "error";
@@ -247,11 +175,6 @@ export default function PlaywrightEditor() {
     [tests, testSearch],
   );
 
-  const selectedAdvancedTab = useMemo(
-    () => ADVANCED_TABS.find((tab) => tab.id === activeAdvancedTab),
-    [activeAdvancedTab],
-  );
-
   const saveScript = async () => {
     if (!selectedCase) {
       setAlert({
@@ -325,61 +248,8 @@ export default function PlaywrightEditor() {
     setSteps([]);
     setTestSearch("");
     setShowDropdown(false);
-    setActiveAdvancedTab("data-driven");
 
     navigate("/script/editor");
-  };
-
-  const handleKeywordConversion = (convertedCode: string) => {
-    setScript(convertedCode);
-
-    setAlert({
-      type: "success",
-      message: "Keyword script converted and loaded into the editor.",
-    });
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const renderAdvancedContent = () => {
-    if (!selectedCase) {
-      return null;
-    }
-
-    const selectedTestCaseId = selectedCase.id;
-
-    switch (activeAdvancedTab) {
-      case "data-driven":
-        return <DataDrivenTestConfig testCaseId={selectedTestCaseId} />;
-
-      case "api-testing":
-        return <APITestingBuilder testCaseId={selectedTestCaseId} />;
-
-      case "conditional":
-        return <ConditionalBlockBuilder testCaseId={selectedTestCaseId} />;
-
-      case "keywords":
-        return (
-          <KeywordScriptEditor
-            testCaseId={selectedTestCaseId}
-            onConvert={handleKeywordConversion}
-          />
-        );
-
-      case "transformation":
-        return <DataTransformationBuilder />;
-
-      case "ai":
-        return (
-          <AISuggestions testCaseId={selectedTestCaseId} script={script} />
-        );
-
-      default:
-        return null;
-    }
   };
 
   return (
@@ -518,13 +388,23 @@ export default function PlaywrightEditor() {
               </button>
 
               {selectedCase && (
-                <Link
-                  to={`/script/runner/${selectedCase.id}`}
-                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                >
-                  <FaPlay className="h-3.5 w-3.5" />
-                  Run
-                </Link>
+                <>
+                  <Link
+                    to={`/script/runner/${selectedCase.id}`}
+                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    <FaPlay className="h-3.5 w-3.5" />
+                    Run
+                  </Link>
+
+                  <Link
+                    to={`/script/advanced/${selectedCase.id}`}
+                    className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                  >
+                    <FaBrain className="h-3.5 w-3.5" />
+                    Advanced Automation
+                  </Link>
+                </>
               )}
             </div>
           </div>
@@ -603,21 +483,21 @@ export default function PlaywrightEditor() {
                 spellCheck={false}
                 placeholder="Write your script here…"
                 className="
-          block
-          h-full
-          min-h-full
-          w-full
-          resize-none
-          overflow-auto
-          bg-white
-          p-5
-          font-mono
-          text-sm
-          text-gray-900
-          outline-none
-          dark:bg-gray-900
-          dark:text-gray-100
-        "
+                  block
+                  h-full
+                  min-h-full
+                  w-full
+                  resize-none
+                  overflow-auto
+                  bg-white
+                  p-5
+                  font-mono
+                  text-sm
+                  text-gray-900
+                  outline-none
+                  dark:bg-gray-900
+                  dark:text-gray-100
+                "
               />
             </div>
           </div>
@@ -671,82 +551,6 @@ export default function PlaywrightEditor() {
             </div>
           </div>
         </div>
-
-        {/* Advanced automation tools */}
-        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <div className="border-b border-gray-200 px-4 py-4 sm:px-5 dark:border-gray-700">
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-purple-100 p-2 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300">
-                <FaBrain />
-              </div>
-
-              <div>
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Advanced Automation
-                </h2>
-
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Configure data-driven, API, conditional, keyword-driven,
-                  transformation, and AI-assisted test capabilities.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {!selectedCase ? (
-            <div className="p-6">
-              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800/50">
-                <FaBrain className="mx-auto mb-3 text-2xl text-gray-400" />
-
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Select a test case to use the advanced automation tools.
-                </p>
-
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  The selected test case ID and current editor script will be
-                  passed to the relevant module.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-700">
-                <div className="flex min-w-max gap-1 p-2">
-                  {ADVANCED_TABS.map((tab) => {
-                    const Icon = tab.icon;
-
-                    const isActive = activeAdvancedTab === tab.id;
-
-                    return (
-                      <button
-                        type="button"
-                        key={tab.id}
-                        onClick={() => setActiveAdvancedTab(tab.id)}
-                        title={tab.description}
-                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                          isActive
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                        }`}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {selectedAdvancedTab?.description}
-                </p>
-              </div>
-
-              <div className="p-4 sm:p-5">{renderAdvancedContent()}</div>
-            </>
-          )}
-        </section>
       </div>
     </div>
   );

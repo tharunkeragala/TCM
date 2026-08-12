@@ -58,6 +58,7 @@ const navItems: NavItem[] = [
       { name: "Runner", path: "/script/runner" },
       { name: "Preview", path: "/script/preview" },
       { name: "Sprints", path: "/sprints" },
+      { name: "Advanced Automation", path: "/script/advanced" },
       // { name: "Sprint Board", path: "/sprintboard" },
     ],
   },

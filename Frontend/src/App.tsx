@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
 import ProjectOverview from "./pages/Projects/ProjectOverview";
+import AdvancedAutomation from "./pages/TestManagement/Playwright/AdvancedAutomation";
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/AuthPages/SignIn"));
@@ -155,6 +156,15 @@ export default function App() {
               />
 
               <Route path="/script/runner" element={<PlaywrightRunner />} />
+              <Route
+  path="/script/advanced"
+  element={<AdvancedAutomation />}
+/>
+
+<Route
+  path="/script/advanced/:testCaseId"
+  element={<AdvancedAutomation />}
+/>
 
               <Route
                 path="/script/runner/:testCaseId"
