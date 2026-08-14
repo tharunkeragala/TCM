@@ -1,12 +1,3 @@
-/**
- * conditionalExecutor.js
- * Place at: server/services/conditionalExecutor.js
- *
- * Executes IF / ELSE / SWITCH / LOOP / WHILE / FOREACH blocks.
- * The `executor` argument passed into each method must expose
- * an `executeStep(step, variables)` function (see enhancedPlaywrightRunner.js).
- */
-
 class ConditionalExecutor {
   /** Evaluate a boolean condition expression with {{variables}} substituted */
   evaluateCondition(expression, variables) {

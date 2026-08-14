@@ -1,24 +1,3 @@
-/**
- * enhancedPlaywrightRunner.js
- *
- * Place at:
- *   Backend/services/enhancedPlaywrightRunner.js
- *
- * Combined runner supporting:
- *   - Existing single test-case execution
- *   - Data-driven execution
- *   - Variable substitution
- *   - Conditional execution
- *   - Keyword-driven execution
- *   - API request steps
- *   - Self-healing locators
- *   - Version and locator-history tracking
- *   - Run cancellation
- *   - Live browser screencast
- *   - Step screenshots
- *   - Page and locator readiness waiting
- */
-
 const { chromium } = require("playwright");
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
@@ -36,7 +15,7 @@ const selfHealingEngine = require("./selfHealingEngine");
 const testMaintenanceEngine = require("./testMaintenanceEngine");
 
 /* -------------------------------------------------------------------------- */
-/*                                Configuration                               */
+/* Configuration                                                              */
 /* -------------------------------------------------------------------------- */
 
 const DATABASE_SCHEMA = "test_case_manager.dbo";
@@ -74,7 +53,7 @@ if (!fs.existsSync(screenshotsDir)) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Active run control                             */
+/* Active run control                                                         */
 /* -------------------------------------------------------------------------- */
 
 const activeRuns = {};
@@ -87,72 +66,75 @@ function cancelRun(runId) {
   }
 
   controller.abort();
+
   return true;
 }
 
 /* -------------------------------------------------------------------------- */
-/*                            Selector utilities                              */
+/* Selector utilities                                                         */
 /* -------------------------------------------------------------------------- */
 
 function normalizeSelector(raw) {
-  if (!raw) return raw;
+  if (!raw) {
+    return raw;
+  }
 
-  // Already-normalized selector object
   if (typeof raw === "object") {
     return raw;
   }
 
-  let s = String(raw).trim();
+  let selector = String(raw).trim();
 
-  // Remove surrounding quotes if they somehow remain
   if (
-    (s.startsWith("'") && s.endsWith("'")) ||
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("`") && s.endsWith("`"))
+    (selector.startsWith("'") && selector.endsWith("'")) ||
+    (selector.startsWith('"') && selector.endsWith('"')) ||
+    (selector.startsWith("`") && selector.endsWith("`"))
   ) {
-    s = s.slice(1, -1).trim();
+    selector = selector.slice(1, -1).trim();
   }
 
-  // Playwright explicit XPath
-  if (s.startsWith("xpath=")) {
+  if (selector.startsWith("xpath=")) {
     return {
-      xpath: s.substring(6),
+      xpath: selector.substring(6),
     };
   }
 
-  // Raw absolute/relative XPath
-  if (s.startsWith("/") || s.startsWith("//") || s.startsWith("(//")) {
+  if (
+    selector.startsWith("/") ||
+    selector.startsWith("//") ||
+    selector.startsWith("(//")
+  ) {
     return {
-      xpath: s,
+      xpath: selector,
     };
   }
 
-  if (s.startsWith("data-testid=")) {
+  if (selector.startsWith("data-testid=")) {
     return {
-      testid: s.substring(13),
+      testid: selector.substring(13),
     };
   }
 
-  if (s.startsWith("name=")) {
+  if (selector.startsWith("name=")) {
     return {
-      name: s.substring(5),
+      name: selector.substring(5),
     };
   }
 
-  if (s.startsWith("id=")) {
+  if (selector.startsWith("id=")) {
     return {
-      id: s.substring(3),
+      id: selector.substring(3),
     };
   }
 
-  if (s.startsWith("text=")) {
+  if (selector.startsWith("text=")) {
     return {
-      text: s.substring(5),
+      text: selector.substring(5),
     };
   }
 
   return {
-    css: s,
+    css: selector,
   };
 }
 
@@ -161,34 +143,34 @@ function resolveLocator(page, selector) {
     throw new Error("Selector is null or undefined");
   }
 
-  const s = normalizeSelector(selector);
+  const normalized = normalizeSelector(selector);
 
-  if (typeof s === "string") {
-    return page.locator(s);
+  if (typeof normalized === "string") {
+    return page.locator(normalized);
   }
 
-  if (s.xpath) {
-    return page.locator(`xpath=${s.xpath}`);
+  if (normalized.xpath) {
+    return page.locator(`xpath=${normalized.xpath}`);
   }
 
-  if (s.id) {
-    return page.locator(`#${escapeCssIdentifier(s.id)}`);
+  if (normalized.id) {
+    return page.locator(`#${escapeCssIdentifier(normalized.id)}`);
   }
 
-  if (s.name) {
-    return page.locator(`[name="${escapeAttributeValue(s.name)}"]`);
+  if (normalized.name) {
+    return page.locator(`[name="${escapeAttributeValue(normalized.name)}"]`);
   }
 
-  if (s.testid) {
-    return page.getByTestId(s.testid);
+  if (normalized.testid) {
+    return page.getByTestId(normalized.testid);
   }
 
-  if (s.text) {
-    return page.getByText(s.text);
+  if (normalized.text) {
+    return page.getByText(normalized.text);
   }
 
-  if (s.css) {
-    return page.locator(s.css);
+  if (normalized.css) {
+    return page.locator(normalized.css);
   }
 
   throw new Error(`Cannot resolve selector: ${JSON.stringify(selector)}`);
@@ -216,7 +198,6 @@ function parseSelectorArgument(arg) {
     return null;
   }
 
-  // Strip JS string quotes
   if (
     (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
@@ -225,7 +206,6 @@ function parseSelectorArgument(arg) {
     return trimmed.slice(1, -1);
   }
 
-  // Support object selectors if ever stored that way
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -234,7 +214,7 @@ function parseSelectorArgument(arg) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               Script parser                                */
+/* Script parser                                                              */
 /* -------------------------------------------------------------------------- */
 
 function parseTestScript(script = "") {
@@ -246,6 +226,7 @@ function parseTestScript(script = "") {
 
   for (const line of lines) {
     const trimmed = line.trim();
+
     let match;
 
     if (
@@ -265,7 +246,9 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "click",
+
         selector: parseSelectorArgument(match[1]),
+
         raw: trimmed,
       });
     } else if (
@@ -275,8 +258,11 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "fill",
+
         selector: parseSelectorArgument(match[1]),
+
         value: match[2],
+
         raw: trimmed,
       });
     } else if (
@@ -286,8 +272,11 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "type",
+
         selector: parseSelectorArgument(match[1]),
+
         value: match[2],
+
         raw: trimmed,
       });
     } else if (
@@ -297,8 +286,11 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "select",
+
         selector: parseSelectorArgument(match[1]),
+
         value: match[2],
+
         raw: trimmed,
       });
     } else if (
@@ -308,7 +300,9 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "waitForSelector",
+
         selector: parseSelectorArgument(match[1]),
+
         raw: trimmed,
       });
     } else if ((match = trimmed.match(/await page\.waitForTimeout\((\d+)\)/))) {
@@ -324,7 +318,9 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "assertTitle",
+
         value: match[1],
+
         raw: trimmed,
       });
     } else if (
@@ -334,12 +330,15 @@ function parseTestScript(script = "") {
     ) {
       steps.push({
         action: "assertUrl",
+
         value: match[1],
+
         raw: trimmed,
       });
     } else if (trimmed.match(/await page\.screenshot\(/)) {
       steps.push({
         action: "screenshot",
+
         raw: trimmed,
       });
     } else {
@@ -358,7 +357,7 @@ function parsePlaywrightScriptSteps(script) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                          Browser launch utilities                          */
+/* Browser launch utilities                                                   */
 /* -------------------------------------------------------------------------- */
 
 function findBrowserExecutable() {
@@ -386,9 +385,12 @@ async function launchBrowser() {
 
   const launchOptions = {
     headless: false,
+
     slowMo: DEFAULT_SLOW_MO,
+
     args: [
       "--start-maximized",
+
       "--disable-blink-features=AutomationControlled",
     ],
   };
@@ -418,6 +420,7 @@ async function createBrowserSession(runId) {
       width: 1280,
       height: 720,
     },
+
     ignoreHTTPSErrors: true,
   });
 
@@ -440,13 +443,15 @@ async function createBrowserSession(runId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                Page waits                                  */
+/* Page waits                                                                 */
 /* -------------------------------------------------------------------------- */
 
 async function waitForPageReady(page, options = {}) {
   const {
     navigationTimeout = DEFAULT_NAVIGATION_TIMEOUT,
+
     networkIdleTimeout = DEFAULT_NETWORK_IDLE_TIMEOUT,
+
     settleDelay = DEFAULT_PAGE_SETTLE_DELAY,
   } = options;
 
@@ -462,13 +467,10 @@ async function waitForPageReady(page, options = {}) {
 
   await page.locator("body").waitFor({
     state: "visible",
+
     timeout: navigationTimeout,
   });
 
-  /*
-   * networkidle is not treated as mandatory.
-   * Applications with polling or WebSockets may never become fully idle.
-   */
   await page
     .waitForLoadState("networkidle", {
       timeout: networkIdleTimeout,
@@ -481,7 +483,11 @@ async function waitForPageReady(page, options = {}) {
 }
 
 async function waitForLocatorReady(page, selector, options = {}) {
-  const { state = "visible", timeout = DEFAULT_ACTION_TIMEOUT } = options;
+  const {
+    state = "visible",
+
+    timeout = DEFAULT_ACTION_TIMEOUT,
+  } = options;
 
   const locator = resolveLocator(page, selector).first();
 
@@ -496,6 +502,7 @@ async function waitForLocatorReady(page, selector, options = {}) {
 async function waitAfterAction(page, options = {}) {
   const {
     settleDelay = DEFAULT_ACTION_SETTLE_DELAY,
+
     networkIdleTimeout = 3000,
   } = options;
 
@@ -521,6 +528,7 @@ async function clickAndWait(page, locator) {
     page
       .waitForNavigation({
         waitUntil: "domcontentloaded",
+
         timeout: 10000,
       })
       .catch(() => null),
@@ -534,7 +542,7 @@ async function clickAndWait(page, locator) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              Live screencast                               */
+/* Live screencast                                                            */
 /* -------------------------------------------------------------------------- */
 
 async function startLiveScreencast(context, page, runId) {
@@ -551,7 +559,9 @@ async function startLiveScreencast(context, page, runId) {
       try {
         broadcast({
           type: "live_frame",
+
           runId,
+
           frame: event.data,
         });
 
@@ -575,7 +585,7 @@ async function startLiveScreencast(context, page, runId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                            Browser diagnostics                             */
+/* Browser diagnostics                                                        */
 /* -------------------------------------------------------------------------- */
 
 function attachBrowserLogging(page, runId) {
@@ -590,8 +600,11 @@ function attachBrowserLogging(page, runId) {
   page.on("requestfailed", (request) => {
     console.warn(
       `[Browser run ${runId}] Request failed:`,
+
       request.method(),
+
       request.url(),
+
       request.failure()?.errorText,
     );
   });
@@ -599,7 +612,9 @@ function attachBrowserLogging(page, runId) {
   page.on("dialog", async (dialog) => {
     console.warn(
       `[Browser run ${runId}] Dialog dismissed:`,
+
       dialog.type(),
+
       dialog.message(),
     );
 
@@ -608,7 +623,7 @@ function attachBrowserLogging(page, runId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                        Original single test runner                         */
+/* Original single test runner                                                */
 /* -------------------------------------------------------------------------- */
 
 async function runTestCase(testCaseId, userId = null) {
@@ -616,13 +631,13 @@ async function runTestCase(testCaseId, userId = null) {
 
   const testCaseResult = await pool.request().input("id", sql.Int, testCaseId)
     .query(`
-      SELECT
-        id,
-        title,
-        playwright_script
-      FROM ${DATABASE_SCHEMA}.test_cases
-      WHERE id = @id
-    `);
+        SELECT
+          id,
+          title,
+          playwright_script
+        FROM ${DATABASE_SCHEMA}.test_cases
+        WHERE id = @id
+      `);
 
   if (!testCaseResult.recordset.length) {
     throw new Error("Test case not found.");
@@ -643,22 +658,22 @@ async function runTestCase(testCaseId, userId = null) {
     .input("status", sql.VarChar, "running")
     .input("started_at", sql.DateTime, new Date())
     .input("created_by", sql.Int, userId).query(`
-      INSERT INTO ${DATABASE_SCHEMA}.playwright_test_runs
+        INSERT INTO ${DATABASE_SCHEMA}.playwright_test_runs
         (
           test_case_id,
           status,
           started_at,
           created_by
         )
-      OUTPUT INSERTED.id
-      VALUES
+        OUTPUT INSERTED.id
+        VALUES
         (
           @test_case_id,
           @status,
           @started_at,
           @created_by
         )
-    `);
+      `);
 
   const runId = runResult.recordset[0].id;
 
@@ -685,6 +700,7 @@ async function runTestCase(testCaseId, userId = null) {
     const session = await createBrowserSession(runId);
 
     browser = session.browser;
+
     context = session.context;
 
     const page = session.page;
@@ -693,7 +709,9 @@ async function runTestCase(testCaseId, userId = null) {
       if (isAborted()) {
         broadcast({
           type: "run_aborted",
+
           runId,
+
           stoppedAtStep: stepIndex + 1,
         });
 
@@ -701,6 +719,7 @@ async function runTestCase(testCaseId, userId = null) {
       }
 
       const step = steps[stepIndex];
+
       const stepStartedAt = Date.now();
 
       const stepId = await createStepRunningRecord(
@@ -712,10 +731,15 @@ async function runTestCase(testCaseId, userId = null) {
 
       broadcast({
         type: "step_started",
+
         runId,
+
         stepId,
+
         stepNum: stepIndex + 1,
+
         step,
+
         total: steps.length,
       });
 
@@ -738,11 +762,17 @@ async function runTestCase(testCaseId, userId = null) {
 
         broadcast({
           type: "step_completed",
+
           runId,
+
           stepId,
+
           stepNum: stepIndex + 1,
+
           status: "passed",
+
           duration_ms: duration,
+
           screenshotPath: screenshotInfo.publicPath,
         });
       } catch (error) {
@@ -761,12 +791,19 @@ async function runTestCase(testCaseId, userId = null) {
 
         broadcast({
           type: "step_failed",
+
           runId,
+
           stepId,
+
           stepNum: stepIndex + 1,
+
           status: "failed",
+
           duration_ms: duration,
+
           error: error.message,
+
           screenshotPath: screenshotInfo.publicPath,
         });
 
@@ -782,8 +819,11 @@ async function runTestCase(testCaseId, userId = null) {
 
     broadcast({
       type: "run_completed",
+
       runId,
+
       status: finalStatus,
+
       duration,
     });
   } catch (error) {
@@ -793,9 +833,13 @@ async function runTestCase(testCaseId, userId = null) {
 
     broadcast({
       type: "run_completed",
+
       runId,
+
       status: "failed",
+
       error: error.message,
+
       duration,
     });
   } finally {
@@ -814,7 +858,7 @@ async function runTestCase(testCaseId, userId = null) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         Enhanced data-driven runner                        */
+/* Enhanced data-driven runner                                                */
 /* -------------------------------------------------------------------------- */
 
 async function runEnhancedTestCase(testCaseId, options = {}) {
@@ -822,14 +866,14 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
   const testCaseResult = await pool.request().input("id", sql.Int, testCaseId)
     .query(`
-      SELECT
-        id,
-        title,
-        playwright_script,
-        test_type
-      FROM ${DATABASE_SCHEMA}.test_cases
-      WHERE id = @id
-    `);
+        SELECT
+          id,
+          title,
+          playwright_script,
+          test_type
+        FROM ${DATABASE_SCHEMA}.test_cases
+        WHERE id = @id
+      `);
 
   if (!testCaseResult.recordset.length) {
     throw new Error("Test case not found.");
@@ -844,7 +888,27 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
     throw new Error("This test case does not have a Playwright script.");
   }
 
-  const dataPoints = await resolveDataPoints(pool, options.dataSourceId);
+  /*
+   * UPDATED:
+   *
+   * testCaseId is supplied so we can
+   * verify the selected dataset belongs
+   * to this test case.
+   */
+  const dataPoints = await resolveDataPoints(
+    pool,
+    testCaseId,
+    options.dataSourceId,
+  );
+
+  /*
+   * Mapping rows should normally already
+   * be loaded by the controller from the
+   * selected mappingSetId.
+   */
+  const parameterMappings = Array.isArray(options.parameterMappings)
+    ? options.parameterMappings
+    : [];
 
   const runIds = [];
 
@@ -872,9 +936,13 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
     broadcast({
       type: "run_started",
+
       runId,
+
       testCaseId,
+
       dataIndex,
+
       totalIterations: dataPoints.length,
     });
 
@@ -882,21 +950,42 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
     let browser = null;
     let context = null;
+
     let locatorRecoveries = 0;
+
     let runFailed = false;
+
     let lastError = null;
 
     try {
       let processedScript = testCase.playwright_script;
 
-      if (options.parameterMappings?.length) {
+      /*
+       * Mapping-set substitution.
+       *
+       * Example mapping set:
+       *
+       * Login Data Mapping
+       *
+       * {{username}} -> username
+       * {{password}} -> password
+       *
+       * Both rows are applied together
+       * for each data iteration.
+       */
+      if (parameterMappings.length > 0) {
         processedScript = dataEngineService.substituteVariables(
           processedScript,
           dataPoint,
-          options.parameterMappings,
+          parameterMappings,
         );
       }
 
+      /*
+       * Keep automatic nested variable
+       * substitution for scripts using
+       * {{customer.name}} directly.
+       */
       processedScript = dataEngineService.substituteNestedVariables(
         processedScript,
         dataPoint,
@@ -916,6 +1005,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
       const session = await createBrowserSession(runId);
 
       browser = session.browser;
+
       context = session.context;
 
       const page = session.page;
@@ -924,7 +1014,9 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
         if (isAborted()) {
           broadcast({
             type: "run_aborted",
+
             runId,
+
             stoppedAtStep: stepIndex + 1,
           });
 
@@ -937,9 +1029,13 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
         broadcast({
           type: "step_started",
+
           runId,
+
           stepNum: stepIndex + 1,
+
           step,
+
           total: steps.length,
         });
 
@@ -968,6 +1064,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
         try {
           const result = await executeStep(page, step, {
             testCaseId,
+
             variableEngine,
 
             onLocatorHealed: () => {
@@ -986,6 +1083,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
           );
         } catch (error) {
           runFailed = true;
+
           lastError = error;
 
           const screenshotInfo = getFailureScreenshotInfo(runId, stepIndex + 1);
@@ -1001,6 +1099,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
             Date.now() - stepStartedAt,
             {
               error: error.message,
+
               screenshotPath: screenshotInfo.publicPath,
             },
           );
@@ -1030,9 +1129,13 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
       broadcast({
         type: "run_completed",
+
         runId,
+
         status: finalStatus,
+
         error: lastError?.message || null,
+
         duration,
       });
     } catch (error) {
@@ -1051,9 +1154,13 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
       broadcast({
         type: "run_completed",
+
         runId,
+
         status: "failed",
+
         error: error.message,
+
         duration,
       });
 
@@ -1082,7 +1189,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
     )
     .catch((error) => {
       console.warn(
-        "[enhancedPlaywrightRunner] Unable to save test version:",
+        "Unable to save test version:",
         error.message,
       );
     });
@@ -1091,7 +1198,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                           Basic step execution                             */
+/* Basic step execution                                                       */
 /* -------------------------------------------------------------------------- */
 
 async function executeBasicStep(page, step) {
@@ -1103,6 +1210,7 @@ async function executeBasicStep(page, step) {
 
       await page.goto(step.value, {
         waitUntil: "domcontentloaded",
+
         timeout: DEFAULT_NAVIGATION_TIMEOUT,
       });
 
@@ -1115,7 +1223,9 @@ async function executeBasicStep(page, step) {
       const locator = await waitForLocatorReady(page, step.selector);
 
       await locator.scrollIntoViewIfNeeded();
+
       await clickAndWait(page, locator);
+
       return;
     }
 
@@ -1129,6 +1239,7 @@ async function executeBasicStep(page, step) {
       });
 
       await waitAfterAction(page);
+
       return;
     }
 
@@ -1142,6 +1253,7 @@ async function executeBasicStep(page, step) {
       });
 
       await waitAfterAction(page);
+
       return;
     }
 
@@ -1155,12 +1267,14 @@ async function executeBasicStep(page, step) {
       });
 
       await waitAfterAction(page);
+
       return;
     }
 
     case "waitForSelector": {
       await waitForLocatorReady(page, step.selector, {
         state: "visible",
+
         timeout: Number(step.timeout) || DEFAULT_ACTION_TIMEOUT,
       });
 
@@ -1168,9 +1282,6 @@ async function executeBasicStep(page, step) {
     }
 
     case "wait": {
-      /*
-       * Keep the original explicit wait timing.
-       */
       await page.waitForTimeout(parseInt(step.value, 10) || 1000);
 
       return;
@@ -1203,12 +1314,16 @@ async function executeBasicStep(page, step) {
 
     case "custom":
     default:
-      console.warn("[Playwright runner] Unsupported script line:", step.raw);
+      console.warn(
+        "[Playwright runner] Unsupported script line:",
+
+        step.raw,
+      );
   }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         Enhanced step execution                            */
+/* Enhanced step execution                                                    */
 /* -------------------------------------------------------------------------- */
 
 async function executeStep(page, rawStep, context) {
@@ -1217,10 +1332,13 @@ async function executeStep(page, rawStep, context) {
   const variables = variableEngine.getVariables();
 
   const step = JSON.parse(
-    JSON.stringify(rawStep, (_key, value) =>
-      typeof value === "string"
-        ? variableEngine.substituteVariables(value, variables)
-        : value,
+    JSON.stringify(
+      rawStep,
+
+      (_key, value) =>
+        typeof value === "string"
+          ? variableEngine.substituteVariables(value, variables)
+          : value,
     ),
   );
 
@@ -1234,6 +1352,7 @@ async function executeStep(page, rawStep, context) {
 
       await page.goto(step.value, {
         waitUntil: "domcontentloaded",
+
         timeout: DEFAULT_NAVIGATION_TIMEOUT,
       });
 
@@ -1247,6 +1366,7 @@ async function executeStep(page, rawStep, context) {
     case "waitForSelector": {
       await waitForLocatorReady(page, step.selector, {
         state: "visible",
+
         timeout: Number(step.timeout) || DEFAULT_ACTION_TIMEOUT,
       });
 
@@ -1285,6 +1405,7 @@ async function executeStep(page, rawStep, context) {
 
       return {
         expectedTitle: step.value,
+
         actualTitle,
       };
     }
@@ -1298,6 +1419,7 @@ async function executeStep(page, rawStep, context) {
 
       return {
         expectedUrl: step.value,
+
         actualUrl,
       };
     }
@@ -1355,13 +1477,19 @@ async function executeStep(page, rawStep, context) {
       return;
     }
 
-    case "custom":
-      console.warn("[Enhanced runner] Unsupported custom line:", step.raw);
+    case "custom": {
+      console.warn(
+        "[Enhanced runner] Unsupported custom line:",
+
+        step.raw,
+      );
 
       return {
         skipped: true,
+
         reason: "Unsupported custom script line.",
       };
+    }
 
     default: {
       if (step.keyword) {
@@ -1376,6 +1504,7 @@ async function executeStep(page, rawStep, context) {
 
       return {
         skipped: true,
+
         reason: `Unknown action: ${action}`,
       };
     }
@@ -1383,7 +1512,7 @@ async function executeStep(page, rawStep, context) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                      Enhanced locator/self-healing                        */
+/* Enhanced locator / self healing                                            */
 /* -------------------------------------------------------------------------- */
 
 async function executeEnhancedLocatorAction(page, step, context) {
@@ -1394,16 +1523,15 @@ async function executeEnhancedLocatorAction(page, step, context) {
   }
 
   let locator = null;
+
   let locatorUsed = step.selector;
+
   let usedFallback = false;
 
-  /*
-   * First allow the original selector to use normal Playwright waiting.
-   * Self-healing only runs after the normal selector has timed out.
-   */
   try {
     locator = await waitForLocatorReady(page, step.selector, {
       state: "visible",
+
       timeout: Number(step.timeout) || DEFAULT_ACTION_TIMEOUT,
     });
   } catch (primaryError) {
@@ -1433,6 +1561,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
 
     await locator.waitFor({
       state: "visible",
+
       timeout: DEFAULT_ACTION_TIMEOUT,
     });
 
@@ -1442,13 +1571,17 @@ async function executeEnhancedLocatorAction(page, step, context) {
       await testMaintenanceEngine
         .trackLocatorChange(
           testCaseId,
+
           JSON.stringify(step.selector),
+
           String(locatorUsed),
+
           "SELF_HEALED",
         )
         .catch((error) => {
           console.warn(
             "[Enhanced runner] Unable to record healed locator:",
+
             error.message,
           );
         });
@@ -1460,6 +1593,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
   switch (step.action) {
     case "click":
       await clickAndWait(page, locator);
+
       break;
 
     case "fill":
@@ -1468,6 +1602,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
       });
 
       await waitAfterAction(page);
+
       break;
 
     case "type":
@@ -1476,6 +1611,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
       });
 
       await waitAfterAction(page);
+
       break;
 
     case "select":
@@ -1484,6 +1620,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
       });
 
       await waitAfterAction(page);
+
       break;
 
     default:
@@ -1492,6 +1629,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
 
   return {
     selectorUsed: locatorUsed,
+
     usedFallback,
   };
 }
@@ -1515,78 +1653,183 @@ async function findElementWithFallback(
 
       await locator.waitFor({
         state: "visible",
+
         timeout: 5000,
       });
 
       return {
         found: true,
+
         selector: candidate,
+
         attemptNumber: index + 1,
+
         usedFallback: index > 0,
+
         confidence: Math.max(0, 1 - index / candidates.length),
       };
     } catch {
-      // Continue to the next locator candidate.
+      // Continue.
     }
   }
 
   return {
     found: false,
+
     attemptedSelectors: candidates,
+
     confidence: 0,
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              Data loading                                  */
+/* Data loading                                                               */
 /* -------------------------------------------------------------------------- */
 
-async function resolveDataPoints(pool, dataSourceId) {
+/**
+ * IMPORTANT:
+ *
+ * Uploaded CSV/XLSX/JSON rows are already stored in:
+ *
+ *   dbo.test_data_rows
+ *
+ * We therefore do NOT reopen source_path during execution.
+ *
+ * This makes saved datasets reusable even if:
+ *   - the original upload file no longer exists
+ *   - the backend restarted
+ *   - the original path was temporary
+ *
+ * The selected dataset is also verified against test_case_id.
+ */
+async function resolveDataPoints(pool, testCaseId, dataSourceId) {
+  /*
+   * No selected data source means one
+   * standard execution with empty data.
+   */
   if (!dataSourceId) {
     return [{}];
   }
 
-  const sourceResult = await pool.request().input("id", sql.Int, dataSourceId)
-    .query(`
-      SELECT *
-      FROM ${DATABASE_SCHEMA}.test_data_sources
-      WHERE id = @id
-    `);
+  const numericSourceId = Number(dataSourceId);
+
+  const numericTestCaseId = Number(testCaseId);
+
+  if (!numericSourceId || numericSourceId <= 0) {
+    throw new Error("Invalid data source ID.");
+  }
+
+  if (!numericTestCaseId || numericTestCaseId <= 0) {
+    throw new Error("Invalid test case ID.");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Verify selected data source                                            */
+  /* ---------------------------------------------------------------------- */
+
+  const sourceResult = await pool
+    .request()
+    .input("dataSourceId", sql.Int, numericSourceId).query(`
+        SELECT
+          id,
+          test_case_id,
+          data_source_type,
+          source_path
+        FROM ${DATABASE_SCHEMA}.test_data_sources
+        WHERE id = @dataSourceId
+      `);
+
+  if (!sourceResult.recordset.length) {
+    throw new Error(`Data source ${numericSourceId} was not found.`);
+  }
 
   const dataSource = sourceResult.recordset[0];
 
-  if (!dataSource) {
-    throw new Error(`Data source ${dataSourceId} was not found.`);
+  /* ---------------------------------------------------------------------- */
+  /* Verify ownership                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  if (Number(dataSource.test_case_id) !== numericTestCaseId) {
+    throw new Error(
+      `Data source ${numericSourceId} does not belong to test case ${numericTestCaseId}.`,
+    );
   }
 
-  let sourceOptions = {};
+  /* ---------------------------------------------------------------------- */
+  /* Load all persisted data rows                                           */
+  /* ---------------------------------------------------------------------- */
 
-  if (dataSource.options) {
+  const rowsResult = await pool
+    .request()
+    .input("dataSourceId", sql.Int, numericSourceId).query(`
+        SELECT
+          id,
+          row_number,
+          data
+        FROM ${DATABASE_SCHEMA}.test_data_rows
+        WHERE data_source_id = @dataSourceId
+        ORDER BY row_number ASC, id ASC
+      `);
+
+  if (!rowsResult.recordset.length) {
+    throw new Error(
+      `Data source ${numericSourceId} does not contain any saved test rows.`,
+    );
+  }
+
+  const dataPoints = [];
+
+  const invalidRows = [];
+
+  for (const row of rowsResult.recordset) {
     try {
-      sourceOptions =
-        typeof dataSource.options === "string"
-          ? JSON.parse(dataSource.options)
-          : dataSource.options;
-    } catch {
-      sourceOptions = {};
+      const parsed =
+        typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+
+      /*
+       * Data-driven rows need to be
+       * normal objects.
+       */
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        invalidRows.push(row.row_number);
+
+        continue;
+      }
+
+      dataPoints.push(parsed);
+    } catch (error) {
+      invalidRows.push(row.row_number);
+
+      console.warn(
+        `Invalid JSON in data source ${numericSourceId}, row ${row.row_number}:`,
+        error.message,
+      );
     }
   }
 
-  const dataPoints = await dataEngineService.loadTestData(
-    dataSource.data_source_type,
-    dataSource.source_path,
-    sourceOptions,
-  );
-
-  if (!Array.isArray(dataPoints) || dataPoints.length === 0) {
-    throw new Error("The selected data source does not contain any test rows.");
+  if (dataPoints.length === 0) {
+    throw new Error(
+      `Data source ${numericSourceId} contains no valid test-data rows.`,
+    );
   }
+
+  if (invalidRows.length > 0) {
+    console.warn(
+      `Data source ${numericSourceId} contains ${invalidRows.length} invalid row(s): ${invalidRows.join(
+        ", ",
+      )}`,
+    );
+  }
+
+  console.log(
+    `Loaded ${dataPoints.length} data row(s) from source ${numericSourceId} for test case ${numericTestCaseId}.`,
+  );
 
   return dataPoints;
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Screenshot helpers                             */
+/* Screenshot helpers                                                         */
 /* -------------------------------------------------------------------------- */
 
 function getStepScreenshotInfo(runId, stepNumber) {
@@ -1594,7 +1837,9 @@ function getStepScreenshotInfo(runId, stepNumber) {
 
   return {
     filename,
+
     absolutePath: path.join(screenshotsDir, filename),
+
     publicPath: `/screenshots/${filename}`,
   };
 }
@@ -1604,7 +1849,9 @@ function getFailureScreenshotInfo(runId, stepNumber) {
 
   return {
     filename,
+
     absolutePath: path.join(screenshotsDir, filename),
+
     publicPath: `/screenshots/${filename}`,
   };
 }
@@ -1617,6 +1864,7 @@ async function captureScreenshot(page, screenshotPath) {
   try {
     await page.screenshot({
       path: screenshotPath,
+
       fullPage: false,
     });
 
@@ -1627,7 +1875,7 @@ async function captureScreenshot(page, screenshotPath) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Database helpers                               */
+/* Database helpers                                                           */
 /* -------------------------------------------------------------------------- */
 
 async function createStepRunningRecord(pool, runId, stepNumber, step) {
@@ -1639,11 +1887,17 @@ async function createStepRunningRecord(pool, runId, stepNumber, step) {
     .input(
       "selector",
       sql.NVarChar(sql.MAX),
+
       step.selector == null ? null : JSON.stringify(step.selector),
     )
-    .input("value", sql.NVarChar(sql.MAX), step.value || null)
+    .input(
+      "value",
+      sql.NVarChar(sql.MAX),
+
+      step.value || null,
+    )
     .input("status", sql.VarChar, "running").query(`
-      INSERT INTO ${DATABASE_SCHEMA}.playwright_test_run_steps
+        INSERT INTO ${DATABASE_SCHEMA}.playwright_test_run_steps
         (
           run_id,
           step_number,
@@ -1652,8 +1906,8 @@ async function createStepRunningRecord(pool, runId, stepNumber, step) {
           value,
           status
         )
-      OUTPUT INSERTED.id
-      VALUES
+        OUTPUT INSERTED.id
+        VALUES
         (
           @run_id,
           @step_number,
@@ -1662,7 +1916,7 @@ async function createStepRunningRecord(pool, runId, stepNumber, step) {
           @value,
           @status
         )
-    `);
+      `);
 
   return result.recordset[0].id;
 }
@@ -1700,7 +1954,7 @@ async function createEnhancedRunRecord(pool, testCaseId, userId, dataIndex) {
     .input("started_at", sql.DateTime, new Date())
     .input("created_by", sql.Int, userId || null)
     .input("data_index", sql.Int, dataIndex).query(`
-      INSERT INTO ${DATABASE_SCHEMA}.playwright_test_runs
+        INSERT INTO ${DATABASE_SCHEMA}.playwright_test_runs
         (
           test_case_id,
           status,
@@ -1708,8 +1962,8 @@ async function createEnhancedRunRecord(pool, testCaseId, userId, dataIndex) {
           created_by,
           data_index
         )
-      OUTPUT INSERTED.id
-      VALUES
+        OUTPUT INSERTED.id
+        VALUES
         (
           @test_case_id,
           @status,
@@ -1717,7 +1971,7 @@ async function createEnhancedRunRecord(pool, testCaseId, userId, dataIndex) {
           @created_by,
           @data_index
         )
-    `);
+      `);
 
   return result.recordset[0].id;
 }
@@ -1739,45 +1993,53 @@ async function recordEnhancedStepResult(
     .input(
       "selector",
       sql.NVarChar(sql.MAX),
+
       step.selector ? JSON.stringify(step.selector) : null,
     )
-    .input("value", sql.NVarChar(sql.MAX), step.value || null)
+    .input(
+      "value",
+      sql.NVarChar(sql.MAX),
+
+      step.value || null,
+    )
     .input("status", sql.VarChar, status)
     .input("duration_ms", sql.Int, duration)
     .input(
       "error_message",
       sql.NVarChar(sql.MAX),
+
       extra.error || extra.reason || null,
     )
     .input(
       "screenshot_path",
       sql.NVarChar(sql.MAX),
+
       extra.screenshotPath || null,
     ).query(`
       INSERT INTO ${DATABASE_SCHEMA}.playwright_test_run_steps
-        (
-          run_id,
-          step_number,
-          action,
-          selector,
-          value,
-          status,
-          duration_ms,
-          error_message,
-          screenshot_path
-        )
+      (
+        run_id,
+        step_number,
+        action,
+        selector,
+        value,
+        status,
+        duration_ms,
+        error_message,
+        screenshot_path
+      )
       VALUES
-        (
-          @run_id,
-          @step_number,
-          @action,
-          @selector,
-          @value,
-          @status,
-          @duration_ms,
-          @error_message,
-          @screenshot_path
-        )
+      (
+        @run_id,
+        @step_number,
+        @action,
+        @selector,
+        @value,
+        @status,
+        @duration_ms,
+        @error_message,
+        @screenshot_path
+      )
     `);
 
   broadcast({
@@ -1789,11 +2051,17 @@ async function recordEnhancedStepResult(
           : "step_failed",
 
     runId,
+
     stepNum: stepNumber,
+
     status,
+
     duration_ms: duration,
+
     error: extra.error,
+
     reason: extra.reason,
+
     screenshotPath: extra.screenshotPath,
   });
 }
@@ -1850,18 +2118,33 @@ async function finalizeEnhancedRun(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                  Exports                                   */
+/* Exports                                                                    */
 /* -------------------------------------------------------------------------- */
 
 module.exports = {
   runTestCase,
+
   runEnhancedTestCase,
+
   executeStep,
+
   cancelRun,
+
   parseTestScript,
+
   parsePlaywrightScriptSteps,
+
   normalizeSelector,
+
   resolveLocator,
+
   waitForPageReady,
+
   waitForLocatorReady,
+
+  /*
+   * Exported mainly for debugging/testing
+   * data-driven execution.
+   */
+  resolveDataPoints,
 };

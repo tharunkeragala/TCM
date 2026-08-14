@@ -1,14 +1,3 @@
-
-/**
- * dataEngineService.js
- *
- * Place at:
- *   Backend/services/dataEngineService.js
- *
- * Requires:
- *   npm install csv-parser xlsx axios
- */
-
 const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parser");
@@ -23,71 +12,51 @@ class DataDrivenEngine {
   async parseCSV(filePath) {
     this.assertFileExists(filePath);
 
-    return new Promise(
-      (resolve, reject) => {
-        const rows = [];
+    return new Promise((resolve, reject) => {
+      const rows = [];
 
-        fs.createReadStream(filePath)
-          .pipe(csv())
-          .on("data", (row) => {
-            rows.push(row);
-          })
-          .on("end", () => {
-            resolve(rows);
-          })
-          .on("error", (error) => {
-            reject(error);
-          });
-      },
-    );
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on("data", (row) => {
+          rows.push(row);
+        })
+        .on("end", () => {
+          resolve(rows);
+        })
+        .on("error", (error) => {
+          reject(error);
+        });
+    });
   }
 
   /* ------------------------------------------------------------------------ */
   /*                              Excel parsing                               */
   /* ------------------------------------------------------------------------ */
 
-  async parseExcel(
-    filePath,
-    sheetName = null,
-  ) {
+  async parseExcel(filePath, sheetName = null) {
     this.assertFileExists(filePath);
 
-    const workbook =
-      XLSX.readFile(filePath);
+    const workbook = XLSX.readFile(filePath);
 
-    if (
-      !workbook.SheetNames ||
-      workbook.SheetNames.length === 0
-    ) {
-      throw new Error(
-        "The Excel workbook does not contain any worksheets.",
-      );
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error("The Excel workbook does not contain any worksheets.");
     }
 
     const selectedSheetName =
-      sheetName &&
-      workbook.Sheets[sheetName]
+      sheetName && workbook.Sheets[sheetName]
         ? sheetName
         : workbook.SheetNames[0];
 
-    const sheet =
-      workbook.Sheets[
-        selectedSheetName
-      ];
+    const sheet = workbook.Sheets[selectedSheetName];
 
     if (!sheet) {
-      throw new Error(
-        `Excel sheet "${selectedSheetName}" was not found.`,
-      );
+      throw new Error(`Excel sheet "${selectedSheetName}" was not found.`);
     }
 
-    return XLSX.utils.sheet_to_json(
-      sheet,
-      {
-        defval: "",
-        raw: false,
-      },
-    );
+    return XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false,
+    });
   }
 
   /* ------------------------------------------------------------------------ */
@@ -97,20 +66,14 @@ class DataDrivenEngine {
   async parseJSON(filePath) {
     this.assertFileExists(filePath);
 
-    const content =
-      await fs.promises.readFile(
-        filePath,
-        "utf-8",
-      );
+    const content = await fs.promises.readFile(filePath, "utf-8");
 
     let parsed;
 
     try {
       parsed = JSON.parse(content);
     } catch (error) {
-      throw new Error(
-        `Invalid JSON test data: ${error.message}`,
-      );
+      throw new Error(`Invalid JSON test data: ${error.message}`);
     }
 
     if (Array.isArray(parsed)) {
@@ -123,11 +86,7 @@ class DataDrivenEngine {
      *   "data": [...]
      * }
      */
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      Array.isArray(parsed.data)
-    ) {
+    if (parsed && typeof parsed === "object" && Array.isArray(parsed.data)) {
       return parsed.data;
     }
 
@@ -146,27 +105,17 @@ class DataDrivenEngine {
     options = {},
   ) {
     if (!apiUrl) {
-      throw new Error(
-        "API source URL is required.",
-      );
+      throw new Error("API source URL is required.");
     }
 
     const response = await axios({
       url: apiUrl,
-      method:
-        String(method).toUpperCase(),
+      method: String(method).toUpperCase(),
       headers: headers || {},
       data: body ?? undefined,
-      params:
-        options.params || undefined,
-      timeout:
-        Number(options.timeout) ||
-        30000,
-      validateStatus: (
-        status,
-      ) =>
-        status >= 200 &&
-        status < 300,
+      params: options.params || undefined,
+      timeout: Number(options.timeout) || 30000,
+      validateStatus: (status) => status >= 200 && status < 300,
     });
 
     let data = response.data;
@@ -182,63 +131,36 @@ class DataDrivenEngine {
      *
      * { items: [...] }
      */
-    if (
-      data &&
-      !Array.isArray(data) &&
-      typeof data === "object"
-    ) {
-      if (
-        Array.isArray(data.data)
-      ) {
+    if (data && !Array.isArray(data) && typeof data === "object") {
+      if (Array.isArray(data.data)) {
         data = data.data;
-      } else if (
-        Array.isArray(
-          data.results,
-        )
-      ) {
+      } else if (Array.isArray(data.results)) {
         data = data.results;
-      } else if (
-        Array.isArray(data.items)
-      ) {
+      } else if (Array.isArray(data.items)) {
         data = data.items;
       }
     }
 
-    return Array.isArray(data)
-      ? data
-      : [data];
+    return Array.isArray(data) ? data : [data];
   }
 
   /* ------------------------------------------------------------------------ */
   /*                            Generic data loader                            */
   /* ------------------------------------------------------------------------ */
 
-  async loadTestData(
-    sourceType,
-    sourcePath,
-    options = {},
-  ) {
-    const type = String(
-      sourceType || "",
-    ).toUpperCase();
+  async loadTestData(sourceType, sourcePath, options = {}) {
+    const type = String(sourceType || "").toUpperCase();
 
     switch (type) {
       case "CSV":
-        return this.parseCSV(
-          sourcePath,
-        );
+        return this.parseCSV(sourcePath);
 
       case "XLSX":
       case "EXCEL":
-        return this.parseExcel(
-          sourcePath,
-          options.sheetName,
-        );
+        return this.parseExcel(sourcePath, options.sheetName);
 
       case "JSON":
-        return this.parseJSON(
-          sourcePath,
-        );
+        return this.parseJSON(sourcePath);
 
       case "API":
       case "REST":
@@ -251,9 +173,7 @@ class DataDrivenEngine {
         );
 
       default:
-        throw new Error(
-          `Unsupported data source type: ${sourceType}`,
-        );
+        throw new Error(`Unsupported data source type: ${sourceType}`);
     }
   }
 
@@ -261,35 +181,19 @@ class DataDrivenEngine {
   /*                           Variable substitution                          */
   /* ------------------------------------------------------------------------ */
 
-  substituteVariables(
-    script,
-    testDataRow,
-    parameterMappings = [],
-  ) {
-    let processedScript =
-      String(script || "");
+  substituteVariables(script, testDataRow, parameterMappings = []) {
+    let processedScript = String(script || "");
 
     for (const mapping of parameterMappings) {
-      const dataColumn =
-        mapping.data_column_name ??
-        mapping.dataColumn;
+      const dataColumn = mapping.data_column_name ?? mapping.dataColumn;
 
-      const placeholder =
-        mapping.variable_placeholder ??
-        mapping.placeholder;
+      const placeholder = mapping.variable_placeholder ?? mapping.placeholder;
 
-      if (
-        !dataColumn ||
-        !placeholder
-      ) {
+      if (!dataColumn || !placeholder) {
         continue;
       }
 
-      const value =
-        this.getNestedValue(
-          testDataRow,
-          dataColumn,
-        );
+      const value = this.getNestedValue(testDataRow, dataColumn);
 
       if (value === undefined) {
         console.warn(
@@ -299,66 +203,38 @@ class DataDrivenEngine {
         continue;
       }
 
-      const escapedValue =
-        this.escapeForPlaywrightString(
-          value,
-        );
+      const escapedValue = this.escapeForPlaywrightString(value);
 
-      processedScript =
-        processedScript
-          .split(placeholder)
-          .join(escapedValue);
+      processedScript = processedScript.split(placeholder).join(escapedValue);
     }
 
     return processedScript;
   }
 
   getNestedValue(object, valuePath) {
-    if (
-      !valuePath ||
-      object === null ||
-      object === undefined
-    ) {
+    if (!valuePath || object === null || object === undefined) {
       return undefined;
     }
 
     const parts = String(valuePath)
-      .replace(
-        /\[(\d+)\]/g,
-        ".$1",
-      )
+      .replace(/\[(\d+)\]/g, ".$1")
       .split(".")
       .filter(Boolean);
 
-    return parts.reduce(
-      (current, property) => {
-        if (
-          current === null ||
-          current === undefined
-        ) {
-          return undefined;
-        }
+    return parts.reduce((current, property) => {
+      if (current === null || current === undefined) {
+        return undefined;
+      }
 
-        return current[property];
-      },
-      object,
-    );
+      return current[property];
+    }, object);
   }
 
-  substituteNestedVariables(
-    script,
-    testDataRow,
-  ) {
-    return String(
-      script || "",
-    ).replace(
+  substituteNestedVariables(script, testDataRow) {
+    return String(script || "").replace(
       /{{\s*([^}]+?)\s*}}/g,
       (match, variablePath) => {
-        const value =
-          this.getNestedValue(
-            testDataRow,
-            variablePath.trim(),
-          );
+        const value = this.getNestedValue(testDataRow, variablePath.trim());
 
         if (value === undefined) {
           console.warn(
@@ -368,9 +244,7 @@ class DataDrivenEngine {
           return match;
         }
 
-        return this.escapeForPlaywrightString(
-          value,
-        );
+        return this.escapeForPlaywrightString(value);
       },
     );
   }
@@ -379,21 +253,13 @@ class DataDrivenEngine {
   /*                          Playwright-safe escaping                        */
   /* ------------------------------------------------------------------------ */
 
-  escapeForPlaywrightString(
-    value,
-  ) {
-    if (
-      value === null ||
-      value === undefined
-    ) {
+  escapeForPlaywrightString(value) {
+    if (value === null || value === undefined) {
       return "";
     }
 
-    if (
-      typeof value === "object"
-    ) {
-      value =
-        JSON.stringify(value);
+    if (typeof value === "object") {
+      value = JSON.stringify(value);
     }
 
     /*
@@ -404,47 +270,26 @@ class DataDrivenEngine {
      * This keeps slashes intact while safely
      * escaping backslashes and single quotes.
      */
-    return String(value)
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'");
+    return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   }
 
   /* ------------------------------------------------------------------------ */
   /*                       Parameterized run generation                       */
   /* ------------------------------------------------------------------------ */
 
-  async generateParameterizedRuns(
-    testCaseId,
-    dataRows,
-    pool,
-  ) {
+  async generateParameterizedRuns(testCaseId, dataRows, pool) {
     const sql = require("mssql");
     const runs = [];
 
     if (!Array.isArray(dataRows)) {
-      throw new Error(
-        "Data rows must be an array.",
-      );
+      throw new Error("Data rows must be an array.");
     }
 
-    for (
-      let index = 0;
-      index < dataRows.length;
-      index += 1
-    ) {
+    for (let index = 0; index < dataRows.length; index += 1) {
       const result = await pool
         .request()
-        .input(
-          "test_case_id",
-          sql.Int,
-          testCaseId,
-        )
-        .input(
-          "data_index",
-          sql.Int,
-          index,
-        )
-        .query(`
+        .input("test_case_id", sql.Int, testCaseId)
+        .input("data_index", sql.Int, index).query(`
           INSERT INTO test_case_manager.dbo.playwright_test_runs
             (
               test_case_id,
@@ -463,12 +308,10 @@ class DataDrivenEngine {
         `);
 
       runs.push({
-        runId:
-          result.recordset[0].id,
+        runId: result.recordset[0].id,
         iteration: index + 1,
         dataIndex: index,
-        dataRow:
-          dataRows[index],
+        dataRow: dataRows[index],
       });
     }
 
@@ -481,25 +324,15 @@ class DataDrivenEngine {
 
   assertFileExists(filePath) {
     if (!filePath) {
-      throw new Error(
-        "Test data file path is required.",
-      );
+      throw new Error("Test data file path is required.");
     }
 
-    const resolvedPath =
-      path.resolve(filePath);
+    const resolvedPath = path.resolve(filePath);
 
-    if (
-      !fs.existsSync(
-        resolvedPath,
-      )
-    ) {
-      throw new Error(
-        `Test data file was not found: ${resolvedPath}`,
-      );
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(`Test data file was not found: ${filePath}`);
     }
   }
 }
 
-module.exports =
-  new DataDrivenEngine();
+module.exports = new DataDrivenEngine();

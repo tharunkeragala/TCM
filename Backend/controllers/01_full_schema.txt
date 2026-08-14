@@ -1,0 +1,471 @@
+/* ============================================================================
+   ENTERPRISE PLAYWRIGHT AUTOMATION PLATFORM
+   Consolidated Database Schema — Single File Migration
+
+   Target:   Microsoft SQL Server 2019+
+   Database: test_case_manager
+   Safe to re-run: every statement is guarded with existence checks.
+
+   Run this whole file once (e.g. via sqlcmd, Azure Data Studio, or SSMS).
+   It creates every table required by the 10 new platform features on top
+   of your existing test_cases / playwright_test_runs / playwright_test_run_steps
+   tables (those are assumed to already exist and are NOT redefined here).
+   ============================================================================ */
+
+USE test_case_manager;
+GO
+
+/* ============================================================================
+   PHASE 1 — DATA-DRIVEN TESTING
+   ============================================================================ */
+
+-- 1.1 Data source definitions (CSV / XLSX / JSON / API) attached to a test case
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_data_sources') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_data_sources (
+        id                INT IDENTITY PRIMARY KEY,
+        test_case_id      INT NOT NULL,
+        data_source_type  VARCHAR(50)   NOT NULL,   -- CSV, XLSX, JSON, API
+        source_path       NVARCHAR(MAX) NULL,       -- file path or API URL
+        options           NVARCHAR(MAX) NULL,       -- JSON: {sheetName, method, headers, body}
+        created_at        DATETIME      NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_test_data_sources_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+    CREATE INDEX IX_test_data_sources_test_case ON dbo.test_data_sources(test_case_id);
+END
+GO
+
+-- 1.2 Individual rows of test data loaded from a source
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_data_rows') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_data_rows (
+        id                 INT IDENTITY PRIMARY KEY,
+        data_source_id     INT NOT NULL,
+        row_number         INT NOT NULL,
+        data               NVARCHAR(MAX) NOT NULL,   -- JSON blob of the row
+        is_used            BIT NOT NULL DEFAULT 0,
+        execution_result   VARCHAR(50) NULL,         -- PENDING, PASSED, FAILED
+        created_at         DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_test_data_rows_source
+            FOREIGN KEY (data_source_id) REFERENCES dbo.test_data_sources(id)
+    );
+    CREATE CLUSTERED INDEX IX_test_data_rows_source_row ON dbo.test_data_rows(data_source_id, row_number);
+END
+GO
+
+-- 1.3 Mapping of {{placeholders}} in a script to a data source column
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_parameter_mappings') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_parameter_mappings (
+        id                     INT IDENTITY PRIMARY KEY,
+        test_case_id           INT NOT NULL,
+        parameter_name         VARCHAR(150) NOT NULL,   -- e.g. customer.name
+        variable_placeholder   VARCHAR(150) NOT NULL,   -- e.g. {{customer.name}}
+        data_column_name       VARCHAR(150) NOT NULL,   -- column in the data source
+        transformation_rules   NVARCHAR(MAX) NULL,      -- JSON transformation config
+        created_at             DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_test_parameter_mappings_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+    CREATE INDEX IX_test_parameter_mappings_test_case ON dbo.test_parameter_mappings(test_case_id);
+END
+GO
+
+-- 1.4 Link between a data row, a generated run, and its iteration number
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_data_execution_runs') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_data_execution_runs (
+        id                 INT IDENTITY PRIMARY KEY,
+        test_case_id       INT NOT NULL,
+        data_row_id        INT NOT NULL,
+        run_id             INT NOT NULL,
+        iteration_number   INT NOT NULL,
+        execution_status   VARCHAR(50) NULL,
+        created_at         DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_test_data_execution_runs_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id),
+        CONSTRAINT FK_test_data_execution_runs_data_row
+            FOREIGN KEY (data_row_id) REFERENCES dbo.test_data_rows(id),
+        CONSTRAINT FK_test_data_execution_runs_run
+            FOREIGN KEY (run_id) REFERENCES dbo.playwright_test_runs(id)
+    );
+    CREATE INDEX IX_test_data_execution_runs_run ON dbo.test_data_execution_runs(run_id);
+END
+GO
+
+/* ============================================================================
+   PHASE 1 — VARIABLE ENGINE
+   ============================================================================ */
+
+-- 1.5 Per-test-case variables (static, dynamic, environment, scoped)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_variables') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_variables (
+        id                INT IDENTITY PRIMARY KEY,
+        test_case_id      INT NOT NULL,
+        variable_name     VARCHAR(150) NOT NULL,
+        variable_type     VARCHAR(50)  NOT NULL DEFAULT 'STATIC', -- STATIC, DYNAMIC, SYSTEM, ENVIRONMENT
+        variable_value    NVARCHAR(MAX) NULL,
+        scope             VARCHAR(50)  NOT NULL DEFAULT 'TEST',   -- TEST, SUITE, GLOBAL
+        created_at        DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_test_variables_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id),
+        CONSTRAINT UQ_test_variables_case_name UNIQUE (test_case_id, variable_name)
+    );
+END
+GO
+
+-- 1.6 Built-in system variable / function catalogue (uuid, timestamp, randomEmail, ...)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.system_variables') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.system_variables (
+        id                   INT IDENTITY PRIMARY KEY,
+        variable_name        VARCHAR(150) NOT NULL UNIQUE,
+        description          NVARCHAR(MAX) NULL,
+        generator_function   VARCHAR(255) NULL,   -- 'uuid', 'timestamp', 'randomEmail', etc.
+        created_at           DATETIME NOT NULL DEFAULT GETDATE()
+    );
+END
+GO
+
+/* ============================================================================
+   PHASE 2 — CONDITIONAL EXECUTION (IF / SWITCH / LOOP / WHILE / FOREACH)
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.conditional_blocks') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.conditional_blocks (
+        id                INT IDENTITY PRIMARY KEY,
+        test_case_id      INT NOT NULL,
+        block_type        VARCHAR(20) NOT NULL,   -- IF, SWITCH, LOOP, WHILE, FOREACH
+        condition_expr    NVARCHAR(MAX) NULL,     -- expression to evaluate
+        parent_block_id   INT NULL,
+        sequence_order    INT NOT NULL DEFAULT 0,
+        created_at        DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_conditional_blocks_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id),
+        CONSTRAINT FK_conditional_blocks_parent
+            FOREIGN KEY (parent_block_id) REFERENCES dbo.conditional_blocks(id)
+    );
+    CREATE INDEX IX_conditional_blocks_test_case ON dbo.conditional_blocks(test_case_id, sequence_order);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.conditional_block_steps') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.conditional_block_steps (
+        id            INT IDENTITY PRIMARY KEY,
+        block_id      INT NOT NULL,
+        step_order    INT NOT NULL,
+        step_type     VARCHAR(50) NOT NULL,   -- click, fill, api_call, keyword, ...
+        step_config   NVARCHAR(MAX) NOT NULL, -- JSON payload for the step
+        created_at    DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_conditional_block_steps_block
+            FOREIGN KEY (block_id) REFERENCES dbo.conditional_blocks(id)
+    );
+    CREATE INDEX IX_conditional_block_steps_block ON dbo.conditional_block_steps(block_id, step_order);
+END
+GO
+
+/* ============================================================================
+   PHASE 2 — KEYWORD-DRIVEN TESTING
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.keywords') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.keywords (
+        id                INT IDENTITY PRIMARY KEY,
+        project_id        INT NULL,
+        keyword_name      VARCHAR(100) NOT NULL,
+        keyword_type      VARCHAR(50)  NOT NULL DEFAULT 'ACTION', -- ACTION, ASSERTION, NAVIGATION, CUSTOM
+        description       NVARCHAR(MAX) NULL,
+        implementation    NVARCHAR(MAX) NULL,   -- JS source or reference to a built-in
+        locator_field     VARCHAR(100) NULL,
+        value_field       VARCHAR(100) NULL,
+        is_custom         BIT NOT NULL DEFAULT 1,
+        created_at        DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_keywords_project_name UNIQUE (project_id, keyword_name)
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.keyword_library') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.keyword_library (
+        id            INT IDENTITY PRIMARY KEY,
+        keyword_id    INT NOT NULL,
+        usage_count   INT NOT NULL DEFAULT 0,
+        last_used     DATETIME NULL,
+        CONSTRAINT FK_keyword_library_keyword
+            FOREIGN KEY (keyword_id) REFERENCES dbo.keywords(id)
+    );
+END
+GO
+
+/* ============================================================================
+   PHASE 2/3 — API-DRIVEN TESTING & API CHAINING
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.api_endpoints') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.api_endpoints (
+        id                       INT IDENTITY PRIMARY KEY,
+        test_case_id             INT NULL,
+        name                     VARCHAR(150) NOT NULL,
+        method                   VARCHAR(10)  NOT NULL DEFAULT 'GET',   -- GET, POST, PUT, DELETE, PATCH
+        url                      NVARCHAR(MAX) NOT NULL,
+        headers                  NVARCHAR(MAX) NULL,   -- JSON
+        body                     NVARCHAR(MAX) NULL,   -- JSON
+        authentication_type      VARCHAR(50)  NULL,    -- NONE, BASIC, BEARER, API_KEY
+        authentication_value     NVARCHAR(MAX) NULL,
+        expected_status_code     INT NULL,
+        assertions               NVARCHAR(MAX) NULL,   -- JSON array
+        created_at               DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_api_endpoints_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+    CREATE INDEX IX_api_endpoints_test_case ON dbo.api_endpoints(test_case_id);
+END
+GO
+
+-- Logical chain container
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.api_chains') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.api_chains (
+        id              INT IDENTITY PRIMARY KEY,
+        test_case_id    INT NOT NULL,
+        name            VARCHAR(150) NOT NULL,
+        description     NVARCHAR(MAX) NULL,
+        created_at      DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_api_chains_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+END
+GO
+
+-- Individual ordered steps of a chain, each pointing at one api_endpoint
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.api_chain_steps') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.api_chain_steps (
+        id                INT IDENTITY PRIMARY KEY,
+        api_chain_id      INT NOT NULL,
+        api_endpoint_id   INT NOT NULL,
+        step_order        INT NOT NULL,
+        extract_rules     NVARCHAR(MAX) NULL,   -- JSON: {"token": "$.access_token"}
+        pass_to_next      NVARCHAR(MAX) NULL,   -- JSON: which vars to forward
+        retry_policy      NVARCHAR(MAX) NULL,   -- JSON: {maxRetries, delayMs}
+        stop_on_failure   BIT NOT NULL DEFAULT 1,
+        created_at        DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_api_chain_steps_chain
+            FOREIGN KEY (api_chain_id) REFERENCES dbo.api_chains(id),
+        CONSTRAINT FK_api_chain_steps_endpoint
+            FOREIGN KEY (api_endpoint_id) REFERENCES dbo.api_endpoints(id)
+    );
+    CREATE INDEX IX_api_chain_steps_chain ON dbo.api_chain_steps(api_chain_id, step_order);
+END
+GO
+
+-- Captured request/response per run, for reporting and debugging
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.api_responses') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.api_responses (
+        id                INT IDENTITY PRIMARY KEY,
+        run_id            INT NOT NULL,
+        api_endpoint_id   INT NOT NULL,
+        request_body      NVARCHAR(MAX) NULL,
+        response_body     NVARCHAR(MAX) NULL,
+        status_code       INT NULL,
+        headers           NVARCHAR(MAX) NULL,
+        duration_ms       INT NULL,
+        created_at        DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_api_responses_run
+            FOREIGN KEY (run_id) REFERENCES dbo.playwright_test_runs(id),
+        CONSTRAINT FK_api_responses_endpoint
+            FOREIGN KEY (api_endpoint_id) REFERENCES dbo.api_endpoints(id)
+    );
+    CREATE INDEX IX_api_responses_run ON dbo.api_responses(run_id);
+END
+GO
+
+/* ============================================================================
+   PHASE 3 — DATA TRANSFORMATION (JSONPath / JMESPath / XPath / Regex / JS)
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.data_transformations') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.data_transformations (
+        id                 INT IDENTITY PRIMARY KEY,
+        test_case_id       INT NULL,
+        name               VARCHAR(150) NULL,
+        transformation_type VARCHAR(20) NOT NULL,  -- JSONPATH, JMESPATH, XPATH, REGEX, JAVASCRIPT
+        expression         NVARCHAR(MAX) NOT NULL,
+        input_source       VARCHAR(150) NULL,      -- e.g. variable name or step id supplying input
+        output_variable    VARCHAR(150) NULL,      -- variable name to store the result under
+        created_at         DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_data_transformations_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+END
+GO
+
+/* ============================================================================
+   PHASE 4 — SELF-HEALING LOCATORS
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.locator_history') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.locator_history (
+        id                     INT IDENTITY PRIMARY KEY,
+        test_case_id           INT NOT NULL,
+        original_locator       NVARCHAR(MAX) NOT NULL,
+        actual_locator_used    NVARCHAR(MAX) NULL,       -- selector that actually worked (may equal original)
+        alternative_locators   NVARCHAR(MAX) NULL,       -- JSON array of candidates generated
+        was_healed             BIT NOT NULL DEFAULT 0,
+        healing_reason         VARCHAR(50) NULL,         -- ELEMENT_MOVED, ID_CHANGED, SELF_HEALED, MANUAL_UPDATE
+        stability_score        FLOAT NULL,
+        use_count              INT NOT NULL DEFAULT 1,
+        last_used              DATETIME NOT NULL DEFAULT GETDATE(),
+        created_at             DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_locator_history_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+    CREATE INDEX IX_locator_history_test_case ON dbo.locator_history(test_case_id, stability_score);
+END
+GO
+
+/* ============================================================================
+   PHASE 4 — AI-POWERED SUGGESTIONS
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_ai_suggestions') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_ai_suggestions (
+        id                  INT IDENTITY PRIMARY KEY,
+        test_case_id        INT NOT NULL,
+        suggestion_type     VARCHAR(50) NOT NULL,   -- MISSING_ASSERTION, DUPLICATE_TEST, REUSABLE_COMPONENT, REFACTOR, PAGE_OBJECT
+        suggestion_text     NVARCHAR(MAX) NOT NULL,
+        suggested_code      NVARCHAR(MAX) NULL,
+        confidence_score    FLOAT NULL,
+        applied             BIT NOT NULL DEFAULT 0,
+        dismissed           BIT NOT NULL DEFAULT 0,
+        created_at          DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_test_ai_suggestions_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id)
+    );
+    CREATE INDEX IX_test_ai_suggestions_test_case ON dbo.test_ai_suggestions(test_case_id, created_at DESC);
+END
+GO
+
+/* ============================================================================
+   PHASE 5 — TEST MAINTENANCE & VERSIONING
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.test_versions') AND type = 'U')
+BEGIN
+    CREATE TABLE dbo.test_versions (
+        id                INT IDENTITY PRIMARY KEY,
+        test_case_id      INT NOT NULL,
+        version_number    INT NOT NULL,
+        script            NVARCHAR(MAX) NOT NULL,
+        change_message    NVARCHAR(MAX) NULL,
+        changed_by        INT NULL,
+        changed_at        DATETIME NOT NULL DEFAULT GETDATE(),
+        script_hash       VARCHAR(64) NULL,
+        CONSTRAINT FK_test_versions_test_case
+            FOREIGN KEY (test_case_id) REFERENCES dbo.test_cases(id),
+        CONSTRAINT UQ_test_versions_case_version UNIQUE (test_case_id, version_number)
+    );
+    CREATE INDEX IX_test_versions_case_date ON dbo.test_versions(test_case_id, changed_at DESC);
+END
+GO
+
+/* ============================================================================
+   EXTEND EXISTING CORE TABLES
+   ============================================================================ */
+
+-- test_cases: support keyword-driven scripts, self-healing bookkeeping,
+-- and a "current" default data source for data-driven runs
+IF COL_LENGTH('dbo.test_cases', 'test_type') IS NULL
+    ALTER TABLE dbo.test_cases ADD test_type VARCHAR(50) NOT NULL DEFAULT 'PLAYWRIGHT'; -- PLAYWRIGHT, KEYWORD
+GO
+IF COL_LENGTH('dbo.test_cases', 'data_source_id') IS NULL
+    ALTER TABLE dbo.test_cases ADD data_source_id INT NULL;
+GO
+IF COL_LENGTH('dbo.test_cases', 'last_healed_at') IS NULL
+    ALTER TABLE dbo.test_cases ADD last_healed_at DATETIME NULL;
+GO
+IF COL_LENGTH('dbo.test_cases', 'healing_count') IS NULL
+    ALTER TABLE dbo.test_cases ADD healing_count INT NOT NULL DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.test_cases', 'stability_score') IS NULL
+    ALTER TABLE dbo.test_cases ADD stability_score FLOAT NOT NULL DEFAULT 1.0;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM sys.foreign_keys WHERE name = 'FK_test_cases_data_source'
+)
+BEGIN
+    ALTER TABLE dbo.test_cases
+        ADD CONSTRAINT FK_test_cases_data_source
+        FOREIGN KEY (data_source_id) REFERENCES dbo.test_data_sources(id);
+END
+GO
+
+-- playwright_test_runs: link a run back to the data row that drove it,
+-- and record self-healing / API-chain summary info
+IF COL_LENGTH('dbo.playwright_test_runs', 'data_row_id') IS NULL
+    ALTER TABLE dbo.playwright_test_runs ADD data_row_id INT NULL;
+GO
+IF COL_LENGTH('dbo.playwright_test_runs', 'data_index') IS NULL
+    ALTER TABLE dbo.playwright_test_runs ADD data_index INT NULL;
+GO
+IF COL_LENGTH('dbo.playwright_test_runs', 'locator_recoveries') IS NULL
+    ALTER TABLE dbo.playwright_test_runs ADD locator_recoveries INT NOT NULL DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.playwright_test_runs', 'api_chain_result') IS NULL
+    ALTER TABLE dbo.playwright_test_runs ADD api_chain_result NVARCHAR(MAX) NULL;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM sys.foreign_keys WHERE name = 'FK_playwright_test_runs_data_row'
+)
+BEGIN
+    ALTER TABLE dbo.playwright_test_runs
+        ADD CONSTRAINT FK_playwright_test_runs_data_row
+        FOREIGN KEY (data_row_id) REFERENCES dbo.test_data_rows(id);
+END
+GO
+
+/* ============================================================================
+   SEED DATA — built-in system variables catalogue
+   ============================================================================ */
+
+IF NOT EXISTS (SELECT 1 FROM dbo.system_variables WHERE variable_name = 'uuid')
+BEGIN
+    INSERT INTO dbo.system_variables (variable_name, description, generator_function) VALUES
+        ('uuid',           'Generate a random UUID v4',                         'uuid'),
+        ('timestamp',      'Current Unix timestamp in milliseconds',            'timestamp'),
+        ('iso_timestamp',  'Current date/time in ISO-8601 format',              'iso_timestamp'),
+        ('date_today',     'Today''s date (YYYY-MM-DD)',                        'date_today'),
+        ('date_tomorrow',  'Tomorrow''s date (YYYY-MM-DD)',                     'date_tomorrow'),
+        ('random_email',   'Randomly generated email address',                  'random_email'),
+        ('random_name',    'Randomly generated full name',                      'random_name'),
+        ('random_phone',   'Randomly generated phone number',                   'random_phone'),
+        ('random_string',  'Randomly generated alphanumeric string',            'random_string'),
+        ('random_number',  'Randomly generated integer within a range',         'random_number'),
+        ('random_boolean', 'Randomly generated true/false value',               'random_boolean'),
+        ('environment',    'Read a value from process environment variables',   'environment');
+END
+GO
+
+/* ============================================================================
+   DONE. Verify with:
+     SELECT name FROM sys.tables WHERE name IN (
+       'test_data_sources','test_data_rows','test_parameter_mappings',
+       'test_data_execution_runs','test_variables','system_variables',
+       'conditional_blocks','conditional_block_steps','keywords','keyword_library',
+       'api_endpoints','api_chains','api_chain_steps','api_responses',
+       'data_transformations','locator_history','test_ai_suggestions','test_versions'
+     ) ORDER BY name;
+   ============================================================================ */

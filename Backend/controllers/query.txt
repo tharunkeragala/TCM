@@ -56,3 +56,29 @@ BEGIN
     ON dbo.project_diagram_versions (project_id, version_number DESC);
 END
 GO
+
+
+
+
+
+
+
+
+
+  CREATE TABLE dbo.test_parameter_mapping_sets (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    test_case_id INT NOT NULL,
+    name NVARCHAR(255) NOT NULL,
+    description NVARCHAR(500) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    updated_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+ALTER TABLE dbo.test_parameter_mappings
+ADD mapping_set_id INT NULL;
+
+
+ALTER TABLE dbo.test_parameter_mappings
+ADD CONSTRAINT FK_test_parameter_mappings_mapping_set
+FOREIGN KEY (mapping_set_id)
+REFERENCES dbo.test_parameter_mapping_sets(id);
