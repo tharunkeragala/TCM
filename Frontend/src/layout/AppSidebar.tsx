@@ -183,16 +183,22 @@ const AppSidebar: React.FC = () => {
       ? othersItems
       : filterMenuByPermissions(othersItems, allowedPaths);
 
-  const isActive = useCallback(
-    (path: string) => location.pathname === path,
-    [location.pathname],
-  );
+const isActive = useCallback(
+  (path: string) =>
+    location.pathname === path ||
+    location.pathname.startsWith(`${path}/`),
+  [location.pathname],
+);
 
-  const isParentActive = useCallback(
-    (nav: NavItem) =>
-      nav.subItems?.some((s) => location.pathname.startsWith(s.path)) ?? false,
-    [location.pathname],
-  );
+const isParentActive = useCallback(
+  (nav: NavItem) =>
+    nav.subItems?.some(
+      (s) =>
+        location.pathname === s.path ||
+        location.pathname.startsWith(`${s.path}/`),
+    ) ?? false,
+  [location.pathname],
+);
 
   useEffect(() => {
     let matched = false;

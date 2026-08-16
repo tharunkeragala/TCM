@@ -1153,7 +1153,7 @@ export default function DataDrivenTestConfig({ testCaseId }: Props) {
           <div className="rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="max-h-[145px] overflow-auto">
               <table className="min-w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 dark:text-white">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs">#</th>
 
@@ -1213,7 +1213,7 @@ export default function DataDrivenTestConfig({ testCaseId }: Props) {
               type="button"
               onClick={loadMappingSets}
               disabled={loadingMappingSets}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs dark:border-gray-700"
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               <FaSync className={loadingMappingSets ? "animate-spin" : ""} />
               Refresh
