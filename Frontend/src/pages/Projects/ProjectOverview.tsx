@@ -843,20 +843,110 @@ export default function ProjectOverview() {
     }
   };
 
-  const openViewTask = async (task: Task) => {
-    setShowViewModal(true);
-    setViewLoading(true);
-    try {
-      const res = await API.get(`/api/tasks/${task.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      setViewingTask(res.data.success ? res.data.data : task);
-    } catch {
-      setViewingTask(task);
-    } finally {
-      setViewLoading(false);
+const openViewTask = async (task: Task) => {
+  setShowViewModal(true);
+  setViewLoading(true);
+
+  try {
+    const res = await API.get(`/api/tasks/${task.id}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    setViewingTask(res.data.success ? res.data.data : task);
+  } catch {
+    setViewingTask(task);
+  } finally {
+    setViewLoading(false);
+  }
+};
+
+// ── Close active modal with ESC key ─────────────────────────────────────────
+useEffect(() => {
+  const handleEscapeKey = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+
+    if (showViewModal) {
+      setShowViewModal(false);
+      setViewingTask(null);
+      return;
+    }
+
+    if (deletingTask) {
+      setDeletingTask(null);
+      setDeleteTaskAlert(null);
+      return;
+    }
+
+    if (showTaskModal) {
+      setShowTaskModal(false);
+      setEditingTask(null);
+      setTaskFormAlert(null);
+      return;
+    }
+
+    if (viewingCase) {
+      setViewingCase(null);
+      return;
+    }
+
+    if (deleteCase) {
+      setDeleteCase(null);
+      setDeleteCaseAlert(null);
+      return;
+    }
+
+    if (addCaseSuiteId !== null || addCaseModal || editCase) {
+      setAddCaseSuiteId(null);
+      setAddCaseModal(false);
+      setEditCase(null);
+      return;
+    }
+
+    if (deleteSprint) {
+      setDeleteSprint(null);
+      return;
+    }
+
+    if (addSprintModal || editSprint) {
+      setAddSprintModal(false);
+      setEditSprint(null);
+      return;
+    }
+
+    if (deleteSuite) {
+      setDeleteSuite(null);
+      setDeleteSuiteAlert(null);
+      return;
+    }
+
+    if (addSuiteModal || editSuite) {
+      setAddSuiteModal(false);
+      setEditSuite(null);
     }
   };
+
+  document.addEventListener("keydown", handleEscapeKey);
+
+  return () => {
+    document.removeEventListener("keydown", handleEscapeKey);
+  };
+}, [
+  showViewModal,
+  viewingTask,
+  deletingTask,
+  showTaskModal,
+  viewingCase,
+  deleteCase,
+  addCaseSuiteId,
+  addCaseModal,
+  editCase,
+  deleteSprint,
+  addSprintModal,
+  editSprint,
+  deleteSuite,
+  addSuiteModal,
+  editSuite,
+]);
 
   // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
@@ -1148,13 +1238,18 @@ export default function ProjectOverview() {
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Tab bar for the four list sections */}
+          {/* Tab bar */}
           <div className="flex gap-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pt-2 overflow-x-auto">
             {[
               {
                 key: "tasks" as const,
                 label: `Tasks (${stats.task_count})`,
                 icon: <FaTasks className="w-3.5 h-3.5" />,
+              },
+              {
+                key: "sprints" as const,
+                label: `Sprints (${stats.sprint_count})`,
+                icon: <FaBolt className="w-3.5 h-3.5" />,
               },
               {
                 key: "suites" as const,
@@ -1167,13 +1262,8 @@ export default function ProjectOverview() {
                 icon: <FaClipboardList className="w-3.5 h-3.5" />,
               },
               {
-                key: "sprints" as const,
-                label: `Sprints (${stats.sprint_count})`,
-                icon: <FaBolt className="w-3.5 h-3.5" />,
-              },
-              {
                 key: "diagram" as const,
-                label: `Diagram`,
+                label: "Diagram",
                 icon: <FaProjectDiagram className="w-3.5 h-3.5" />,
               },
             ].map((t) => (
@@ -1183,15 +1273,16 @@ export default function ProjectOverview() {
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                   mainTab === t.key
                     ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                    : "border-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                 }`}
               >
-                {t.icon} {t.label}
+                {t.icon}
+                {t.label}
               </button>
             ))}
           </div>
 
-          {/* Suites */}
+          {/* ==================== Suites ==================== */}
           {mainTab === "suites" && (
             <Section
               title={`Test Suites (${stats.suite_count})`}
@@ -1201,10 +1292,12 @@ export default function ProjectOverview() {
               action={
                 canSuites("can_create") && (
                   <button
+                    type="button"
                     onClick={() => setAddSuiteModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                   >
-                    <FaPlus className="w-3 h-3" /> Add Suite
+                    <FaPlus className="w-3 h-3" />
+                    Add Suite
                   </button>
                 )
               }
@@ -1214,46 +1307,60 @@ export default function ProjectOverview() {
                   {suites.map((suite) => (
                     <div
                       key={suite.id}
-                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                      className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/10 transition-colors"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <FaLayerGroup className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+
                         <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                           {suite.suite_name}
                         </span>
+
                         <span className="text-xs text-gray-400 flex-shrink-0">
                           {suite.case_count}{" "}
                           {suite.case_count === 1 ? "case" : "cases"}
                         </span>
+
                         <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${ACTIVE_COLORS[String(suite.is_active)]}`}
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                            ACTIVE_COLORS[String(suite.is_active)]
+                          }`}
                         >
                           {suite.is_active ? "Active" : "Inactive"}
                         </span>
                       </div>
+
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Add Test Case */}
                         {canCases("can_create") && (
                           <button
+                            type="button"
                             onClick={() => setAddCaseSuiteId(suite.id)}
-                            className="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600"
+                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
                             title="Add Test Case"
                           >
                             <FaPlus className="w-3 h-3" />
                           </button>
                         )}
+
+                        {/* Edit */}
                         {canSuites("can_edit") && (
                           <button
+                            type="button"
                             onClick={() => setEditSuite(suite)}
-                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
                             title="Edit Suite"
                           >
                             <FaEdit className="w-3 h-3" />
                           </button>
                         )}
+
+                        {/* Delete */}
                         {canSuites("can_delete") && (
                           <button
+                            type="button"
                             onClick={() => openDeleteSuite(suite)}
-                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
                             title="Delete Suite"
                           >
                             <FaTrash className="w-3 h-3" />
@@ -1267,7 +1374,7 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* Test Cases */}
+          {/* ==================== Test Cases ==================== */}
           {mainTab === "cases" && (
             <Section
               title={`Test Cases (${stats.test_case_count})`}
@@ -1278,72 +1385,120 @@ export default function ProjectOverview() {
                 canCases("can_create") &&
                 suites.length > 0 && (
                   <button
+                    type="button"
                     onClick={() => setAddCaseModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                   >
-                    <FaPlus className="w-3 h-3" /> Add Test Case
+                    <FaPlus className="w-3 h-3" />
+                    Add Test Case
                   </button>
                 )
               }
             >
               <ScrollFade className="max-h-[325px] overflow-y-auto pr-1 py-1">
                 <div className="space-y-2">
-                  {projectTestCases.map((tc) => (
-                    <div
-                      key={tc.id}
-                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <FaClipboardList className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                          {tc.title}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${PRIORITY_COLORS[tc.priority]}`}
-                        >
-                          {tc.priority}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[tc.status]}`}
-                        >
-                          {tc.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => openViewCase(tc)}
-                          className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
-                          title="View"
-                        >
-                          <FaEye className="w-3 h-3" />
-                        </button>
-                        {canCases("can_edit") && (
-                          <button
-                            onClick={() => openEditCase(tc)}
-                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
-                            title="Edit"
+                  {projectTestCases.map((tc) => {
+                    const suiteName =
+                      tc.suite_name ||
+                      suiteNameById.get(tc.suite_id) ||
+                      "Unknown Suite";
+
+                    return (
+                      <div
+                        key={tc.id}
+                        onClick={() => openViewCase(tc)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openViewCase(tc);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title="Click to view test case"
+                        className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/10 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <FaClipboardList className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+
+                          {/* Title + Suite - Same Line */}
+                          <div className="min-w-0 flex-1 flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                              {tc.title}
+                            </p>
+
+                            <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
+                              <FaLayerGroup className="w-3 h-3 text-purple-400 flex-shrink-0" />
+
+                              <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[180px]">
+                                {suiteName}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Priority */}
+                          <span
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                              PRIORITY_COLORS[tc.priority]
+                            }`}
                           >
-                            <FaEdit className="w-3 h-3" />
-                          </button>
-                        )}
-                        {canCases("can_delete") && (
-                          <button
-                            onClick={() => setDeleteCase(tc)}
-                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                            title="Delete"
+                            {tc.priority}
+                          </span>
+
+                          {/* Status */}
+                          <span
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                              STATUS_COLORS[tc.status]
+                            }`}
                           >
-                            <FaTrash className="w-3 h-3" />
-                          </button>
-                        )}
+                            {tc.status}
+                          </span>
+                        </div>
+
+                        <div
+                          className="flex items-center gap-2 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          {/* Edit */}
+                          {canCases("can_edit") && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditCase(tc);
+                              }}
+                              className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
+                              title="Edit Test Case"
+                            >
+                              <FaEdit className="w-3 h-3" />
+                            </button>
+                          )}
+
+                          {/* Delete */}
+                          {canCases("can_delete") && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteCase(tc);
+                              }}
+                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
+                              title="Delete Test Case"
+                            >
+                              <FaTrash className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollFade>
             </Section>
           )}
 
-          {/* Sprints */}
+          {/* ==================== Sprints ==================== */}
           {mainTab === "sprints" && (
             <Section
               title={`Sprints (${stats.sprint_count})`}
@@ -1353,10 +1508,12 @@ export default function ProjectOverview() {
               action={
                 canSprints("can_create") && (
                   <button
+                    type="button"
                     onClick={() => setAddSprintModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                   >
-                    <FaPlus className="w-3 h-3" /> Add Sprint
+                    <FaPlus className="w-3 h-3" />
+                    Add Sprint
                   </button>
                 )
               }
@@ -1365,44 +1522,57 @@ export default function ProjectOverview() {
                 <div className="space-y-2">
                   {sprints.map((sprint) => {
                     const StatusIcon = sprintStatusIcon(sprint.status);
+
                     return (
                       <div
                         key={sprint.id}
                         onClick={() => navigate(`/sprints/${sprint.id}`)}
-                        className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                        className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/10 transition-colors"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <StatusIcon className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+
                           <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                             {sprint.sprint_name}
                           </span>
+
                           <span className="text-xs text-gray-400 flex-shrink-0">
                             {sprint.suite_count ?? 0} suites ·{" "}
                             {sprint.case_count ?? 0} cases
                           </span>
+
                           <span
-                            className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[sprint.status]}`}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                              STATUS_COLORS[sprint.status]
+                            }`}
                           >
                             {sprint.status}
                           </span>
                         </div>
+
                         <div
                           className="flex items-center gap-2 flex-shrink-0"
                           onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
                         >
+                          {/* Edit */}
                           {canSprints("can_edit") && (
                             <button
+                              type="button"
                               onClick={() => setEditSprint(sprint)}
-                              className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                              className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
                               title="Edit Sprint"
                             >
                               <FaEdit className="w-3 h-3" />
                             </button>
                           )}
+
+                          {/* Delete */}
                           {canSprints("can_delete") && (
                             <button
+                              type="button"
                               onClick={() => setDeleteSprint(sprint)}
-                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
                               title="Delete Sprint"
                             >
                               <FaTrash className="w-3 h-3" />
@@ -1417,20 +1587,22 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* Tasks */}
+          {/* ==================== Tasks ==================== */}
           {mainTab === "tasks" && (
             <Section
               title={`Tasks (${stats.task_count})`}
-              icon={<FaTasks className="w-3.5 h-3.5 text-emerald-500" />}
+              icon={<FaTasks className="w-3.5 h-3.5 text-blue-500" />}
               isEmpty={tasks.length === 0}
               emptyText="No tasks linked to this project yet."
               action={
                 canTasks("can_create") && (
                   <button
+                    type="button"
                     onClick={openCreateTask}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                   >
-                    <FaPlus className="w-3 h-3" /> Add Task
+                    <FaPlus className="w-3 h-3" />
+                    Add Task
                   </button>
                 )
               }
@@ -1440,53 +1612,85 @@ export default function ProjectOverview() {
                   {(tasks as any[]).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                      onClick={() => openViewTask(task)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openViewTask(task);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title="Click to view task"
+                      className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/10 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {/* Task Code */}
                         <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-mono text-[10px] flex-shrink-0">
                           {task.task_code}
                         </span>
+
+                        {/* Task Title */}
                         <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                           {task.title}
                         </span>
+
+                        {/* Priority */}
                         <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${PRIORITY_COLORS[task.priority]}`}
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                            PRIORITY_COLORS[task.priority]
+                          }`}
                         >
                           {task.priority}
                         </span>
+
+                        {/* Status */}
                         <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${STATUS_COLORS[task.status] || ""}`}
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                            STATUS_COLORS[task.status] || ""
+                          }`}
                         >
                           {task.status}
                         </span>
+
+                        {/* Assignees */}
                         {task.assignees && (
                           <span className="text-xs text-gray-400 flex-shrink-0 truncate max-w-[160px]">
                             {task.assignees}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => openViewTask(task)}
-                          className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
-                          title="View"
-                        >
-                          <FaEye className="w-3 h-3" />
-                        </button>
+
+                      <div
+                        className="flex items-center gap-2 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {/* Edit */}
                         {canTasks("can_edit") && (
                           <button
-                            onClick={() => openEditTask(task)}
-                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
-                            title="Edit"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditTask(task);
+                            }}
+                            className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
+                            title="Edit Task"
                           >
                             <FaEdit className="w-3 h-3" />
                           </button>
                         )}
+
+                        {/* Delete */}
                         {canTasks("can_delete") && (
                           <button
-                            onClick={() => setDeletingTask(task)}
-                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                            title="Delete"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingTask(task);
+                            }}
+                            className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
+                            title="Delete Task"
                           >
                             <FaTrash className="w-3 h-3" />
                           </button>
@@ -1499,11 +1703,11 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* Diagram */}
+          {/* ==================== Diagram ==================== */}
           {mainTab === "diagram" && (
             <Section
               title="Flow Diagram"
-              icon={<FaProjectDiagram className="w-3.5 h-3.5 text-cyan-500" />}
+              icon={<FaProjectDiagram className="w-3.5 h-3.5 text-blue-500" />}
               isEmpty={false}
               emptyText=""
             >
