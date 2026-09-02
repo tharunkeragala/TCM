@@ -1,4 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { lazy, Suspense } from "react";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -45,7 +50,9 @@ const Sprintboard = lazy(() => import("./pages/TestManagement/Sprintboard"));
 const Sprints = lazy(() => import("./pages/TestManagement/Sprints"));
 
 // Flow Diagrams
-const FlowDiagramEditor = lazy(() => import("./pages/Projects/FlowDiagramEditor"));
+const FlowDiagramEditor = lazy(
+  () => import("./pages/Projects/FlowDiagramEditor"),
+);
 
 // Playwright
 const PlaywrightRecorder = lazy(() =>
@@ -138,15 +145,15 @@ export default function App() {
 
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/:id" element={<ProjectOverview />} />
-              <Route path="/projects/:id/diagram" element={<FlowDiagramEditor />} />
+              <Route
+                path="/projects/:id/diagram"
+                element={<FlowDiagramEditor />}
+              />
               <Route path="/test-suites" element={<TestSuites />} />
               <Route path="/test-cases" element={<TestCases />} />
               <Route path="/test-cases/:id" element={<TestCaseDetails />} />
 
-              <Route
-                path="/script/recorder"
-                element={<PlaywrightRecorder />}
-              />
+              <Route path="/script/recorder" element={<PlaywrightRecorder />} />
 
               <Route path="/script/editor" element={<PlaywrightEditor />} />
 
@@ -156,25 +163,19 @@ export default function App() {
               />
 
               <Route path="/script/runner" element={<PlaywrightRunner />} />
-              <Route
-  path="/script/advanced"
-  element={<AdvancedAutomation />}
-/>
+              <Route path="/script/advanced" element={<AdvancedAutomation />} />
 
-<Route
-  path="/script/advanced/:testCaseId"
-  element={<AdvancedAutomation />}
-/>
+              <Route
+                path="/script/advanced/:testCaseId"
+                element={<AdvancedAutomation />}
+              />
 
               <Route
                 path="/script/runner/:testCaseId"
                 element={<PlaywrightRunner />}
               />
 
-              <Route
-                path="/script/preview"
-                element={<PlaywrightPreview />}
-              />
+              <Route path="/script/preview" element={<PlaywrightPreview />} />
 
               <Route
                 path="/script/preview/:runId"

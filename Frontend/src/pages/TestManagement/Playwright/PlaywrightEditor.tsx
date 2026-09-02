@@ -397,13 +397,13 @@ export default function PlaywrightEditor() {
                     Run
                   </Link>
 
-                  <Link
+                  {/* <Link
                     to={`/script/advanced/${selectedCase.id}`}
                     className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
                   >
                     <FaBrain className="h-3.5 w-3.5" />
                     Advanced Automation
-                  </Link>
+                  </Link> */}
                 </>
               )}
             </div>

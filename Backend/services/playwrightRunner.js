@@ -1,6 +1,5 @@
 const { chromium } = require("playwright");
-const { poolPromise } = require("../config/db");
-const sql = require("mssql");
+const { poolPromise, sql } = require("../config/db");
 const path = require("path");
 const fs = require("fs");
 
@@ -18,18 +17,16 @@ const testMaintenanceEngine = require("./testMaintenanceEngine");
 /* Configuration                                                              */
 /* -------------------------------------------------------------------------- */
 
-const DATABASE_SCHEMA = "test_case_manager.dbo";
-
 const DEFAULT_NAVIGATION_TIMEOUT = Number(
-  process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT || 60000,
+  process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT || 5000,
 );
 
 const DEFAULT_ACTION_TIMEOUT = Number(
-  process.env.PLAYWRIGHT_ACTION_TIMEOUT || 30000,
+  process.env.PLAYWRIGHT_ACTION_TIMEOUT || 300,
 );
 
 const DEFAULT_NETWORK_IDLE_TIMEOUT = Number(
-  process.env.PLAYWRIGHT_NETWORK_IDLE_TIMEOUT || 10000,
+  process.env.PLAYWRIGHT_NETWORK_IDLE_TIMEOUT || 100,
 );
 
 const DEFAULT_PAGE_SETTLE_DELAY = Number(
@@ -529,7 +526,7 @@ async function clickAndWait(page, locator) {
       .waitForNavigation({
         waitUntil: "domcontentloaded",
 
-        timeout: 10000,
+        timeout: 3000,
       })
       .catch(() => null),
 
@@ -635,7 +632,7 @@ async function runTestCase(testCaseId, userId = null) {
           id,
           title,
           playwright_script
-        FROM ${DATABASE_SCHEMA}.test_cases
+        FROM dbo.test_cases
         WHERE id = @id
       `);
 
@@ -658,7 +655,7 @@ async function runTestCase(testCaseId, userId = null) {
     .input("status", sql.VarChar, "running")
     .input("started_at", sql.DateTime, new Date())
     .input("created_by", sql.Int, userId).query(`
-        INSERT INTO ${DATABASE_SCHEMA}.playwright_test_runs
+        INSERT INTO dbo.playwright_test_runs
         (
           test_case_id,
           status,
@@ -871,7 +868,7 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
           title,
           playwright_script,
           test_type
-        FROM ${DATABASE_SCHEMA}.test_cases
+        FROM dbo.test_cases
         WHERE id = @id
       `);
 
@@ -1735,7 +1732,7 @@ async function resolveDataPoints(pool, testCaseId, dataSourceId) {
           test_case_id,
           data_source_type,
           source_path
-        FROM ${DATABASE_SCHEMA}.test_data_sources
+        FROM dbo.test_data_sources
         WHERE id = @dataSourceId
       `);
 
@@ -1766,7 +1763,7 @@ async function resolveDataPoints(pool, testCaseId, dataSourceId) {
           id,
           row_number,
           data
-        FROM ${DATABASE_SCHEMA}.test_data_rows
+        FROM dbo.test_data_rows
         WHERE data_source_id = @dataSourceId
         ORDER BY row_number ASC, id ASC
       `);
@@ -1897,7 +1894,7 @@ async function createStepRunningRecord(pool, runId, stepNumber, step) {
       step.value || null,
     )
     .input("status", sql.VarChar, "running").query(`
-        INSERT INTO ${DATABASE_SCHEMA}.playwright_test_run_steps
+        INSERT INTO dbo.playwright_test_run_steps
         (
           run_id,
           step_number,
@@ -1936,7 +1933,7 @@ async function updateExistingStepRecord(
     .input("duration_ms", sql.Int, duration)
     .input("error_message", sql.NVarChar(sql.MAX), errorMessage)
     .input("screenshot_path", sql.NVarChar(sql.MAX), screenshotPath).query(`
-      UPDATE ${DATABASE_SCHEMA}.playwright_test_run_steps
+      UPDATE dbo.playwright_test_run_steps
       SET
         status = @status,
         duration_ms = @duration_ms,
@@ -1954,7 +1951,7 @@ async function createEnhancedRunRecord(pool, testCaseId, userId, dataIndex) {
     .input("started_at", sql.DateTime, new Date())
     .input("created_by", sql.Int, userId || null)
     .input("data_index", sql.Int, dataIndex).query(`
-        INSERT INTO ${DATABASE_SCHEMA}.playwright_test_runs
+        INSERT INTO dbo.playwright_test_runs
         (
           test_case_id,
           status,
@@ -2016,7 +2013,7 @@ async function recordEnhancedStepResult(
 
       extra.screenshotPath || null,
     ).query(`
-      INSERT INTO ${DATABASE_SCHEMA}.playwright_test_run_steps
+      INSERT INTO dbo.playwright_test_run_steps
       (
         run_id,
         step_number,
@@ -2080,7 +2077,7 @@ async function updateRunRecord(
     .input("completed_at", sql.DateTime, new Date())
     .input("duration_ms", sql.Int, duration)
     .input("error_message", sql.NVarChar(sql.MAX), errorMessage).query(`
-      UPDATE ${DATABASE_SCHEMA}.playwright_test_runs
+      UPDATE dbo.playwright_test_runs
       SET
         status = @status,
         completed_at = @completed_at,
@@ -2106,7 +2103,7 @@ async function finalizeEnhancedRun(
     .input("locator_recoveries", sql.Int, locatorRecoveries)
     .input("error_message", sql.NVarChar(sql.MAX), errorMessage)
     .input("duration_ms", sql.Int, duration).query(`
-      UPDATE ${DATABASE_SCHEMA}.playwright_test_runs
+      UPDATE dbo.playwright_test_runs
       SET
         status = @status,
         completed_at = @completed_at,

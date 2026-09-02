@@ -21,8 +21,8 @@ exports.getProjectNotes = async (req, res) => {
           n.created_by,
           n.created_at,
           u.username AS created_by_name
-        FROM test_case_manager.dbo.project_notes n
-        LEFT JOIN test_case_manager.dbo.users u ON u.id = n.created_by
+        FROM dbo.project_notes n
+        LEFT JOIN dbo.users u ON u.id = n.created_by
         WHERE n.project_id = @project_id
         ORDER BY n.created_at DESC
       `);
@@ -62,7 +62,7 @@ exports.createProjectNote = async (req, res) => {
     const projectCheck = await pool
       .request()
       .input("id", sql.Int, id)
-      .query(`SELECT id, project_name FROM test_case_manager.dbo.projects WHERE id = @id`);
+      .query(`SELECT id, project_name FROM dbo.projects WHERE id = @id`);
 
     if (!projectCheck.recordset[0]) {
       return res.status(404).json({
@@ -77,7 +77,7 @@ exports.createProjectNote = async (req, res) => {
       .input("note_text", sql.VarChar(sql.MAX), note_text.trim())
       .input("created_by", sql.Int, userId)
       .query(`
-        INSERT INTO test_case_manager.dbo.project_notes
+        INSERT INTO dbo.project_notes
           (project_id, note_text, created_by, created_at)
         OUTPUT INSERTED.*
         VALUES
@@ -92,7 +92,7 @@ exports.createProjectNote = async (req, res) => {
       ? await pool
           .request()
           .input("user_id", sql.Int, userId)
-          .query(`SELECT username FROM test_case_manager.dbo.users WHERE id = @user_id`)
+          .query(`SELECT username FROM dbo.users WHERE id = @user_id`)
       : null;
 
     note.created_by_name = userResult?.recordset[0]?.username || null;
@@ -135,7 +135,7 @@ exports.deleteProjectNote = async (req, res) => {
     const noteResult = await pool
       .request()
       .input("id", sql.Int, noteId)
-      .query(`SELECT * FROM test_case_manager.dbo.project_notes WHERE id = @id`);
+      .query(`SELECT * FROM dbo.project_notes WHERE id = @id`);
 
     const note = noteResult.recordset[0];
     if (!note) {
@@ -148,7 +148,7 @@ exports.deleteProjectNote = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, noteId)
-      .query(`DELETE FROM test_case_manager.dbo.project_notes WHERE id = @id`);
+      .query(`DELETE FROM dbo.project_notes WHERE id = @id`);
 
     await logAudit({
       userId,
