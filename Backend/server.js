@@ -120,6 +120,8 @@ app.use("/api/departments", require("./routes/departmentRoutes"));
 app.use("/api/roles", require("./routes/roleRoutes"));
 app.use("/api/teams", require("./routes/teamRoutes"));
 app.use("/api/projects", require("./routes/projectRoutes"));
+app.use("/api/project-functions", require("./routes/projectFunctionsRoutes"));
+app.use("/api/bug-reports", require("./routes/bugReportRoutes"));
 app.use("/api/test-suites", require("./routes/testSuiteRoutes"));
 app.use("/api/test-cases", require("./routes/testCaseRoutes"));
 app.use("/api/playwright", require("./routes/playwrightRoutes"));
