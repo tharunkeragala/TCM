@@ -10,18 +10,47 @@ const logAudit = require("./auditController");
 // ===============================
 
 // Get next bug report ID (e.g., BUG-001)
-async function getNextBugReportId(pool, projectId) {
+async function getNextBugReportId(
+  pool,
+  projectId,
+) {
   const result = await pool
     .request()
-    .input("project_id", sql.Int, projectId)
+    .input(
+      "project_id",
+      sql.Int,
+      projectId,
+    )
     .query(`
-      SELECT COUNT(*) as total
+      SELECT
+        ISNULL(
+          MAX(
+            TRY_CAST(
+              RIGHT(report_id, 4)
+              AS INT
+            )
+          ),
+          0
+        ) AS max_number
       FROM test_case_manager.dbo.bug_reports
-      WHERE project_id = @project_id AND is_archived = 0
+      WHERE project_id = @project_id
     `);
 
-  const nextNum = (result.recordset[0].total + 1).toString().padStart(4, "0");
-  return `BUG-${projectId}-${nextNum}`;
+  const maxNumber =
+    Number(
+      result.recordset[0]
+        ?.max_number || 0,
+    );
+
+  const nextNumber =
+    maxNumber + 1;
+
+  const formattedNumber =
+    nextNumber
+      .toString()
+      .padStart(4, "0");
+
+  return `BUG-${projectId}-${formattedNumber}`;
 }
 
 // Clean audit data
@@ -60,16 +89,31 @@ async function saveScreenshot(file) {
 }
 
 // Log audit trail
-async function logBugAudit(pool, bugId, actionType, fieldName, oldValue, newValue, userId) {
+async function logBugAudit(
+  pool,
+  bugId,
+  actionType,
+  fieldName,
+  oldValue,
+  newValue,
+  userId,
+) {
   await pool
     .request()
     .input("bug_report_id", sql.Int, bugId)
     .input("action_type", sql.NVarChar, actionType)
     .input("field_name", sql.NVarChar, fieldName)
-    .input("old_value", sql.NVarChar, oldValue ? JSON.stringify(oldValue) : null)
-    .input("new_value", sql.NVarChar, newValue ? JSON.stringify(newValue) : null)
-    .input("changed_by", sql.Int, userId)
-    .query(`
+    .input(
+      "old_value",
+      sql.NVarChar,
+      oldValue ? JSON.stringify(oldValue) : null,
+    )
+    .input(
+      "new_value",
+      sql.NVarChar,
+      newValue ? JSON.stringify(newValue) : null,
+    )
+    .input("changed_by", sql.Int, userId).query(`
       INSERT INTO test_case_manager.dbo.bug_audit
         (bug_report_id, action_type, field_name, old_value, new_value, changed_by)
       VALUES
@@ -83,8 +127,7 @@ async function addSystemComment(pool, bugId, message, userId = 1) {
     .request()
     .input("bug_report_id", sql.Int, bugId)
     .input("comment", sql.NVarChar, message)
-    .input("commented_by", sql.Int, userId)
-    .query(`
+    .input("commented_by", sql.Int, userId).query(`
       INSERT INTO test_case_manager.dbo.bug_comments
         (bug_report_id, comment, is_system, commented_by)
       VALUES
@@ -99,63 +142,144 @@ exports.createBugReport = async (req, res) => {
   try {
     const pool = await poolPromise;
     const userId = req.user.id;
-    const { project_id, function_id, sprint_id, title, description, severity, priority, environment, affected_version } = req.body;
+
+    const {
+      project_id,
+      function_id,
+      sprint_id,
+      title,
+      description,
+      severity,
+      priority,
+      environment,
+      affected_version,
+      test_case_ids,
+    } = req.body;
 
     // Validate required fields
-    if (!project_id || !function_id || !title || !description) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (
+      !project_id ||
+      !function_id ||
+      !title ||
+      !description
+    ) {
+      return res.status(400).json({
+        error: "Missing required fields",
+      });
     }
 
     // Get next report ID
-    const reportId = await getNextBugReportId(pool, project_id);
+    const reportId =
+      await getNextBugReportId(
+        pool,
+        project_id,
+      );
 
     // Create bug report
     const result = await pool
       .request()
-      .input("report_id", sql.NVarChar, reportId)
-      .input("project_id", sql.Int, project_id)
-      .input("project_function_id", sql.Int, function_id)
-      .input("sprint_id", sql.Int, sprint_id || null)
-      .input("title", sql.NVarChar, title)
-      .input("description", sql.NVarChar, description)
-      .input("severity", sql.NVarChar, severity || "Medium")
-      .input("priority", sql.Int, priority || 3)
-      .input("environment", sql.NVarChar, environment || null)
-      .input("affected_version", sql.NVarChar, affected_version || null)
-      .input("reported_by", sql.Int, userId)
-      .input("created_by", sql.Int, userId)
+      .input(
+        "report_id",
+        sql.NVarChar,
+        reportId,
+      )
+      .input(
+        "project_id",
+        sql.Int,
+        project_id,
+      )
+      .input(
+        "project_function_id",
+        sql.Int,
+        function_id,
+      )
+      .input(
+        "sprint_id",
+        sql.Int,
+        sprint_id || null,
+      )
+      .input(
+        "title",
+        sql.NVarChar,
+        title,
+      )
+      .input(
+        "description",
+        sql.NVarChar,
+        description,
+      )
+      .input(
+        "severity",
+        sql.NVarChar,
+        severity || "Medium",
+      )
+      .input(
+        "priority",
+        sql.Int,
+        priority || 3,
+      )
+      .input(
+        "environment",
+        sql.NVarChar,
+        environment || null,
+      )
+      .input(
+        "affected_version",
+        sql.NVarChar,
+        affected_version || null,
+      )
+      .input(
+        "reported_by",
+        sql.Int,
+        userId,
+      )
+      .input(
+        "created_by",
+        sql.Int,
+        userId,
+      )
       .query(`
         INSERT INTO test_case_manager.dbo.bug_reports
-          (report_id, project_id, project_function_id, sprint_id, title, description, 
-           severity, priority, environment, affected_version, reported_by, created_by)
+          (
+            report_id,
+            project_id,
+            project_function_id,
+            sprint_id,
+            title,
+            description,
+            severity,
+            priority,
+            environment,
+            affected_version,
+            reported_by,
+            created_by
+          )
         VALUES
-          (@report_id, @project_id, @project_function_id, @sprint_id, @title, @description,
-           @severity, @priority, @environment, @affected_version, @reported_by, @created_by);
-        SELECT SCOPE_IDENTITY() as id;
+          (
+            @report_id,
+            @project_id,
+            @project_function_id,
+            @sprint_id,
+            @title,
+            @description,
+            @severity,
+            @priority,
+            @environment,
+            @affected_version,
+            @reported_by,
+            @created_by
+          );
+
+        SELECT SCOPE_IDENTITY() AS id;
       `);
 
-    const bugId = result.recordset[0].id;
+    const bugId =
+      result.recordset[0].id;
 
-    // Handle screenshot uploads
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const screenshotPath = await saveScreenshot(file);
-        await pool
-          .request()
-          .input("bug_report_id", sql.Int, bugId)
-          .input("screenshot_path", sql.NVarChar, screenshotPath)
-          .input("screenshot_name", sql.NVarChar, file.originalname)
-          .input("created_by", sql.Int, userId)
-          .query(`
-            INSERT INTO test_case_manager.dbo.bug_screenshots
-              (bug_report_id, screenshot_path, screenshot_name, created_by)
-            VALUES
-              (@bug_report_id, @screenshot_path, @screenshot_name, @created_by)
-          `);
-      }
-    }
+    // =====================================================
+    // FIRST: LOG BUG CREATION
+    // =====================================================
 
-    // Log audit
     await logAudit({
       userId,
       action: "CREATE",
@@ -163,20 +287,212 @@ exports.createBugReport = async (req, res) => {
       entityType: "Bug Report",
       entityId: bugId,
       entityName: reportId,
-      description: `Bug report created`,
-      newValues: { title, description, severity, project_id, function_id }
+      description: "Bug report created",
+      newValues: {
+        title,
+        description,
+        severity,
+        project_id,
+        function_id,
+      },
     });
-    await addSystemComment(pool, bugId, `Bug report created`, userId);
+
+    await addSystemComment(
+      pool,
+      bugId,
+      "Bug report created",
+      userId,
+    );
+
+    // =====================================================
+    // SCREENSHOTS
+    // =====================================================
+
+    if (
+      req.files &&
+      req.files.length > 0
+    ) {
+      for (const file of req.files) {
+        const screenshotPath =
+          await saveScreenshot(file);
+
+        await pool
+          .request()
+          .input(
+            "bug_report_id",
+            sql.Int,
+            bugId,
+          )
+          .input(
+            "screenshot_path",
+            sql.NVarChar,
+            screenshotPath,
+          )
+          .input(
+            "screenshot_name",
+            sql.NVarChar,
+            file.originalname,
+          )
+          .input(
+            "created_by",
+            sql.Int,
+            userId,
+          )
+          .query(`
+            INSERT INTO test_case_manager.dbo.bug_screenshots
+              (
+                bug_report_id,
+                screenshot_path,
+                screenshot_name,
+                created_by
+              )
+            VALUES
+              (
+                @bug_report_id,
+                @screenshot_path,
+                @screenshot_name,
+                @created_by
+              )
+          `);
+      }
+    }
+
+    // =====================================================
+    // THEN: LINK SELECTED TEST CASES
+    // =====================================================
+
+    let parsedTestCaseIds = [];
+
+    if (test_case_ids) {
+      try {
+        parsedTestCaseIds =
+          Array.isArray(test_case_ids)
+            ? test_case_ids
+            : JSON.parse(
+                test_case_ids,
+              );
+      } catch (error) {
+        console.warn(
+          "Invalid test_case_ids received while creating bug:",
+          test_case_ids,
+        );
+      }
+    }
+
+    if (
+      Array.isArray(
+        parsedTestCaseIds,
+      ) &&
+      parsedTestCaseIds.length > 0
+    ) {
+      const uniqueTestCaseIds = [
+        ...new Set(
+          parsedTestCaseIds
+            .map((value) =>
+              Number(value),
+            )
+            .filter(
+              (value) =>
+                Number.isInteger(
+                  value,
+                ) &&
+                value > 0,
+            ),
+        ),
+      ];
+
+      for (
+        const testCaseId of
+        uniqueTestCaseIds
+      ) {
+        const testCaseResult =
+          await pool
+            .request()
+            .input(
+              "test_case_id",
+              sql.Int,
+              testCaseId,
+            )
+            .query(`
+              SELECT
+                tc.id,
+                tc.title
+              FROM test_case_manager.dbo.test_cases tc
+              WHERE tc.id = @test_case_id
+            `);
+
+        const testCase =
+          testCaseResult.recordset[0];
+
+        if (!testCase) {
+          continue;
+        }
+
+        await pool
+          .request()
+          .input(
+            "bug_report_id",
+            sql.Int,
+            bugId,
+          )
+          .input(
+            "test_case_id",
+            sql.Int,
+            testCaseId,
+          )
+          .input(
+            "linked_by",
+            sql.Int,
+            userId,
+          )
+          .query(`
+            IF NOT EXISTS (
+              SELECT 1
+              FROM test_case_manager.dbo.bug_test_case_links
+              WHERE bug_report_id = @bug_report_id
+                AND test_case_id = @test_case_id
+            )
+            BEGIN
+              INSERT INTO test_case_manager.dbo.bug_test_case_links
+                (
+                  bug_report_id,
+                  test_case_id,
+                  linked_by
+                )
+              VALUES
+                (
+                  @bug_report_id,
+                  @test_case_id,
+                  @linked_by
+                )
+            END
+          `);
+
+        await addSystemComment(
+          pool,
+          bugId,
+          `Linked test case #${testCase.id}: ${testCase.title}`,
+          userId,
+        );
+      }
+    }
 
     res.status(201).json({
       success: true,
-      message: "Bug report created successfully",
+      message:
+        "Bug report created successfully",
       bugId,
       reportId,
     });
   } catch (error) {
-    console.error("Create bug report error:", error);
-    res.status(500).json({ error: error.message });
+    console.error(
+      "Create bug report error:",
+      error,
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
@@ -186,7 +502,15 @@ exports.createBugReport = async (req, res) => {
 exports.getBugReports = async (req, res) => {
   try {
     const pool = await poolPromise;
-    const { project_id, sprint_id, status, severity, assigned_to, limit = 50, offset = 0 } = req.query;
+    const {
+      project_id,
+      sprint_id,
+      status,
+      severity,
+      assigned_to,
+      limit = 50,
+      offset = 0,
+    } = req.query;
 
     let query = `
       SELECT 
@@ -274,10 +598,7 @@ exports.getBugReportById = async (req, res) => {
     const { id } = req.params;
 
     // Get main bug report
-    const bugResult = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`
+    const bugResult = await pool.request().input("id", sql.Int, id).query(`
         SELECT 
           br.*,
           pf.function_name,
@@ -301,9 +622,7 @@ exports.getBugReportById = async (req, res) => {
     const bug = bugResult.recordset[0];
 
     // Get screenshots
-    const screenshots = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
+    const screenshots = await pool.request().input("bug_id", sql.Int, id)
       .query(`
         SELECT * FROM test_case_manager.dbo.bug_screenshots
         WHERE bug_report_id = @bug_id
@@ -311,10 +630,7 @@ exports.getBugReportById = async (req, res) => {
       `);
 
     // Get history/iterations
-    const history = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
-      .query(`
+    const history = await pool.request().input("bug_id", sql.Int, id).query(`
         SELECT 
           bh.*,
           sp.sprint_name,
@@ -326,10 +642,7 @@ exports.getBugReportById = async (req, res) => {
         ORDER BY bh.cycle_number ASC
       `);
 
-    const summary = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
-      .query(`
+    const summary = await pool.request().input("bug_id", sql.Int, id).query(`
         SELECT
           brs.*,
           s.sprint_name
@@ -339,11 +652,46 @@ exports.getBugReportById = async (req, res) => {
         ORDER BY brs.latest_status_date DESC, brs.sprint_id
       `);
 
-    // Get comments
-    const comments = await pool
+    // Get linked test cases
+    const linkedTestCases = await pool
       .request()
       .input("bug_id", sql.Int, id)
       .query(`
+        SELECT
+          btc.id AS link_id,
+          btc.bug_report_id,
+          btc.test_case_id,
+          btc.linked_at,
+          btc.linked_by,
+          tc.title,
+          tc.priority,
+          tc.status,
+          tc.preconditions,
+          tc.suite_id,
+          ts.suite_name,
+          p.id AS project_id,
+          p.project_name,
+          u.username AS linked_by_name,
+          (
+            SELECT COUNT(*)
+            FROM test_case_manager.dbo.test_steps step_count
+            WHERE step_count.test_case_id = tc.id
+          ) AS step_count
+        FROM test_case_manager.dbo.bug_test_case_links btc
+        INNER JOIN test_case_manager.dbo.test_cases tc
+          ON tc.id = btc.test_case_id
+        LEFT JOIN test_case_manager.dbo.test_suites ts
+          ON ts.id = tc.suite_id
+        LEFT JOIN test_case_manager.dbo.projects p
+          ON p.id = ts.project_id
+        LEFT JOIN test_case_manager.dbo.users u
+          ON u.id = btc.linked_by
+        WHERE btc.bug_report_id = @bug_id
+        ORDER BY btc.linked_at DESC, btc.id DESC
+      `);
+
+    // Get comments
+    const comments = await pool.request().input("bug_id", sql.Int, id).query(`
         SELECT 
           bc.*,
           u.username as commented_by_name
@@ -359,6 +707,7 @@ exports.getBugReportById = async (req, res) => {
       screenshots: screenshots.recordset,
       history: history.recordset,
       summary: summary.recordset,
+      linkedTestCases: linkedTestCases.recordset,
       comments: comments.recordset,
     });
   } catch (error) {
@@ -375,37 +724,88 @@ exports.updateBugReport = async (req, res) => {
     const pool = await poolPromise;
     const { id } = req.params;
     const userId = req.user.id;
-    const { title, description, severity, priority, status, assigned_to, target_resolution_date, environment, affected_version } = req.body;
+
+    const {
+      title,
+      description,
+      severity,
+      priority,
+      status,
+      assigned_to,
+      target_resolution_date,
+      environment,
+      affected_version,
+    } = req.body;
 
     // Get current bug report for comparison
-    const currentResult = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`SELECT * FROM test_case_manager.dbo.bug_reports WHERE id = @id`);
+    const currentResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT *
+        FROM test_case_manager.dbo.bug_reports
+        WHERE id = @id
+      `);
 
     if (!currentResult.recordset[0]) {
-      return res.status(404).json({ error: "Bug report not found" });
+      return res.status(404).json({
+        error: "Bug report not found",
+      });
     }
 
     const currentBug = currentResult.recordset[0];
+
+    // Preserve current values when fields are not provided.
+    // This is especially important for assignment-only updates.
+    const nextAssignedTo =
+      assigned_to !== undefined ? assigned_to || null : currentBug.assigned_to;
+
+    const nextTargetResolutionDate =
+      target_resolution_date !== undefined
+        ? target_resolution_date || null
+        : currentBug.target_resolution_date;
+
+    const nextEnvironment =
+      environment !== undefined ? environment || null : currentBug.environment;
+
+    const nextAffectedVersion =
+      affected_version !== undefined
+        ? affected_version || null
+        : currentBug.affected_version;
 
     // Update bug report
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("title", sql.NVarChar, title || currentBug.title)
-      .input("description", sql.NVarChar, description || currentBug.description)
-      .input("severity", sql.NVarChar, severity || currentBug.severity)
-      .input("priority", sql.Int, priority !== undefined ? priority : currentBug.priority)
-      .input("status", sql.NVarChar, status || currentBug.status)
-      .input("assigned_to", sql.Int, assigned_to || null)
-      .input("target_resolution_date", sql.DateTime, target_resolution_date || null)
-      .input("environment", sql.NVarChar, environment || currentBug.environment)
-      .input("affected_version", sql.NVarChar, affected_version || currentBug.affected_version)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input(
+        "title",
+        sql.NVarChar,
+        title !== undefined ? title : currentBug.title,
+      )
+      .input(
+        "description",
+        sql.NVarChar,
+        description !== undefined ? description : currentBug.description,
+      )
+      .input(
+        "severity",
+        sql.NVarChar,
+        severity !== undefined ? severity : currentBug.severity,
+      )
+      .input(
+        "priority",
+        sql.Int,
+        priority !== undefined ? priority : currentBug.priority,
+      )
+      .input(
+        "status",
+        sql.NVarChar,
+        status !== undefined ? status : currentBug.status,
+      )
+      .input("assigned_to", sql.Int, nextAssignedTo)
+      .input("target_resolution_date", sql.DateTime, nextTargetResolutionDate)
+      .input("environment", sql.NVarChar, nextEnvironment)
+      .input("affected_version", sql.NVarChar, nextAffectedVersion)
+      .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.bug_reports
-        SET 
+        SET
           title = @title,
           description = @description,
           severity = @severity,
@@ -421,19 +821,111 @@ exports.updateBugReport = async (req, res) => {
       `);
 
     // Log changes for audit
-    if (title && title !== currentBug.title) {
-      await logBugAudit(pool, id, "Updated", "title", currentBug.title, title, userId);
+    if (title !== undefined && title !== currentBug.title) {
+      await logBugAudit(
+        pool,
+        id,
+        "Updated",
+        "title",
+        currentBug.title,
+        title,
+        userId,
+      );
     }
-    if (status && status !== currentBug.status) {
-      await logBugAudit(pool, id, "Status Changed", "status", currentBug.status, status, userId);
-      await addSystemComment(pool, id, `Status changed from ${currentBug.status} to ${status}`, userId);
+
+    if (status !== undefined && status !== currentBug.status) {
+      await logBugAudit(
+        pool,
+        id,
+        "Status Changed",
+        "status",
+        currentBug.status,
+        status,
+        userId,
+      );
+
+      await addSystemComment(
+        pool,
+        id,
+        `Status changed from ${currentBug.status} to ${status}`,
+        userId,
+      );
     }
-    if (assigned_to && assigned_to !== currentBug.assigned_to) {
-      await logBugAudit(pool, id, "Assigned", "assigned_to", currentBug.assigned_to, assigned_to, userId);
-      await addSystemComment(pool, id, `Assigned to user ${assigned_to}`, userId);
+
+    // Assignment changed
+    if (
+      assigned_to !== undefined &&
+      Number(assigned_to || 0) !== Number(currentBug.assigned_to || 0)
+    ) {
+      let previousUserName = "Unassigned";
+      let newUserName = "Unassigned";
+
+      // Get previous assigned user's name
+      if (currentBug.assigned_to) {
+        const previousUserResult = await pool
+          .request()
+          .input("previous_user_id", sql.Int, currentBug.assigned_to).query(`
+            SELECT
+              id,
+              username
+            FROM test_case_manager.dbo.users
+            WHERE id = @previous_user_id
+          `);
+
+        previousUserName =
+          previousUserResult.recordset[0]?.username ||
+          `User ${currentBug.assigned_to}`;
+      }
+
+      // Get newly assigned user's name
+      if (assigned_to) {
+        const assignedUserResult = await pool
+          .request()
+          .input("assigned_user_id", sql.Int, assigned_to).query(`
+            SELECT
+              id,
+              username
+            FROM test_case_manager.dbo.users
+            WHERE id = @assigned_user_id
+          `);
+
+        newUserName =
+          assignedUserResult.recordset[0]?.username || `User ${assigned_to}`;
+      }
+
+      await logBugAudit(
+        pool,
+        id,
+        assigned_to ? "Assigned" : "Unassigned",
+        "assigned_to",
+        currentBug.assigned_to,
+        assigned_to || null,
+        userId,
+      );
+
+      let assignmentMessage = "";
+
+      if (!currentBug.assigned_to && assigned_to) {
+        assignmentMessage = `Assigned to ${newUserName}`;
+      } else if (currentBug.assigned_to && !assigned_to) {
+        assignmentMessage = `Unassigned from ${previousUserName}`;
+      } else {
+        assignmentMessage = `Assignment changed from ${previousUserName} to ${newUserName}`;
+      }
+
+      await addSystemComment(pool, id, assignmentMessage, userId);
     }
-    if (severity && severity !== currentBug.severity) {
-      await logBugAudit(pool, id, "Updated", "severity", currentBug.severity, severity, userId);
+
+    if (severity !== undefined && severity !== currentBug.severity) {
+      await logBugAudit(
+        pool,
+        id,
+        "Updated",
+        "severity",
+        currentBug.severity,
+        severity,
+        userId,
+      );
     }
 
     res.json({
@@ -442,7 +934,197 @@ exports.updateBugReport = async (req, res) => {
     });
   } catch (error) {
     console.error("Update bug report error:", error);
-    res.status(500).json({ error: error.message });
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+// ===============================
+// LINK TEST CASE TO BUG
+// ===============================
+exports.linkTestCaseToBug = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { test_case_id } = req.body;
+
+    if (!test_case_id) {
+      return res.status(400).json({
+        success: false,
+        error: "test_case_id is required",
+      });
+    }
+
+    const bugResult = await pool
+      .request()
+      .input("bug_id", sql.Int, id)
+      .query(`
+        SELECT id, report_id
+        FROM test_case_manager.dbo.bug_reports
+        WHERE id = @bug_id AND is_archived = 0
+      `);
+
+    if (!bugResult.recordset[0]) {
+      return res.status(404).json({
+        success: false,
+        error: "Bug report not found",
+      });
+    }
+
+    const testCaseResult = await pool
+      .request()
+      .input("test_case_id", sql.Int, test_case_id)
+      .query(`
+        SELECT id, title
+        FROM test_case_manager.dbo.test_cases
+        WHERE id = @test_case_id
+      `);
+
+    if (!testCaseResult.recordset[0]) {
+      return res.status(404).json({
+        success: false,
+        error: "Test case not found",
+      });
+    }
+
+    const existingResult = await pool
+      .request()
+      .input("bug_id", sql.Int, id)
+      .input("test_case_id", sql.Int, test_case_id)
+      .query(`
+        SELECT id
+        FROM test_case_manager.dbo.bug_test_case_links
+        WHERE bug_report_id = @bug_id
+          AND test_case_id = @test_case_id
+      `);
+
+    if (existingResult.recordset[0]) {
+      return res.status(200).json({
+        success: true,
+        message: "Test case is already linked to this bug",
+        alreadyLinked: true,
+      });
+    }
+
+    const result = await pool
+      .request()
+      .input("bug_id", sql.Int, id)
+      .input("test_case_id", sql.Int, test_case_id)
+      .input("linked_by", sql.Int, userId)
+      .query(`
+        INSERT INTO test_case_manager.dbo.bug_test_case_links
+          (bug_report_id, test_case_id, linked_by)
+        OUTPUT INSERTED.id
+        VALUES
+          (@bug_id, @test_case_id, @linked_by)
+      `);
+
+    const testCase = testCaseResult.recordset[0];
+
+    await addSystemComment(
+      pool,
+      id,
+      `Linked test case TC-${testCase.id}: ${testCase.title}`,
+      userId,
+    );
+
+    await logBugAudit(
+      pool,
+      id,
+      "Test Case Linked",
+      "test_case_id",
+      null,
+      Number(test_case_id),
+      userId,
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Test case linked successfully",
+      linkId: result.recordset[0].id,
+    });
+  } catch (error) {
+    console.error("Link test case to bug error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// ===============================
+// UNLINK TEST CASE FROM BUG
+// ===============================
+exports.unlinkTestCaseFromBug = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const { id, testCaseId } = req.params;
+    const userId = req.user.id;
+
+    const linkedResult = await pool
+      .request()
+      .input("bug_id", sql.Int, id)
+      .input("test_case_id", sql.Int, testCaseId)
+      .query(`
+        SELECT
+          btc.id,
+          tc.title
+        FROM test_case_manager.dbo.bug_test_case_links btc
+        INNER JOIN test_case_manager.dbo.test_cases tc
+          ON tc.id = btc.test_case_id
+        WHERE btc.bug_report_id = @bug_id
+          AND btc.test_case_id = @test_case_id
+      `);
+
+    if (!linkedResult.recordset[0]) {
+      return res.status(404).json({
+        success: false,
+        error: "Linked test case not found for this bug",
+      });
+    }
+
+    const linkedTestCase = linkedResult.recordset[0];
+
+    await pool
+      .request()
+      .input("bug_id", sql.Int, id)
+      .input("test_case_id", sql.Int, testCaseId)
+      .query(`
+        DELETE FROM test_case_manager.dbo.bug_test_case_links
+        WHERE bug_report_id = @bug_id
+          AND test_case_id = @test_case_id
+      `);
+
+    await addSystemComment(
+      pool,
+      id,
+      `Unlinked test case TC-${testCaseId}: ${linkedTestCase.title}`,
+      userId,
+    );
+
+    await logBugAudit(
+      pool,
+      id,
+      "Test Case Unlinked",
+      "test_case_id",
+      Number(testCaseId),
+      null,
+      userId,
+    );
+
+    res.json({
+      success: true,
+      message: "Test case unlinked successfully",
+    });
+  } catch (error) {
+    console.error("Unlink test case from bug error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
 
@@ -457,7 +1139,9 @@ exports.recordBugIteration = async (req, res) => {
     const { sprint_id, status, status_reason, notes } = req.body;
 
     if (!sprint_id || !status) {
-      return res.status(400).json({ error: "sprint_id and status are required" });
+      return res
+        .status(400)
+        .json({ error: "sprint_id and status are required" });
     }
 
     // Get current bug
@@ -471,9 +1155,7 @@ exports.recordBugIteration = async (req, res) => {
     }
 
     // Get next cycle number
-    const cycleResult = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
+    const cycleResult = await pool.request().input("bug_id", sql.Int, id)
       .query(`
         SELECT MAX(cycle_number) as max_cycle
         FROM test_case_manager.dbo.bug_history
@@ -492,8 +1174,7 @@ exports.recordBugIteration = async (req, res) => {
       .input("status_reason", sql.NVarChar, status_reason || null)
       .input("notes", sql.NVarChar, notes || null)
       .input("tested_by", sql.Int, userId)
-      .input("created_by", sql.Int, userId)
-      .query(`
+      .input("created_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.bug_history
           (bug_report_id, sprint_id, cycle_number, status, status_reason, notes, tested_by, created_by)
         VALUES
@@ -506,8 +1187,7 @@ exports.recordBugIteration = async (req, res) => {
       .request()
       .input("bug_report_id", sql.Int, id)
       .input("sprint_id", sql.Int, sprint_id)
-      .input("status", sql.NVarChar, status)
-      .query(`
+      .input("status", sql.NVarChar, status).query(`
         UPDATE test_case_manager.dbo.bug_report_summary
         SET pass_count = pass_count + CASE WHEN @status = 'Pass' THEN 1 ELSE 0 END,
             fail_count = fail_count + CASE WHEN @status = 'Fail' THEN 1 ELSE 0 END,
@@ -536,8 +1216,7 @@ exports.recordBugIteration = async (req, res) => {
       .request()
       .input("id", sql.Int, id)
       .input("current_cycle_status", sql.NVarChar, status)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.bug_reports
         SET current_cycle_status = @current_cycle_status,
             updated_by = @updated_by,
@@ -546,10 +1225,23 @@ exports.recordBugIteration = async (req, res) => {
       `);
 
     // Add system comment
-    await addSystemComment(pool, id, `Cycle ${nextCycle}: ${status} - ${status_reason || ""}`, userId);
+    await addSystemComment(
+      pool,
+      id,
+      `Cycle ${nextCycle}: ${status} - ${status_reason || ""}`,
+      userId,
+    );
 
     // Log audit
-    await logBugAudit(pool, id, "Iteration Added", `Cycle ${nextCycle}`, null, status, userId);
+    await logBugAudit(
+      pool,
+      id,
+      "Iteration Added",
+      `Cycle ${nextCycle}`,
+      null,
+      status,
+      userId,
+    );
 
     res.status(201).json({
       success: true,
@@ -581,8 +1273,7 @@ exports.addBugComment = async (req, res) => {
       .request()
       .input("bug_report_id", sql.Int, id)
       .input("comment", sql.NVarChar, comment)
-      .input("commented_by", sql.Int, userId)
-      .query(`
+      .input("commented_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.bug_comments
           (bug_report_id, comment, commented_by)
         VALUES
@@ -622,8 +1313,7 @@ exports.uploadBugScreenshots = async (req, res) => {
         .input("bug_report_id", sql.Int, id)
         .input("screenshot_path", sql.NVarChar, screenshotPath)
         .input("screenshot_name", sql.NVarChar, file.originalname)
-        .input("created_by", sql.Int, userId)
-        .query(`
+        .input("created_by", sql.Int, userId).query(`
           INSERT INTO test_case_manager.dbo.bug_screenshots
             (bug_report_id, screenshot_path, screenshot_name, created_by)
           VALUES
@@ -657,10 +1347,7 @@ exports.getBugHistory = async (req, res) => {
     const pool = await poolPromise;
     const { id } = req.params;
 
-    const history = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
-      .query(`
+    const history = await pool.request().input("bug_id", sql.Int, id).query(`
         SELECT 
           bh.*,
           s.sprint_name,
@@ -717,11 +1404,7 @@ exports.getBugStatistics = async (req, res) => {
         AND br.project_id = @stats_project_id
       `;
 
-      statsRequest.input(
-        "stats_project_id",
-        sql.Int,
-        Number(project_id),
-      );
+      statsRequest.input("stats_project_id", sql.Int, Number(project_id));
     }
 
     if (sprint_id) {
@@ -734,11 +1417,7 @@ exports.getBugStatistics = async (req, res) => {
         )
       `;
 
-      statsRequest.input(
-        "stats_sprint_id",
-        sql.Int,
-        Number(sprint_id),
-      );
+      statsRequest.input("stats_sprint_id", sql.Int, Number(sprint_id));
     }
 
     const stats = await statsRequest.query(`
@@ -820,11 +1499,7 @@ exports.getBugStatistics = async (req, res) => {
         AND br.project_id = @trend_project_id
       `;
 
-      trendRequest.input(
-        "trend_project_id",
-        sql.Int,
-        Number(project_id),
-      );
+      trendRequest.input("trend_project_id", sql.Int, Number(project_id));
     }
 
     if (sprint_id) {
@@ -832,11 +1507,7 @@ exports.getBugStatistics = async (req, res) => {
         AND bh.sprint_id = @trend_sprint_id
       `;
 
-      trendRequest.input(
-        "trend_sprint_id",
-        sql.Int,
-        Number(sprint_id),
-      );
+      trendRequest.input("trend_sprint_id", sql.Int, Number(sprint_id));
     }
 
     const trend = await trendRequest.query(`
@@ -890,11 +1561,7 @@ exports.getBugStatistics = async (req, res) => {
         AND br.project_id = @summary_project_id
       `;
 
-      summaryRequest.input(
-        "summary_project_id",
-        sql.Int,
-        Number(project_id),
-      );
+      summaryRequest.input("summary_project_id", sql.Int, Number(project_id));
     }
 
     if (sprint_id) {
@@ -902,11 +1569,7 @@ exports.getBugStatistics = async (req, res) => {
         AND brs.sprint_id = @summary_sprint_id
       `;
 
-      summaryRequest.input(
-        "summary_sprint_id",
-        sql.Int,
-        Number(sprint_id),
-      );
+      summaryRequest.input("summary_sprint_id", sql.Int, Number(sprint_id));
     }
 
     const summary = await summaryRequest.query(`
@@ -1020,11 +1683,7 @@ exports.getBugStatistics = async (req, res) => {
         AND br.project_id = @bugwise_project_id
       `;
 
-      bugWiseRequest.input(
-        "bugwise_project_id",
-        sql.Int,
-        Number(project_id),
-      );
+      bugWiseRequest.input("bugwise_project_id", sql.Int, Number(project_id));
     }
 
     if (sprint_id) {
@@ -1032,11 +1691,7 @@ exports.getBugStatistics = async (req, res) => {
         AND brs.sprint_id = @bugwise_sprint_id
       `;
 
-      bugWiseRequest.input(
-        "bugwise_sprint_id",
-        sql.Int,
-        Number(sprint_id),
-      );
+      bugWiseRequest.input("bugwise_sprint_id", sql.Int, Number(sprint_id));
     }
 
     const bugWise = await bugWiseRequest.query(`
@@ -1114,41 +1769,29 @@ exports.getBugStatistics = async (req, res) => {
     // ============================================================
     // RESPONSE
     // ============================================================
-    const statisticRow =
-      stats.recordset[0] || {};
+    const statisticRow = stats.recordset[0] || {};
 
     res.json({
       success: true,
 
       statistics: {
-        total_bugs:
-          Number(statisticRow.total_bugs || 0),
+        total_bugs: Number(statisticRow.total_bugs || 0),
 
-        open_bugs:
-          Number(statisticRow.open_bugs || 0),
+        open_bugs: Number(statisticRow.open_bugs || 0),
 
-        in_progress_bugs:
-          Number(
-            statisticRow.in_progress_bugs || 0,
-          ),
+        in_progress_bugs: Number(statisticRow.in_progress_bugs || 0),
 
-        resolved_bugs:
-          Number(statisticRow.resolved_bugs || 0),
+        resolved_bugs: Number(statisticRow.resolved_bugs || 0),
 
-        closed_bugs:
-          Number(statisticRow.closed_bugs || 0),
+        closed_bugs: Number(statisticRow.closed_bugs || 0),
 
-        critical_bugs:
-          Number(statisticRow.critical_bugs || 0),
+        critical_bugs: Number(statisticRow.critical_bugs || 0),
 
-        high_bugs:
-          Number(statisticRow.high_bugs || 0),
+        high_bugs: Number(statisticRow.high_bugs || 0),
 
-        medium_bugs:
-          Number(statisticRow.medium_bugs || 0),
+        medium_bugs: Number(statisticRow.medium_bugs || 0),
 
-        low_bugs:
-          Number(statisticRow.low_bugs || 0),
+        low_bugs: Number(statisticRow.low_bugs || 0),
       },
 
       trend: trend.recordset,
@@ -1160,10 +1803,7 @@ exports.getBugStatistics = async (req, res) => {
       bugWise: bugWise.recordset,
     });
   } catch (error) {
-    console.error(
-      "Get bug statistics error:",
-      error,
-    );
+    console.error("Get bug statistics error:", error);
 
     res.status(500).json({
       success: false,
@@ -1171,7 +1811,6 @@ exports.getBugStatistics = async (req, res) => {
     });
   }
 };
-
 
 // ===============================
 // DELETE BUG REPORT (Soft Delete)
@@ -1185,8 +1824,7 @@ exports.deleteBugReport = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.bug_reports
         SET is_archived = 1,
             updated_by = @updated_by,

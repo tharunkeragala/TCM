@@ -8,10 +8,10 @@ import {
   ChevronDownIcon,
   GridIcon,
   ListIcon,
-  PageIcon,
+  // PageIcon,
   PieChartIcon,
   PlugInIcon,
-  TableIcon,
+  // TableIcon,
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";

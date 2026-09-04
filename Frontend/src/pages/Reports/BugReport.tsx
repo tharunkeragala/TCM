@@ -152,12 +152,12 @@ export default function BugReport() {
   const [sprintId, setSprintId] = useState("");
   const [search, setSearch] = useState("");
 
-  const [statistics, setStatistics] =
-    useState<BugReportStatistics | null>(null);
+  const [statistics, setStatistics] = useState<BugReportStatistics | null>(
+    null,
+  );
   const [summary, setSummary] = useState<BugReportSummaryRow[]>([]);
   const [bugWise, setBugWise] = useState<BugWiseReportRow[]>([]);
-  const [reportView, setReportView] =
-    useState<"sprint" | "bug">("sprint");
+  const [reportView, setReportView] = useState<"sprint" | "bug">("sprint");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -208,9 +208,7 @@ export default function BugReport() {
     return summary.filter((row) =>
       [row.project_name, row.sprint_name, row.project_id, row.sprint_id]
         .filter(Boolean)
-        .some((value) =>
-          String(value).toLowerCase().includes(query),
-        ),
+        .some((value) => String(value).toLowerCase().includes(query)),
     );
   }, [search, summary]);
 
@@ -232,9 +230,7 @@ export default function BugReport() {
         row.latest_status,
       ]
         .filter(Boolean)
-        .some((value) =>
-          String(value).toLowerCase().includes(query),
-        ),
+        .some((value) => String(value).toLowerCase().includes(query)),
     );
   }, [bugWise, search]);
 
@@ -271,18 +267,14 @@ export default function BugReport() {
     if (reportView === "sprint") {
       const rows = filteredSummary.map((row, index) => ({
         "#": index + 1,
-        Project:
-          row.project_name ?? `Project ${row.project_id}`,
-        Sprint:
-          row.sprint_name ?? `Sprint ${row.sprint_id}`,
+        Project: row.project_name ?? `Project ${row.project_id}`,
+        Sprint: row.sprint_name ?? `Sprint ${row.sprint_id}`,
         Bugs: numberValue(row.bug_count),
         Pass: numberValue(row.pass_count),
         Fail: numberValue(row.fail_count),
         Blocked: numberValue(row.blocked_count),
         "No Test": numberValue(row.no_test_count),
-        "Latest Status Date": formatDate(
-          row.latest_status_date,
-        ),
+        "Latest Status Date": formatDate(row.latest_status_date),
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -299,35 +291,25 @@ export default function BugReport() {
         { wch: 20 },
       ];
 
-      XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        "Sprint Wise",
-      );
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Sprint Wise");
     } else {
       const rows = filteredBugWise.map((row, index) => ({
         "#": index + 1,
         "Bug ID": row.report_id,
         Title: row.title,
-        Project:
-          row.project_name ?? `Project ${row.project_id}`,
-        Sprint:
-          row.sprint_name ?? `Sprint ${row.sprint_id}`,
+        Project: row.project_name ?? `Project ${row.project_id}`,
+        Sprint: row.sprint_name ?? `Sprint ${row.sprint_id}`,
         Function: row.function_name ?? "-",
         Severity: row.severity,
         "Bug Status": row.bug_status,
         Priority: row.priority,
-        "Assigned To":
-          row.assigned_to_name ?? "Unassigned",
+        "Assigned To": row.assigned_to_name ?? "Unassigned",
         Pass: numberValue(row.pass_count),
         Fail: numberValue(row.fail_count),
         Blocked: numberValue(row.blocked_count),
         "No Test": numberValue(row.no_test_count),
-        "Latest Cycle Status":
-          row.latest_status ?? "-",
-        "Latest Status Date": formatDate(
-          row.latest_status_date,
-        ),
+        "Latest Cycle Status": row.latest_status ?? "-",
+        "Latest Status Date": formatDate(row.latest_status_date),
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -351,19 +333,13 @@ export default function BugReport() {
         { wch: 20 },
       ];
 
-      XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        "Bug Wise",
-      );
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Bug Wise");
     }
 
     XLSX.writeFile(
       workbook,
       `Bug_Report_${
-        reportView === "sprint"
-          ? "Sprint_Wise"
-          : "Bug_Wise"
+        reportView === "sprint" ? "Sprint_Wise" : "Bug_Wise"
       }_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
   };
@@ -407,19 +383,17 @@ export default function BugReport() {
 
       <div className="mt-4 min-w-0">
         {/* Statistics */}
-        <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="mb-5 grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {cards.map((card) => (
             <div
               key={card.label}
-              className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm px-5 py-4"
             >
-              <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                 {card.label}
               </p>
 
-              <p
-                className={`text-2xl font-bold ${card.color}`}
-              >
+              <p className={`text-2xl font-bold ${card.color}`}>
                 {loading ? "-" : card.value}
               </p>
             </div>
@@ -428,25 +402,20 @@ export default function BugReport() {
 
         {error && (
           <div className="mb-4">
-            <Alert
-              variant="error"
-              title="Error"
-              message={error}
-            />
+            <Alert variant="error" title="Error" message={error} />
           </div>
         )}
 
         {/* Filters */}
-        <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <div className="relative md:col-span-2">
-              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400" />
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm mb-4 p-4 min-w-0">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
+            {/* Search */}
+            <div className="relative min-w-[280px] flex-1">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none" />
 
               <input
                 value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder={
                   reportView === "sprint"
                     ? "Search project or sprint..."
@@ -459,39 +428,36 @@ export default function BugReport() {
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 >
                   <FaTimes className="text-xs" />
                 </button>
               )}
             </div>
 
+            {/* Project */}
             <select
               value={projectId}
               onChange={(event) => {
                 setProjectId(event.target.value);
                 setSprintId("");
               }}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              className="min-w-[170px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="">All Projects</option>
 
               {(projects ?? []).map((project) => (
-                <option
-                  key={project.id}
-                  value={project.id}
-                >
+                <option key={project.id} value={project.id}>
                   {project.project_name ?? project.name}
                 </option>
               ))}
             </select>
 
+            {/* Sprint */}
             <select
               value={sprintId}
-              onChange={(event) =>
-                setSprintId(event.target.value)
-              }
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              onChange={(event) => setSprintId(event.target.value)}
+              className="min-w-[170px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="">All Sprints</option>
 
@@ -499,59 +465,79 @@ export default function BugReport() {
                 .filter(
                   (sprint) =>
                     !projectId ||
-                    String(sprint.project_id) ===
-                      String(projectId),
+                    String(sprint.project_id) === String(projectId),
                 )
                 .map((sprint) => (
-                  <option
-                    key={sprint.id}
-                    value={sprint.id}
-                  >
+                  <option key={sprint.id} value={sprint.id}>
                     {sprint.sprint_name}
                   </option>
                 ))}
             </select>
-          </div>
 
-          {(projectId || sprintId || search) && (
+            {/* Clear Filters */}
+            {(projectId || sprintId || search) && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                <FaTimes className="text-[10px]" />
+                Clear
+              </button>
+            )}
+
+            {/* Export Excel */}
             <button
               type="button"
-              onClick={clearFilters}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+              onClick={handleExport}
+              disabled={
+                reportView === "sprint"
+                  ? filteredSummary.length === 0
+                  : filteredBugWise.length === 0
+              }
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition duration-150 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FaTimes />
-              Clear filters
+              <FaFileExcel />
+              Export Excel
+              {(reportView === "sprint"
+                ? filteredSummary.length
+                : filteredBugWise.length) > 0 && (
+                <span className="rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                  {reportView === "sprint"
+                    ? filteredSummary.length
+                    : filteredBugWise.length}
+                </span>
+              )}
             </button>
-          )}
+          </div>
         </div>
 
         {/* Header / Export */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          {/* <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <FaBug className="text-blue-500" />
 
             {reportView === "sprint"
               ? `${filteredSummary.length} sprint summaries`
               : `${filteredBugWise.length} bug/sprint records`}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={
-              reportView === "sprint"
-                ? filteredSummary.length === 0
-                : filteredBugWise.length === 0
-            }
-            className="inline-flex items-center gap-2 rounded-lg border border-green-600 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-green-400 dark:hover:bg-green-900/20"
-          >
-            <FaFileExcel />
-            Export Excel
-          </button>
+          </div> */}
         </div>
 
+        {/* {!loading && !error && (
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Showing{" "}
+              <span className="font-semibold text-gray-700 dark:text-gray-200">
+                {reportView === "sprint" ? filteredSummary.length : filteredBugWise.length}
+              </span>
+              {" "}
+              {reportView === "sprint" ? "sprint summaries" : "bug/sprint records"}
+            </p>
+          </div>
+        )} */}
+
         {/* Report tabs */}
-        <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white px-2 pt-2 dark:border-gray-700 dark:bg-gray-900">
+        <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pt-2 shadow-sm">
           <button
             type="button"
             onClick={() => setReportView("sprint")}
@@ -579,38 +565,22 @@ export default function BugReport() {
 
         {/* Sprint-wise */}
         {reportView === "sprint" && (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
+            <table className="w-full text-sm text-left border-collapse bg-white dark:bg-gray-900">
+              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3">
-                    Project
-                  </th>
-                  <th className="px-4 py-3">
-                    Sprint
-                  </th>
-                  <th className="px-4 py-3">
-                    Bugs
-                  </th>
-                  <th className="px-4 py-3">
-                    Pass
-                  </th>
-                  <th className="px-4 py-3">
-                    Fail
-                  </th>
-                  <th className="px-4 py-3">
-                    Blocked
-                  </th>
-                  <th className="px-4 py-3">
-                    No Test
-                  </th>
-                  <th className="px-4 py-3">
-                    Latest Update
-                  </th>
+                  <th className="px-4 py-3">Project</th>
+                  <th className="px-4 py-3">Sprint</th>
+                  <th className="px-4 py-3">Bugs</th>
+                  <th className="px-4 py-3">Pass</th>
+                  <th className="px-4 py-3">Fail</th>
+                  <th className="px-4 py-3">Blocked</th>
+                  <th className="px-4 py-3">No Test</th>
+                  <th className="px-4 py-3">Latest Update</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
                 {loading ? (
                   <tr>
                     <td
@@ -635,48 +605,44 @@ export default function BugReport() {
                       key={`${row.project_id}-${row.sprint_id}`}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
                     >
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
-                        {row.project_name ??
-                          `Project ${row.project_id}`}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700 dark:text-gray-200">
+                        {row.project_name ?? `Project ${row.project_id}`}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
-                        {row.sprint_name ??
-                          `Sprint ${row.sprint_id}`}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                        {row.sprint_name ?? `Sprint ${row.sprint_id}`}
                       </td>
 
-                      <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">
+                      <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold text-gray-700 dark:text-gray-200">
                         {numberValue(row.bug_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.pass}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.pass}`}
                       >
                         {numberValue(row.pass_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.fail}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.fail}`}
                       >
                         {numberValue(row.fail_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.blocked}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.blocked}`}
                       >
                         {numberValue(row.blocked_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.noTest}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.noTest}`}
                       >
                         {numberValue(row.no_test_count)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500 dark:text-gray-400">
-                        {formatDate(
-                          row.latest_status_date,
-                        )}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                        {formatDate(row.latest_status_date)}
                       </td>
                     </tr>
                   ))
@@ -688,56 +654,31 @@ export default function BugReport() {
 
         {/* Bug-wise */}
         {reportView === "bug" && (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <table className="min-w-[1450px] w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
+            <table
+              className="w-full text-sm text-left border-collapse bg-white dark:bg-gray-900"
+              style={{ minWidth: "1450px" }}
+            >
+              <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3">
-                    Bug ID
-                  </th>
-                  <th className="px-4 py-3">
-                    Title
-                  </th>
-                  <th className="px-4 py-3">
-                    Project
-                  </th>
-                  <th className="px-4 py-3">
-                    Sprint
-                  </th>
-                  <th className="px-4 py-3">
-                    Function
-                  </th>
-                  <th className="px-4 py-3">
-                    Severity
-                  </th>
-                  <th className="px-4 py-3">
-                    Bug Status
-                  </th>
-                  <th className="px-4 py-3">
-                    Assigned To
-                  </th>
-                  <th className="px-4 py-3">
-                    Pass
-                  </th>
-                  <th className="px-4 py-3">
-                    Fail
-                  </th>
-                  <th className="px-4 py-3">
-                    Blocked
-                  </th>
-                  <th className="px-4 py-3">
-                    No Test
-                  </th>
-                  <th className="px-4 py-3">
-                    Latest Cycle
-                  </th>
-                  <th className="px-4 py-3">
-                    Latest Update
-                  </th>
+                  <th className="px-4 py-3">Bug ID</th>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Project</th>
+                  <th className="px-4 py-3">Sprint</th>
+                  <th className="px-4 py-3">Function</th>
+                  <th className="px-4 py-3">Severity</th>
+                  <th className="px-4 py-3">Bug Status</th>
+                  <th className="px-4 py-3">Assigned To</th>
+                  <th className="px-4 py-3">Pass</th>
+                  <th className="px-4 py-3">Fail</th>
+                  <th className="px-4 py-3">Blocked</th>
+                  <th className="px-4 py-3">No Test</th>
+                  <th className="px-4 py-3">Latest Cycle</th>
+                  <th className="px-4 py-3">Latest Update</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200">
                 {loading ? (
                   <tr>
                     <td
@@ -762,36 +703,36 @@ export default function BugReport() {
                       key={`${row.bug_id}-${row.sprint_id}`}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
                     >
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">
-                        {row.report_id}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                          {row.report_id}
+                        </span>
                       </td>
 
                       <td className="max-w-[320px] px-4 py-3">
                         <p
-                          className="truncate font-medium text-gray-800 dark:text-gray-200"
+                          className="text-sm font-medium text-gray-900 dark:text-white leading-snug overflow-hidden line-clamp-2"
                           title={row.title}
                         >
                           {row.title}
                         </p>
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
-                        {row.project_name ??
-                          `Project ${row.project_id}`}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                        {row.project_name ?? `Project ${row.project_id}`}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
-                        {row.sprint_name ??
-                          `Sprint ${row.sprint_id}`}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                        {row.sprint_name ?? `Sprint ${row.sprint_id}`}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500 dark:text-gray-400">
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                         {row.function_name || "—"}
                       </td>
 
                       <td className="px-4 py-3">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${severityBadge(
+                          className={`px-2 py-1 text-xs rounded-md font-medium ${severityBadge(
                             row.severity,
                           )}`}
                         >
@@ -801,7 +742,7 @@ export default function BugReport() {
 
                       <td className="px-4 py-3">
                         <span
-                          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${bugStatusBadge(
+                          className={`px-2 py-1 text-xs rounded-md font-medium whitespace-nowrap ${bugStatusBadge(
                             row.bug_status,
                           )}`}
                         >
@@ -809,42 +750,37 @@ export default function BugReport() {
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500 dark:text-gray-400">
-                        {row.assigned_to_name ||
-                          "Unassigned"}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                        {row.assigned_to_name || "Unassigned"}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.pass}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.pass}`}
                       >
                         {numberValue(row.pass_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.fail}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.fail}`}
                       >
                         {numberValue(row.fail_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.blocked}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.blocked}`}
                       >
-                        {numberValue(
-                          row.blocked_count,
-                        )}
+                        {numberValue(row.blocked_count)}
                       </td>
 
                       <td
-                        className={`px-4 py-3 font-semibold ${STATUS_COLORS.noTest}`}
+                        className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.noTest}`}
                       >
-                        {numberValue(
-                          row.no_test_count,
-                        )}
+                        {numberValue(row.no_test_count)}
                       </td>
 
                       <td className="px-4 py-3">
                         <span
-                          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${cycleBadge(
+                          className={`px-2 py-1 text-xs rounded-md font-medium whitespace-nowrap ${cycleBadge(
                             row.latest_status,
                           )}`}
                         >
@@ -852,10 +788,8 @@ export default function BugReport() {
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500 dark:text-gray-400">
-                        {formatDate(
-                          row.latest_status_date,
-                        )}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                        {formatDate(row.latest_status_date)}
                       </td>
                     </tr>
                   ))
@@ -866,7 +800,7 @@ export default function BugReport() {
         )}
 
         {/* Totals */}
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+        {/* <div className="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
           {[
             {
               label: "Tracked Bugs",
@@ -896,20 +830,20 @@ export default function BugReport() {
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm px-5 py-4"
             >
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {item.label}
               </p>
 
               <p
-                className={`mt-1 text-xl font-bold ${item.color} dark:text-opacity-90`}
+                className={`text-2xl font-bold ${item.color} dark:text-opacity-90`}
               >
                 {item.value}
               </p>
             </div>
           ))}
-        </div>
+        </div> */}
       </div>
     </div>
   );

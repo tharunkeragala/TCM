@@ -257,3 +257,40 @@ VALUES
     (source.bug_report_id, source.sprint_id, source.pass_count, source.fail_count, source.blocked_count, source.no_test_count, source.latest_status, source.latest_status_date);
 
 PRINT 'Bug Report System Schema Created Successfully!';
+
+
+
+
+IF OBJECT_ID('test_case_manager.dbo.bug_test_case_links', 'U') IS NULL
+BEGIN
+  CREATE TABLE test_case_manager.dbo.bug_test_case_links (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    bug_report_id INT NOT NULL,
+    test_case_id INT NOT NULL,
+    linked_by INT NULL,
+    linked_at DATETIME NOT NULL CONSTRAINT DF_bug_test_case_links_linked_at DEFAULT GETDATE(),
+
+    CONSTRAINT FK_bug_test_case_links_bug
+      FOREIGN KEY (bug_report_id)
+      REFERENCES test_case_manager.dbo.bug_reports(id)
+      ON DELETE CASCADE,
+
+    CONSTRAINT FK_bug_test_case_links_test_case
+      FOREIGN KEY (test_case_id)
+      REFERENCES test_case_manager.dbo.test_cases(id)
+      ON DELETE CASCADE,
+
+    CONSTRAINT FK_bug_test_case_links_user
+      FOREIGN KEY (linked_by)
+      REFERENCES test_case_manager.dbo.users(id),
+
+    CONSTRAINT UQ_bug_test_case_links_bug_test
+      UNIQUE (bug_report_id, test_case_id)
+  );
+
+  CREATE INDEX IX_bug_test_case_links_bug_report_id
+    ON test_case_manager.dbo.bug_test_case_links(bug_report_id);
+
+  CREATE INDEX IX_bug_test_case_links_test_case_id
+    ON test_case_manager.dbo.bug_test_case_links(test_case_id);
+END;

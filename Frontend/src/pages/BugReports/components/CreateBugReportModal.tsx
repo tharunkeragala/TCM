@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { FaPlus } from "react-icons/fa";
+import { useEffect, useMemo, useState } from "react";
+import { FaLink, FaPlus, FaTimes } from "react-icons/fa";
 import { bugReportAPI, BugReport, projectFunctionsAPI } from "../../../services/bugReportAPI";
+import useFetchWithAuth from "../../../hooks/useFetchWithAuth";
 
 interface CreateBugReportModalProps {
   bug?: BugReport | null;
@@ -20,6 +21,15 @@ interface BugFormState {
   sprint_id: string;
   environment: string;
   affected_version: string;
+}
+
+interface AvailableTestCase {
+  id: number;
+  title: string;
+  priority?: string;
+  status?: string;
+  suite_name?: string | null;
+  project_name?: string | null;
 }
 
 const inputClass = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-white";
@@ -50,6 +60,56 @@ export default function CreateBugReportModal({
   const [showAddFunctionForm, setShowAddFunctionForm] = useState(false);
   const [newFunctionName, setNewFunctionName] = useState("");
   const [newFunctionCategory, setNewFunctionCategory] = useState("");
+
+  const [selectedTestCaseIds, setSelectedTestCaseIds] = useState<number[]>([]);
+  const [testCaseToAdd, setTestCaseToAdd] = useState("");
+
+  const { data: testCasesResponse } = useFetchWithAuth<any>(
+    "/api/test-cases"
+  );
+
+  const allTestCases: AvailableTestCase[] = useMemo(() => {
+    if (Array.isArray(testCasesResponse)) return testCasesResponse;
+    if (Array.isArray(testCasesResponse?.data)) return testCasesResponse.data;
+    return [];
+  }, [testCasesResponse]);
+
+  const selectedProjectName = useMemo(() => {
+    const selectedProject = projects.find(
+      (project) => String(project.id) === String(formData.project_id)
+    );
+
+    return selectedProject?.project_name || "";
+  }, [projects, formData.project_id]);
+
+  const availableTestCases = useMemo(() => {
+    if (!formData.project_id) return [];
+
+    return allTestCases
+      .filter((testCase) => {
+        if (!selectedProjectName) return true;
+
+        return (
+          !testCase.project_name ||
+          testCase.project_name === selectedProjectName
+        );
+      })
+      .filter(
+        (testCase) => !selectedTestCaseIds.includes(Number(testCase.id))
+      )
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [
+    allTestCases,
+    formData.project_id,
+    selectedProjectName,
+    selectedTestCaseIds,
+  ]);
+
+  const selectedTestCases = useMemo(() => {
+    return selectedTestCaseIds
+      .map((id) => allTestCases.find((testCase) => Number(testCase.id) === id))
+      .filter(Boolean) as AvailableTestCase[];
+  }, [allTestCases, selectedTestCaseIds]);
 
   useEffect(() => {
     if (formData.project_id) loadFunctions(formData.project_id);
@@ -99,6 +159,27 @@ export default function CreateBugReportModal({
     }
   };
 
+  const handleAddTestCase = () => {
+    if (!testCaseToAdd) return;
+
+    const testCaseId = Number(testCaseToAdd);
+
+    if (
+      !Number.isNaN(testCaseId) &&
+      !selectedTestCaseIds.includes(testCaseId)
+    ) {
+      setSelectedTestCaseIds((current) => [...current, testCaseId]);
+    }
+
+    setTestCaseToAdd("");
+  };
+
+  const handleRemoveTestCase = (testCaseId: number) => {
+    setSelectedTestCaseIds((current) =>
+      current.filter((id) => id !== testCaseId)
+    );
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setError("");
@@ -130,6 +211,14 @@ export default function CreateBugReportModal({
         if (formData.sprint_id) payload.append("sprint_id", formData.sprint_id);
         if (formData.environment) payload.append("environment", formData.environment);
         if (formData.affected_version) payload.append("affected_version", formData.affected_version);
+
+        if (selectedTestCaseIds.length > 0) {
+          payload.append(
+            "test_case_ids",
+            JSON.stringify(selectedTestCaseIds)
+          );
+        }
+
         screenshots.forEach((file) => payload.append("screenshots", file));
         await bugReportAPI.createBugReport(payload);
       }
@@ -165,7 +254,21 @@ export default function CreateBugReportModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Project <span className="text-red-500">*</span></label>
-                <select className={inputClass} value={formData.project_id} onChange={(e) => setFormData({ ...formData, project_id: e.target.value, function_id: "" })} disabled={!!bug || loading} required>
+                <select
+                  className={inputClass}
+                  value={formData.project_id}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      project_id: e.target.value,
+                      function_id: "",
+                    });
+                    setSelectedTestCaseIds([]);
+                    setTestCaseToAdd("");
+                  }}
+                  disabled={!!bug || loading}
+                  required
+                >
                   <option value="">Select Project</option>
                   {projects.map((project) => <option key={project.id} value={project.id}>{project.project_name}</option>)}
                 </select>
@@ -253,6 +356,112 @@ export default function CreateBugReportModal({
                 </select>
               </div>
             </div>
+
+            {!bug && (
+              <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <FaLink className="h-3.5 w-3.5 text-blue-500" />
+                      Linked Test Cases
+                    </label>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      Optional. You can link one or more test cases to this bug.
+                    </p>
+                  </div>
+
+                  {selectedTestCaseIds.length > 0 && (
+                    <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                      {selectedTestCaseIds.length} linked
+                    </span>
+                  )}
+                </div>
+
+                {!formData.project_id ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-xs text-gray-400 dark:border-gray-700">
+                    Select a project first to choose test cases.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <select
+                        className={`${inputClass} flex-1`}
+                        value={testCaseToAdd}
+                        onChange={(e) => setTestCaseToAdd(e.target.value)}
+                        disabled={loading || availableTestCases.length === 0}
+                      >
+                        <option value="">
+                          {availableTestCases.length > 0
+                            ? "Select Test Case"
+                            : "No additional test cases available"}
+                        </option>
+
+                        {availableTestCases.map((testCase) => (
+                          <option
+                            key={testCase.id}
+                            value={testCase.id}
+                          >
+                            #{testCase.id} - {testCase.title}
+                            {testCase.suite_name
+                              ? ` (${testCase.suite_name})`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={handleAddTestCase}
+                        disabled={loading || !testCaseToAdd}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <FaPlus className="h-3 w-3" />
+                        Link
+                      </button>
+                    </div>
+
+                    {selectedTestCases.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {selectedTestCases.map((testCase) => (
+                          <div
+                            key={testCase.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+                                #{testCase.id} - {testCase.title}
+                              </p>
+
+                              <p className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">
+                                {testCase.suite_name || "No suite"}
+                                {testCase.status
+                                  ? ` · ${testCase.status}`
+                                  : ""}
+                                {testCase.priority
+                                  ? ` · ${testCase.priority}`
+                                  : ""}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveTestCase(testCase.id)
+                              }
+                              disabled={loading}
+                              className="flex-shrink-0 rounded-md p-1.5 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50 dark:hover:bg-red-900/30"
+                              title="Remove linked test case"
+                            >
+                              <FaTimes className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {!bug && (
               <div>

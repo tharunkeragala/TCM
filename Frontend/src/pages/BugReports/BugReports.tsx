@@ -31,11 +31,12 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  Open: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  "In Progress": "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  Pass: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  Fail: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  Blocked: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  "No Test": "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
   Reopened: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-  Resolved: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  Closed: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
+  "Not Tested": "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
 };
 
 export default function BugReports() {
@@ -108,7 +109,11 @@ export default function BugReports() {
       setTotalRecords(response.total || 0);
     } catch (error) {
       console.error("Error loading bug reports:", error);
-      setAlert({ show: true, message: "Failed to load bug reports", type: "error" });
+      setAlert({
+        show: true,
+        message: "Failed to load bug reports",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -126,6 +131,7 @@ export default function BugReports() {
         bug.function_name,
         bug.assigned_to_name,
         bug.status,
+        bug.current_cycle_status,
         bug.severity,
       ]
         .filter(Boolean)
@@ -133,7 +139,9 @@ export default function BugReports() {
     );
   }, [bugReports, search]);
 
-  const hasFilters = Boolean(filterStatus || filterSeverity || filterProject || search);
+  const hasFilters = Boolean(
+    filterStatus || filterSeverity || filterProject || search,
+  );
 
   const handleCreateSuccess = (message: string) => {
     setAlert({ show: true, message, type: "success" });
@@ -161,13 +169,21 @@ export default function BugReports() {
     if (!selectedBug) return;
     try {
       await bugReportAPI.deleteBugReport(selectedBug.id);
-      setAlert({ show: true, message: "Bug report deleted successfully", type: "success" });
+      setAlert({
+        show: true,
+        message: "Bug report deleted successfully",
+        type: "success",
+      });
       setShowDeleteModal(false);
       setSelectedBug(null);
       loadBugReports();
     } catch (error) {
       console.error("Error deleting bug report:", error);
-      setAlert({ show: true, message: "Failed to delete bug report", type: "error" });
+      setAlert({
+        show: true,
+        message: "Failed to delete bug report",
+        type: "error",
+      });
     }
   };
 
@@ -181,34 +197,37 @@ export default function BugReports() {
 
   return (
     <div>
-      <PageMeta title="Bug Reports" description="Manage bug and issue reports" />
+      <PageMeta
+        title="Bug Reports"
+        description="Manage bug and issue reports"
+      />
       <PageBreadcrumb pageTitle="Bug Reports" />
 
       <div className="mt-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {totalRecords} bug report{totalRecords !== 1 ? "s" : ""}
+              {/* {totalRecords} bug report{totalRecords !== 1 ? "s" : ""} */}
               {hasFilters ? " · filtered view" : ""}
             </p>
           </div>
-
-          <button
-            onClick={() => {
-              setSelectedBug(null);
-              setShowCreateModal(true);
-            }}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <FaPlus className="h-3.5 w-3.5" /> Report New Bug
-          </button>
         </div>
 
         {alert.show && (
           <div className="mb-4">
             <Alert
-              variant={alert.type === "warning" || alert.type === "info" ? "info" : alert.type}
-              title={alert.type === "success" ? "Success" : alert.type === "error" ? "Error" : "Notice"}
+              variant={
+                alert.type === "warning" || alert.type === "info"
+                  ? "info"
+                  : alert.type
+              }
+              title={
+                alert.type === "success"
+                  ? "Success"
+                  : alert.type === "error"
+                    ? "Error"
+                    : "Notice"
+              }
               message={alert.message}
             />
           </div>
@@ -272,6 +291,15 @@ export default function BugReports() {
                 </option>
               ))}
             </select>
+            <button
+              onClick={() => {
+                setSelectedBug(null);
+                setShowCreateModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <FaPlus className="h-3.5 w-3.5" /> Report New Bug
+            </button>
 
             {hasFilters && (
               <button
@@ -295,9 +323,13 @@ export default function BugReports() {
           </div>
 
           {loading ? (
-            <div className="py-12 text-center text-sm text-gray-400">Loading bug reports…</div>
+            <div className="py-12 text-center text-sm text-gray-400">
+              Loading bug reports…
+            </div>
           ) : filteredBugReports.length === 0 ? (
-            <div className="py-12 text-center text-sm text-gray-400 italic">No bug reports found.</div>
+            <div className="py-12 text-center text-sm text-gray-400 italic">
+              No bug reports found.
+            </div>
           ) : (
             <div className="max-h-[560px] space-y-2 overflow-y-auto p-4">
               {filteredBugReports.map((bug) => (
@@ -331,15 +363,27 @@ export default function BugReports() {
                       </div>
                       <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
                         {bug.function_name || "No function"}
-                        {bug.assigned_to_name ? ` · Assigned to ${bug.assigned_to_name}` : " · Unassigned"}
+                        {bug.assigned_to_name
+                          ? ` · Assigned to ${bug.assigned_to_name}`
+                          : " · Unassigned"}
                       </p>
                     </div>
 
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SEVERITY_COLORS[bug.severity] || "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"}`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SEVERITY_COLORS[bug.severity] || "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"}`}
+                    >
                       {bug.severity}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[bug.status] || "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"}`}>
-                      {bug.status}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        STATUS_COLORS[
+                          bug.current_cycle_status || "Not Tested"
+                        ] ||
+                        "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      }`}
+                      title="Latest cycle status"
+                    >
+                      {bug.current_cycle_status || "Not Tested"}
                     </span>
                   </div>
 
@@ -372,7 +416,8 @@ export default function BugReports() {
             <div className="border-t border-gray-200 px-4 py-3 dark:border-gray-700">
               <TablePagination
                 currentPage={Math.floor(offset / limit) + 1}
-                totalRecords={totalRecords}
+                totalItems={totalRecords}
+                totalPages={Math.ceil(totalRecords / limit)}
                 pageSize={limit}
                 onPageChange={(page) => setOffset((page - 1) * limit)}
               />
