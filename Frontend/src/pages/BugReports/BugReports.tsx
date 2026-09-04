@@ -198,10 +198,10 @@ export default function BugReports() {
   return (
     <div>
       <PageMeta
-        title="Bug Reports"
+        title="Log Defect"
         description="Manage bug and issue reports"
       />
-      <PageBreadcrumb pageTitle="Bug Reports" />
+      <PageBreadcrumb pageTitle="Log Defect" />
 
       <div className="mt-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -315,7 +315,7 @@ export default function BugReports() {
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-              <FaBug className="h-3.5 w-3.5 text-red-500" /> Bug Reports
+              <FaBug className="h-3.5 w-3.5 text-red-500" /> Bugs Reported
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
               Showing {filteredBugReports.length} of {totalRecords}

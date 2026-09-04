@@ -59,10 +59,12 @@ const navItems: NavItem[] = [
       { name: "Preview", path: "/script/preview" },
       { name: "Sprints", path: "/sprints" },
       { name: "Advanced Automation", path: "/script/advanced" },
-      { name: "Bug Reports", path: "/bug-reports" },
+      // { name: "Bug Reports", path: "/bug-reports" },
       // { name: "Sprint Board", path: "/sprintboard" },
     ],
   },
+
+  { icon: <ListIcon />, name: "Log Defect", path: "/bug-reports" },
 
   {
     name: "Reports",
