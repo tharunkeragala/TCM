@@ -8,10 +8,8 @@ import {
   ChevronDownIcon,
   GridIcon,
   ListIcon,
-  // PageIcon,
   PieChartIcon,
   PlugInIcon,
-  // TableIcon,
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
@@ -36,54 +34,152 @@ interface UserPermission {
 }
 
 const navItems: NavItem[] = [
-  { icon: <GridIcon />, name: "Dashboard", path: "/home" },
+  // =========================
+  // MAIN
+  // =========================
 
-  { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
+  {
+    icon: <GridIcon />,
+    name: "Dashboard",
+    path: "/home",
+  },
 
-  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+  {
+    icon: <CalenderIcon />,
+    name: "Calendar",
+    path: "/calendar",
+  },
 
-  { icon: <ListIcon />, name: "Projects", path: "/projects" },
+  {
+    icon: <UserCircleIcon />,
+    name: "User Profile",
+    path: "/profile",
+  },
 
-  { icon: <ListIcon />, name: "Tasks", path: "/tasks" },
+  // =========================
+  // PROJECT MANAGEMENT
+  // =========================
+
+  {
+    icon: <BoxCubeIcon />,
+    name: "Projects",
+    path: "/projects",
+  },
+
+  {
+    icon: <ListIcon />,
+    name: "Tasks",
+    path: "/tasks",
+  },
+
+  // =========================
+  // TEST MANAGEMENT
+  // =========================
 
   {
     name: "Test Repository",
-    icon: <ListIcon />,
+    icon: <BoxCubeIcon />,
     subItems: [
-      { name: "Test Suites", path: "/test-suites" },
-      { name: "Test Cases", path: "/test-cases" },
-      // { name: "Recording", path: "/recordingengine" },
-      { name: "Recorder", path: "/script/recorder" },
-      { name: "Editor", path: "/script/editor" },
-      { name: "Runner", path: "/script/runner" },
-      { name: "Preview", path: "/script/preview" },
-      { name: "Sprints", path: "/sprints" },
-      { name: "Advanced Automation", path: "/script/advanced" },
-      // { name: "Bug Reports", path: "/bug-reports" },
-      // { name: "Sprint Board", path: "/sprintboard" },
+      {
+        name: "Test Suites",
+        path: "/test-suites",
+      },
+      {
+        name: "Test Cases",
+        path: "/test-cases",
+      },
+      // {
+      //   name: "Recording",
+      //   path: "/recordingengine",
+      // },
+      {
+        name: "Recorder",
+        path: "/script/recorder",
+      },
+      {
+        name: "Editor",
+        path: "/script/editor",
+      },
+      {
+        name: "Runner",
+        path: "/script/runner",
+      },
+      {
+        name: "Preview",
+        path: "/script/preview",
+      },
+      {
+        name: "Sprints",
+        path: "/sprints",
+      },
+      {
+        name: "Advanced Automation",
+        path: "/script/advanced",
+      },
+      // {
+      //   name: "Sprint Board",
+      //   path: "/sprintboard",
+      // },
     ],
   },
 
-  { icon: <ListIcon />, name: "Log Defect", path: "/bug-reports" },
+  // =========================
+  // DEFECT MANAGEMENT
+  // =========================
+
+  {
+    icon: <PlugInIcon />,
+    name: "Log Defect",
+    path: "/bug-reports",
+  },
+
+  // =========================
+  // REPORTS
+  // =========================
 
   {
     name: "Reports",
-    icon: <ListIcon />,
+    icon: <PieChartIcon />,
     subItems: [
-      { name: "Users", path: "/reports/users" },
-      { name: "Tasks", path: "/reports/tasks" },
-      { name: "Bugs", path: "/reports/bugs" },
+      {
+        name: "Users",
+        path: "/reports/users",
+      },
+      {
+        name: "Tasks",
+        path: "/reports/tasks",
+      },
+      {
+        name: "Bugs",
+        path: "/reports/bugs",
+      },
     ],
   },
 
+  // =========================
+  // SYSTEM
+  // =========================
+
   {
     name: "System Configuration",
-    icon: <ListIcon />,
+    icon: <PlugInIcon />,
     subItems: [
-      { name: "User Management", path: "/users" },
-      { name: "Roles", path: "/roles" },
-      { name: "Departments", path: "/departments" },
-      { name: "Teams", path: "/teams" },
+      {
+        name: "User Management",
+        path: "/users",
+      },
+      {
+        name: "Roles",
+        path: "/roles",
+      },
+      {
+        name: "Departments",
+        path: "/departments",
+      },
+      {
+        name: "Teams",
+        path: "/teams",
+      },
     ],
   },
 ];
@@ -93,28 +189,60 @@ const othersItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Charts",
     subItems: [
-      { name: "Line Chart", path: "/line-chart" },
-      { name: "Bar Chart", path: "/bar-chart" },
+      {
+        name: "Line Chart",
+        path: "/line-chart",
+      },
+      {
+        name: "Bar Chart",
+        path: "/bar-chart",
+      },
     ],
   },
+
   {
     icon: <BoxCubeIcon />,
     name: "UI Elements",
     subItems: [
-      { name: "Alerts", path: "/alerts" },
-      { name: "Avatar", path: "/avatars" },
-      { name: "Badge", path: "/badge" },
-      { name: "Buttons", path: "/buttons" },
-      { name: "Images", path: "/images" },
-      { name: "Videos", path: "/videos" },
+      {
+        name: "Alerts",
+        path: "/alerts",
+      },
+      {
+        name: "Avatar",
+        path: "/avatars",
+      },
+      {
+        name: "Badge",
+        path: "/badge",
+      },
+      {
+        name: "Buttons",
+        path: "/buttons",
+      },
+      {
+        name: "Images",
+        path: "/images",
+      },
+      {
+        name: "Videos",
+        path: "/videos",
+      },
     ],
   },
+
   {
     icon: <PlugInIcon />,
     name: "Authentication",
     subItems: [
-      { name: "Sign In", path: "/signin" },
-      { name: "Sign Up", path: "/signup" },
+      {
+        name: "Sign In",
+        path: "/signin",
+      },
+      {
+        name: "Sign Up",
+        path: "/signup",
+      },
     ],
   },
 ];
@@ -153,7 +281,9 @@ const AppSidebar: React.FC = () => {
     index: number;
   } | null>(null);
 
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
+  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
+    {},
+  );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isOpen = isExpanded || isHovered || isMobileOpen;
@@ -187,22 +317,21 @@ const AppSidebar: React.FC = () => {
       ? othersItems
       : filterMenuByPermissions(othersItems, allowedPaths);
 
-const isActive = useCallback(
-  (path: string) =>
-    location.pathname === path ||
-    location.pathname.startsWith(`${path}/`),
-  [location.pathname],
-);
+  const isActive = useCallback(
+    (path: string) =>
+      location.pathname === path || location.pathname.startsWith(`${path}/`),
+    [location.pathname],
+  );
 
-const isParentActive = useCallback(
-  (nav: NavItem) =>
-    nav.subItems?.some(
-      (s) =>
-        location.pathname === s.path ||
-        location.pathname.startsWith(`${s.path}/`),
-    ) ?? false,
-  [location.pathname],
-);
+  const isParentActive = useCallback(
+    (nav: NavItem) =>
+      nav.subItems?.some(
+        (s) =>
+          location.pathname === s.path ||
+          location.pathname.startsWith(`${s.path}/`),
+      ) ?? false,
+    [location.pathname],
+  );
 
   useEffect(() => {
     let matched = false;
@@ -253,20 +382,20 @@ const isParentActive = useCallback(
               <button
                 onClick={() => handleSubmenuToggle(index, menuType)}
                 className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium
                   transition-colors duration-150 cursor-pointer
                   ${
                     parentActive || isSubmenuOpen
-                      ? "bg-white/10 text-white"
-                      : "text-white hover:bg-white/10 hover:text-white"
+                      ? "bg-white/10 text-slate-100"
+                      : "text-slate-300 hover:bg-white/10 hover:text-slate-100"
                   }
                 `}
               >
                 <span
-                  className={`flex-shrink-0 w-5 h-5 ${
+                  className={`flex-shrink-0 w-6 h-6 flex items-center justify-center ${
                     parentActive || isSubmenuOpen
-                      ? "text-white"
-                      : "text-white"
+                      ? "text-slate-100"
+                      : "text-slate-300"
                   }`}
                 >
                   {nav.icon}
@@ -280,7 +409,7 @@ const isParentActive = useCallback(
 
                 {isOpen && (
                   <ChevronDownIcon
-                    className={`flex-shrink-0 w-4 h-4 transition-transform duration-200 ${
+                    className={`flex-shrink-0 w-[18px] h-[18px] text-slate-400 transition-transform duration-200 ${
                       isSubmenuOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -291,18 +420,20 @@ const isParentActive = useCallback(
                 <Link
                   to={nav.path}
                   className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                    flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium
                     transition-colors duration-150
                     ${
                       isActive(nav.path)
-                        ? "bg-white/10 text-white"
-                        : "text-white hover:bg-white/10 hover:text-white"
+                        ? "bg-white/10 text-slate-100"
+                        : "text-slate-300 hover:bg-white/10 hover:text-slate-100"
                     }
                   `}
                 >
                   <span
-                    className={`flex-shrink-0 w-5 h-5 ${
-                      isActive(nav.path) ? "text-white" : "text-white"
+                    className={`flex-shrink-0 w-6 h-6 flex items-center justify-center ${
+                      isActive(nav.path)
+                        ? "text-slate-100"
+                        : "text-slate-300"
                     }`}
                   >
                     {nav.icon}
@@ -326,7 +457,7 @@ const isParentActive = useCallback(
                     : "0px",
                 }}
               >
-                <ul className="mt-1 ml-8 space-y-0.5 border-l border-white/20 pl-3">
+                <ul className="mt-1 ml-9 space-y-0.5 border-l border-white/15 pl-3">
                   {nav.subItems.map((subItem) => (
                     <li key={subItem.name}>
                       <Link
@@ -336,15 +467,15 @@ const isParentActive = useCallback(
                           transition-colors duration-150
                           ${
                             isActive(subItem.path)
-                              ? "text-white font-medium bg-white/10"
-                              : "text-white hover:text-white hover:bg-white/10"
+                              ? "text-slate-100 font-medium bg-white/10"
+                              : "text-slate-300 hover:text-slate-100 hover:bg-white/10"
                           }
                         `}
                       >
                         <span>{subItem.name}</span>
                         <span className="flex items-center gap-1 ml-2">
                           {subItem.new && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/15 text-slate-200">
                               new
                             </span>
                           )}
@@ -416,7 +547,11 @@ const isParentActive = useCallback(
           {isOpen ? (
             <img className="h-8" src="/images/logo/logo-dark.svg" alt="Logo" />
           ) : (
-            <img src="/images/logo/logo-icon.svg" alt="Logo" className="w-8 h-8" />
+            <img
+              src="/images/logo/logo-icon.svg"
+              alt="Logo"
+              className="w-8 h-8"
+            />
           )}
         </Link>
       </div>
@@ -426,7 +561,7 @@ const isParentActive = useCallback(
         {filteredNavItems.length > 0 ? (
           renderMenuItems(filteredNavItems, "main")
         ) : (
-          <p className="text-xs text-white px-3 py-2">No menu access</p>
+          <p className="text-xs text-slate-400 px-3 py-2">No menu access</p>
         )}
       </nav>
     </aside>

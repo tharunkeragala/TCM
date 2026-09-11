@@ -5,7 +5,6 @@ import {
   FaEdit,
   FaPlus,
   FaTrash,
-  FaEye,
   FaLayerGroup,
   FaClipboardList,
   FaTasks,
@@ -23,6 +22,7 @@ import {
   FaCalendarAlt,
   FaStickyNote,
   FaProjectDiagram,
+  FaPuzzlePiece,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -138,6 +138,20 @@ interface ProjectNote {
   created_by?: number;
   created_by_name?: string;
   created_at: string;
+}
+
+interface ProjectFunction {
+  id: number;
+  project_id: number;
+  function_name: string;
+  description?: string | null;
+  function_category?: string | null;
+  bug_count?: number;
+  is_archived?: boolean;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 const getToken = () =>
@@ -455,17 +469,41 @@ export default function ProjectOverview() {
   const canSprints = (
     a: "can_view" | "can_create" | "can_edit" | "can_delete",
   ) => can("/sprints", a);
+  const canFunctions = (
+    a: "can_view" | "can_create" | "can_edit" | "can_delete",
+  ) => can("/project-functions", a);
 
   // Only the four list sections are tabbed now — stats, breakdown bars,
   // assignees, documents, and notes stay always-visible as they were.
   const [mainTab, setMainTab] = useState<
-    "suites" | "cases" | "sprints" | "tasks" | "diagram"
+    "suites" | "cases" | "sprints" | "tasks" | "functions" | "diagram"
   >("tasks");
 
   // ── Overview data ──────────────────────────────────────────────────────────
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [toastAlert, setToastAlert] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+  }>({
+    show: false,
+    message: "",
+    type: "info",
+  });
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+  ) => {
+    setToastAlert({
+      show: true,
+      message,
+      type,
+    });
+  };
 
   const fetchOverview = useCallback(async () => {
     setLoading(true);
@@ -500,8 +538,189 @@ export default function ProjectOverview() {
     [allTestCases, projectSuiteIds],
   );
 
+  const suiteNameById = useMemo(() => {
+    return new Map(
+      (overview?.suites ?? []).map((suite) => [suite.id, suite.suite_name]),
+    );
+  }, [overview]);
+
   // ── Users (for task assignees) ─────────────────────────────────────────────
   const { data: users } = useFetchWithAuth<User[]>("/api/users");
+
+  // ── Project functions ──────────────────────────────────────────────────────
+  const [projectFunctions, setProjectFunctions] = useState<ProjectFunction[]>(
+    [],
+  );
+  const [loadingFunctions, setLoadingFunctions] = useState(false);
+  const [functionModalOpen, setFunctionModalOpen] = useState(false);
+  const [editingFunction, setEditingFunction] =
+    useState<ProjectFunction | null>(null);
+  const [functionName, setFunctionName] = useState("");
+  const [functionDescription, setFunctionDescription] = useState("");
+  const [functionCategory, setFunctionCategory] = useState("");
+  const [functionSubmitting, setFunctionSubmitting] = useState(false);
+  const [functionError, setFunctionError] = useState("");
+  const [deleteFunction, setDeleteFunction] = useState<ProjectFunction | null>(
+    null,
+  );
+  const [deletingFunctionId, setDeletingFunctionId] = useState<number | null>(
+    null,
+  );
+
+  const fetchProjectFunctions = useCallback(async () => {
+    if (!id) return;
+
+    setLoadingFunctions(true);
+
+    try {
+      const res = await API.get(`/api/project-functions/project/${id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      if (res.data.success) {
+        setProjectFunctions(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load project functions:", err);
+      setProjectFunctions([]);
+    } finally {
+      setLoadingFunctions(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchProjectFunctions();
+  }, [fetchProjectFunctions]);
+
+  const openAddFunction = () => {
+    setEditingFunction(null);
+    setFunctionName("");
+    setFunctionDescription("");
+    setFunctionCategory("");
+    setFunctionError("");
+    setFunctionModalOpen(true);
+  };
+
+  const openEditFunction = (projectFunction: ProjectFunction) => {
+    setEditingFunction(projectFunction);
+    setFunctionName(projectFunction.function_name || "");
+    setFunctionDescription(projectFunction.description || "");
+    setFunctionCategory(projectFunction.function_category || "");
+    setFunctionError("");
+    setFunctionModalOpen(true);
+  };
+
+  const closeFunctionModal = () => {
+    if (functionSubmitting) return;
+
+    setFunctionModalOpen(false);
+    setEditingFunction(null);
+    setFunctionName("");
+    setFunctionDescription("");
+    setFunctionCategory("");
+    setFunctionError("");
+  };
+
+  const handleSaveFunction = async () => {
+    const trimmedName = functionName.trim();
+
+    if (!trimmedName) {
+      setFunctionError("Function name is required.");
+      return;
+    }
+
+    setFunctionSubmitting(true);
+    setFunctionError("");
+
+    try {
+      if (editingFunction) {
+        await API.put(
+          `/api/project-functions/${editingFunction.id}`,
+          {
+            function_name: trimmedName,
+            description: functionDescription.trim() || null,
+            function_category: functionCategory.trim() || null,
+          },
+          {
+            headers: { Authorization: `Bearer ${getToken()}` },
+          },
+        );
+      } else {
+        await API.post(
+          "/api/project-functions",
+          {
+            project_id: Number(id),
+            function_name: trimmedName,
+            description: functionDescription.trim() || null,
+            function_category: functionCategory.trim() || null,
+          },
+          {
+            headers: { Authorization: `Bearer ${getToken()}` },
+          },
+        );
+      }
+
+      setFunctionModalOpen(false);
+      setEditingFunction(null);
+      setFunctionName("");
+      setFunctionDescription("");
+      setFunctionCategory("");
+
+      showToast(
+        editingFunction
+          ? "Project function updated successfully."
+          : "Project function added successfully.",
+        "success",
+      );
+
+      await fetchProjectFunctions();
+    } catch (err: any) {
+      const message =
+        err?.response?.status === 403
+          ? "Access denied. You do not have permission to save project functions."
+          : err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            "Failed to save project function.";
+
+      setFunctionError(message);
+      showToast(message, "error");
+    } finally {
+      setFunctionSubmitting(false);
+    }
+  };
+
+  const handleDeleteFunction = (projectFunction: ProjectFunction) => {
+    setDeleteFunction(projectFunction);
+  };
+
+  const confirmDeleteFunction = async () => {
+    if (!deleteFunction) return;
+
+    setDeletingFunctionId(deleteFunction.id);
+
+    try {
+      await API.delete(`/api/project-functions/${deleteFunction.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      setDeleteFunction(null);
+
+      showToast("Project function deleted successfully.", "success");
+
+      await fetchProjectFunctions();
+    } catch (err: any) {
+      showToast(
+        err?.response?.status === 403
+          ? "Access denied. You do not have permission to delete project functions."
+          : err?.response?.data?.error ||
+              err?.response?.data?.message ||
+              "Failed to delete project function.",
+        "error",
+      );
+    } finally {
+      setDeletingFunctionId(null);
+    }
+  };
 
   // ── Documents (loaded eagerly now — right-rail panel, not a tab) ───────────
   const [docs, setDocs] = useState<ProjectDoc[]>([]);
@@ -559,11 +778,28 @@ export default function ProjectOverview() {
 
   const fetchNotes = useCallback(async () => {
     setLoadingNotes(true);
+
     try {
       const res = await API.get(`/api/projects/${id}/notes`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (res.data.success) setNotes(res.data.data);
+
+      if (res.data.success) {
+        setNotes(res.data.data || []);
+      }
+    } catch (err: any) {
+      console.error("Failed to load project notes:", err);
+
+      setNotes([]);
+
+      showToast(
+        err?.response?.status === 403
+          ? "Access denied. You do not have permission to view project notes."
+          : err?.response?.data?.message ||
+              err?.response?.data?.error ||
+              "Failed to load project notes.",
+        "error",
+      );
     } finally {
       setLoadingNotes(false);
     }
@@ -575,18 +811,38 @@ export default function ProjectOverview() {
 
   const handleAddNote = async () => {
     const text = newNote.trim();
-    if (!text) return;
+
+    if (!text) {
+      showToast("Please enter a note before adding.", "warning");
+      return;
+    }
+
     setAddingNote(true);
+
     try {
       const res = await API.post(
         `/api/projects/${id}/notes`,
         { note_text: text },
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
+
       if (res.data.success) {
         setNotes((prev) => [res.data.data, ...prev]);
         setNewNote("");
+
+        showToast("Project note added successfully.", "success");
       }
+    } catch (err: any) {
+      console.error("Failed to add project note:", err);
+
+      showToast(
+        err?.response?.status === 403
+          ? "Access denied. You do not have permission to add project notes."
+          : err?.response?.data?.message ||
+              err?.response?.data?.error ||
+              "Failed to add project note.",
+        "error",
+      );
     } finally {
       setAddingNote(false);
     }
@@ -594,11 +850,28 @@ export default function ProjectOverview() {
 
   const handleDeleteNote = async (note: ProjectNote) => {
     setDeletingNoteId(note.id);
+
     try {
       await API.delete(`/api/projects/notes/${note.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+
+      setNotes((prev) =>
+        prev.filter((existingNote) => existingNote.id !== note.id),
+      );
+
+      showToast("Project note deleted successfully.", "success");
+    } catch (err: any) {
+      console.error("Failed to delete project note:", err);
+
+      showToast(
+        err?.response?.status === 403
+          ? "Access denied. You do not have permission to delete project notes."
+          : err?.response?.data?.message ||
+              err?.response?.data?.error ||
+              "Failed to delete project note.",
+        "error",
+      );
     } finally {
       setDeletingNoteId(null);
     }
@@ -843,110 +1116,122 @@ export default function ProjectOverview() {
     }
   };
 
-const openViewTask = async (task: Task) => {
-  setShowViewModal(true);
-  setViewLoading(true);
+  const openViewTask = async (task: Task) => {
+    setShowViewModal(true);
+    setViewLoading(true);
 
-  try {
-    const res = await API.get(`/api/tasks/${task.id}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    try {
+      const res = await API.get(`/api/tasks/${task.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
 
-    setViewingTask(res.data.success ? res.data.data : task);
-  } catch {
-    setViewingTask(task);
-  } finally {
-    setViewLoading(false);
-  }
-};
-
-// ── Close active modal with ESC key ─────────────────────────────────────────
-useEffect(() => {
-  const handleEscapeKey = (event: KeyboardEvent) => {
-    if (event.key !== "Escape") return;
-
-    if (showViewModal) {
-      setShowViewModal(false);
-      setViewingTask(null);
-      return;
-    }
-
-    if (deletingTask) {
-      setDeletingTask(null);
-      setDeleteTaskAlert(null);
-      return;
-    }
-
-    if (showTaskModal) {
-      setShowTaskModal(false);
-      setEditingTask(null);
-      setTaskFormAlert(null);
-      return;
-    }
-
-    if (viewingCase) {
-      setViewingCase(null);
-      return;
-    }
-
-    if (deleteCase) {
-      setDeleteCase(null);
-      setDeleteCaseAlert(null);
-      return;
-    }
-
-    if (addCaseSuiteId !== null || addCaseModal || editCase) {
-      setAddCaseSuiteId(null);
-      setAddCaseModal(false);
-      setEditCase(null);
-      return;
-    }
-
-    if (deleteSprint) {
-      setDeleteSprint(null);
-      return;
-    }
-
-    if (addSprintModal || editSprint) {
-      setAddSprintModal(false);
-      setEditSprint(null);
-      return;
-    }
-
-    if (deleteSuite) {
-      setDeleteSuite(null);
-      setDeleteSuiteAlert(null);
-      return;
-    }
-
-    if (addSuiteModal || editSuite) {
-      setAddSuiteModal(false);
-      setEditSuite(null);
+      setViewingTask(res.data.success ? res.data.data : task);
+    } catch {
+      setViewingTask(task);
+    } finally {
+      setViewLoading(false);
     }
   };
 
-  document.addEventListener("keydown", handleEscapeKey);
+  // ── Close active modal with ESC key ─────────────────────────────────────────
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
 
-  return () => {
-    document.removeEventListener("keydown", handleEscapeKey);
-  };
-}, [
-  showViewModal,
-  viewingTask,
-  deletingTask,
-  showTaskModal,
-  viewingCase,
-  deleteCase,
-  addCaseSuiteId,
-  addCaseModal,
-  editCase,
-  deleteSprint,
-  addSprintModal,
-  editSprint,
-  deleteSuite,
-  addSuiteModal,
-  editSuite,
-]);
+      if (deleteFunction) {
+        setDeleteFunction(null);
+        return;
+      }
+
+      if (functionModalOpen) {
+        closeFunctionModal();
+        return;
+      }
+
+      if (showViewModal) {
+        setShowViewModal(false);
+        setViewingTask(null);
+        return;
+      }
+
+      if (deletingTask) {
+        setDeletingTask(null);
+        setDeleteTaskAlert(null);
+        return;
+      }
+
+      if (showTaskModal) {
+        setShowTaskModal(false);
+        setEditingTask(null);
+        setTaskFormAlert(null);
+        return;
+      }
+
+      if (viewingCase) {
+        setViewingCase(null);
+        return;
+      }
+
+      if (deleteCase) {
+        setDeleteCase(null);
+        setDeleteCaseAlert(null);
+        return;
+      }
+
+      if (addCaseSuiteId !== null || addCaseModal || editCase) {
+        setAddCaseSuiteId(null);
+        setAddCaseModal(false);
+        setEditCase(null);
+        return;
+      }
+
+      if (deleteSprint) {
+        setDeleteSprint(null);
+        return;
+      }
+
+      if (addSprintModal || editSprint) {
+        setAddSprintModal(false);
+        setEditSprint(null);
+        return;
+      }
+
+      if (deleteSuite) {
+        setDeleteSuite(null);
+        setDeleteSuiteAlert(null);
+        return;
+      }
+
+      if (addSuiteModal || editSuite) {
+        setAddSuiteModal(false);
+        setEditSuite(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscapeKey);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [
+    deleteFunction,
+    functionModalOpen,
+    showViewModal,
+    viewingTask,
+    deletingTask,
+    showTaskModal,
+    viewingCase,
+    deleteCase,
+    addCaseSuiteId,
+    addCaseModal,
+    editCase,
+    deleteSprint,
+    addSprintModal,
+    editSprint,
+    deleteSuite,
+    addSuiteModal,
+    editSuite,
+  ]);
 
   // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
@@ -998,6 +1283,30 @@ useEffect(() => {
 
   return (
     <div>
+      {toastAlert.show && (
+        <Alert
+          variant={toastAlert.type}
+          title={
+            toastAlert.type === "success"
+              ? "Success"
+              : toastAlert.type === "error"
+                ? "Error"
+                : toastAlert.type === "warning"
+                  ? "Warning"
+                  : "Information"
+          }
+          message={toastAlert.message}
+          isToast
+          duration={3000}
+          onClose={() =>
+            setToastAlert((previous) => ({
+              ...previous,
+              show: false,
+            }))
+          }
+        />
+      )}
+
       <PageMeta title={project.project_name} description="Project overview" />
       <PageBreadcrumb pageTitle="Project Overview" />
 
@@ -1260,6 +1569,11 @@ useEffect(() => {
                 key: "cases" as const,
                 label: `Test Cases (${stats.test_case_count})`,
                 icon: <FaClipboardList className="w-3.5 h-3.5" />,
+              },
+              {
+                key: "functions" as const,
+                label: `Functions (${projectFunctions.length})`,
+                icon: <FaPuzzlePiece className="w-3.5 h-3.5" />,
               },
               {
                 key: "diagram" as const,
@@ -1703,6 +2017,105 @@ useEffect(() => {
             </Section>
           )}
 
+          {/* ==================== Project Functions ==================== */}
+          {mainTab === "functions" && (
+            <Section
+              title={`Project Functions (${projectFunctions.length})`}
+              icon={<FaPuzzlePiece className="w-3.5 h-3.5 text-cyan-500" />}
+              isEmpty={!loadingFunctions && projectFunctions.length === 0}
+              emptyText="No project functions added yet."
+              action={
+                canFunctions("can_create") && (
+                  <button
+                    type="button"
+                    onClick={openAddFunction}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  >
+                    <FaPlus className="w-3 h-3" />
+                    Add Function
+                  </button>
+                )
+              }
+            >
+              {loadingFunctions ? (
+                <p className="text-sm text-gray-400 text-center py-6">
+                  Loading project functions…
+                </p>
+              ) : (
+                <ScrollFade className="max-h-[325px] overflow-y-auto pr-1 py-1">
+                  <div className="space-y-2">
+                    {projectFunctions.map((projectFunction) => (
+                      <div
+                        key={projectFunction.id}
+                        className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/10 transition-colors"
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <FaPuzzlePiece className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0" />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+                                {projectFunction.function_name}
+                              </p>
+
+                              {projectFunction.function_category && (
+                                <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[11px] font-semibold text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                                  {projectFunction.function_category}
+                                </span>
+                              )}
+
+                              <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                {projectFunction.bug_count ?? 0} bug
+                                {(projectFunction.bug_count ?? 0) === 1
+                                  ? ""
+                                  : "s"}
+                              </span>
+                            </div>
+
+                            {projectFunction.description && (
+                              <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
+                                {projectFunction.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-shrink-0 items-center gap-2">
+                          {canFunctions("can_edit") && (
+                            <button
+                              type="button"
+                              onClick={() => openEditFunction(projectFunction)}
+                              className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
+                              title="Edit Function"
+                            >
+                              <FaEdit className="w-3 h-3" />
+                            </button>
+                          )}
+
+                          {canFunctions("can_delete") && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeleteFunction(projectFunction)
+                              }
+                              disabled={
+                                deletingFunctionId === projectFunction.id
+                              }
+                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 disabled:opacity-50 transition-colors"
+                              title="Archive Function"
+                            >
+                              <FaTrash className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollFade>
+              )}
+            </Section>
+          )}
+
           {/* ==================== Diagram ==================== */}
           {mainTab === "diagram" && (
             <Section
@@ -1801,6 +2214,135 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* ── Project function delete confirmation ── */}
+      {deleteFunction && (
+        <ConfirmDeleteModal
+          title="Delete Project Function"
+          name={deleteFunction.function_name}
+          alert={null}
+          warning={
+            (deleteFunction.bug_count ?? 0) > 0
+              ? `${deleteFunction.bug_count} active bug${
+                  (deleteFunction.bug_count ?? 0) === 1 ? " is" : "s are"
+                } currently linked to this function.`
+              : "This function will be deleted and removed from active project functions."
+          }
+          inProgress={deletingFunctionId === deleteFunction.id}
+          onConfirm={confirmDeleteFunction}
+          onClose={() => {
+            if (deletingFunctionId !== deleteFunction.id) {
+              setDeleteFunction(null);
+            }
+          }}
+        />
+      )}
+
+      {/* ── Project function modal ── */}
+      {functionModalOpen && (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-800/50">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {editingFunction
+                    ? "Edit Project Function"
+                    : "Add Project Function"}
+                </h2>
+
+                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                  {project.project_name}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeFunctionModal}
+                disabled={functionSubmitting}
+                className="text-xl font-bold text-gray-400 transition-colors hover:text-gray-600 disabled:opacity-50 dark:hover:text-gray-200"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-5">
+              {functionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                  {functionError}
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Function Name <span className="text-red-500">*</span>
+                </label>
+
+                <input
+                  value={functionName}
+                  onChange={(e) => setFunctionName(e.target.value)}
+                  disabled={functionSubmitting}
+                  placeholder="e.g. Login, Checkout, User Management"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Category
+                </label>
+
+                <input
+                  value={functionCategory}
+                  onChange={(e) => setFunctionCategory(e.target.value)}
+                  disabled={functionSubmitting}
+                  placeholder="e.g. UI, API, Database"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Description
+                </label>
+
+                <textarea
+                  value={functionDescription}
+                  onChange={(e) => setFunctionDescription(e.target.value)}
+                  disabled={functionSubmitting}
+                  rows={4}
+                  placeholder="Describe this project function or module."
+                  className="w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-800/50">
+              <button
+                type="button"
+                onClick={closeFunctionModal}
+                disabled={functionSubmitting}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveFunction}
+                disabled={functionSubmitting || !functionName.trim()}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {functionSubmitting
+                  ? "Saving…"
+                  : editingFunction
+                    ? "Update Function"
+                    : "Add Function"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Suite modals ── */}
       {(addSuiteModal || editSuite) && (

@@ -20,10 +20,13 @@ exports.addFunctionToProject = async (req, res) => {
   try {
     const pool = await poolPromise;
     const userId = req.user.id;
-    const { project_id, function_name, description, function_category } = req.body;
+    const { project_id, function_name, description, function_category } =
+      req.body;
 
     if (!project_id || !function_name?.trim()) {
-      return res.status(400).json({ error: "project_id and function_name are required" });
+      return res
+        .status(400)
+        .json({ error: "project_id and function_name are required" });
     }
 
     const result = await pool
@@ -32,8 +35,7 @@ exports.addFunctionToProject = async (req, res) => {
       .input("function_name", sql.NVarChar(255), function_name.trim())
       .input("description", sql.NVarChar(sql.MAX), description || null)
       .input("function_category", sql.NVarChar(100), function_category || null)
-      .input("created_by", sql.Int, userId)
-      .query(`
+      .input("created_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.project_functions
           (project_id, function_name, description, function_category, created_by)
         VALUES
@@ -50,7 +52,10 @@ exports.addFunctionToProject = async (req, res) => {
       entityId: functionId,
       entityName: function_name.trim(),
       description: "Project function created",
-      newValues: cleanAuditData({ function_name: function_name.trim(), function_category }),
+      newValues: cleanAuditData({
+        function_name: function_name.trim(),
+        function_category,
+      }),
     });
 
     return res.status(201).json({
@@ -70,9 +75,7 @@ exports.getProjectFunctions = async (req, res) => {
     const { project_id } = req.params;
     const includeArchived = req.query.include_archived === "true";
 
-    const result = await pool
-      .request()
-      .input("project_id", sql.Int, project_id)
+    const result = await pool.request().input("project_id", sql.Int, project_id)
       .query(`
         SELECT
           pf.*,
@@ -167,54 +170,109 @@ exports.getAllFunctions = async (req, res) => {
 exports.updateFunction = async (req, res) => {
   try {
     const pool = await poolPromise;
-    const userId = req.user.id;
+
+    const userId = req.user?.id;
     const { id } = req.params;
+
     const { function_name, description, function_category } = req.body;
 
-    const currentResult = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`SELECT * FROM test_case_manager.dbo.project_functions WHERE id = @id`);
-
-    const current = currentResult.recordset[0];
-    if (!current) return res.status(404).json({ error: "Project function not found" });
-
-    const nextName = function_name?.trim() || current.function_name;
-    await pool
-      .request()
-      .input("id", sql.Int, id)
-      .input("function_name", sql.NVarChar(255), nextName)
-      .input("description", sql.NVarChar(sql.MAX), description !== undefined ? description : current.description)
-      .input("function_category", sql.NVarChar(100), function_category !== undefined ? function_category : current.function_category)
-      .input("updated_by", sql.Int, userId)
-      .query(`
-        UPDATE test_case_manager.dbo.project_functions
-        SET function_name = @function_name,
-            description = @description,
-            function_category = @function_category,
-            updated_by = @updated_by,
-            updated_at = GETDATE()
-        WHERE id = @id
-      `);
-
-    if (nextName !== current.function_name || description !== undefined || function_category !== undefined) {
-      await logAudit({
-        userId,
-        action: "UPDATE",
-        module: "project_functions",
-        entityType: "Project Function",
-        entityId: Number(id),
-        entityName: nextName,
-        description: "Project function updated",
-        oldValues: cleanAuditData(current),
-        newValues: cleanAuditData({ function_name: nextName, description, function_category }),
+    // Make sure authenticated user ID is available
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Authenticated user ID not found",
       });
     }
 
-    return res.json({ success: true, message: "Function updated successfully" });
+    // Get existing project function
+    const currentResult = await pool.request().input("id", sql.Int, id).query(`
+        SELECT *
+        FROM test_case_manager.dbo.project_functions
+        WHERE id = @id
+      `);
+
+    const current = currentResult.recordset[0];
+
+    if (!current) {
+      return res.status(404).json({
+        success: false,
+        error: "Project function not found",
+      });
+    }
+
+    const nextName = function_name?.trim() || current.function_name;
+
+    const nextDescription =
+      description !== undefined ? description : current.description;
+
+    const nextCategory =
+      function_category !== undefined
+        ? function_category
+        : current.function_category;
+
+    // Update project function
+    const updateResult = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("function_name", sql.NVarChar(255), nextName)
+      .input("description", sql.NVarChar(sql.MAX), nextDescription || null)
+      .input("function_category", sql.NVarChar(100), nextCategory || null)
+      .input("updated_by", sql.Int, userId).query(`
+        UPDATE test_case_manager.dbo.project_functions
+        SET
+          function_name = @function_name,
+          description = @description,
+          function_category = @function_category,
+          updated_by = @updated_by,
+          updated_at = GETDATE()
+        OUTPUT
+          INSERTED.id,
+          INSERTED.project_id,
+          INSERTED.function_name,
+          INSERTED.description,
+          INSERTED.function_category,
+          INSERTED.updated_by,
+          INSERTED.updated_at
+        WHERE id = @id
+      `);
+
+    const updatedFunction = updateResult.recordset[0];
+
+    console.log("Project function updated:", {
+      functionId: Number(id),
+      updatedBy: userId,
+      updatedAt: updatedFunction?.updated_at,
+    });
+
+    // Audit
+    await logAudit({
+      userId,
+      action: "UPDATE",
+      module: "project_functions",
+      entityType: "Project Function",
+      entityId: Number(id),
+      entityName: nextName,
+      description: "Project function updated",
+      oldValues: cleanAuditData(current),
+      newValues: cleanAuditData({
+        function_name: nextName,
+        description: nextDescription,
+        function_category: nextCategory,
+      }),
+    });
+
+    return res.json({
+      success: true,
+      message: "Function updated successfully",
+      data: updatedFunction,
+    });
   } catch (error) {
     console.error("Update function error:", error);
-    return res.status(500).json({ error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
 
@@ -227,8 +285,7 @@ exports.deleteFunction = async (req, res) => {
     const result = await pool
       .request()
       .input("id", sql.Int, id)
-      .input("updated_by", sql.Int, userId)
-      .query(`
+      .input("updated_by", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.project_functions
         SET is_archived = 1, updated_by = @updated_by, updated_at = GETDATE()
         WHERE id = @id AND is_archived = 0;
@@ -248,7 +305,10 @@ exports.deleteFunction = async (req, res) => {
       description: "Project function archived",
     });
 
-    return res.json({ success: true, message: "Function deleted successfully" });
+    return res.json({
+      success: true,
+      message: "Function deleted successfully",
+    });
   } catch (error) {
     console.error("Delete function error:", error);
     return res.status(500).json({ error: error.message });

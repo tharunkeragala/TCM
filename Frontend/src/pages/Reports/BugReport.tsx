@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { FaBug, FaFileExcel, FaSearch, FaTimes } from "react-icons/fa";
+import {
+  FaBug,
+  FaCalendarAlt,
+  FaFileExcel,
+  FaSearch,
+  FaTimes,
+} from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Alert from "../../components/ui/alert/Alert";
 import useFetchWithAuth from "../../hooks/useFetchWithAuth";
 import { bugReportAPI } from "../../services/bugReportAPI";
+import TablePagination from "../../components/common/TablePagination";
 
 interface BugReportSummaryRow {
   sprint_id: number;
@@ -144,6 +151,9 @@ const bugStatusBadge = (status?: string | null) => {
   }
 };
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
+
 export default function BugReport() {
   const { data: projects } = useFetchWithAuth<any[]>("/api/projects");
   const { data: sprints } = useFetchWithAuth<any[]>("/api/sprints");
@@ -161,6 +171,10 @@ export default function BugReport() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     let active = true;
@@ -234,31 +248,57 @@ export default function BugReport() {
     );
   }, [bugWise, search]);
 
-  const totals = useMemo(
-    () =>
-      summary.reduce(
-        (result, row) => ({
-          bugs: result.bugs + numberValue(row.bug_count),
-          pass: result.pass + numberValue(row.pass_count),
-          fail: result.fail + numberValue(row.fail_count),
-          blocked: result.blocked + numberValue(row.blocked_count),
-          noTest: result.noTest + numberValue(row.no_test_count),
-        }),
-        {
-          bugs: 0,
-          pass: 0,
-          fail: 0,
-          blocked: 0,
-          noTest: 0,
-        },
-      ),
-    [summary],
+  const activeFilteredRows =
+    reportView === "sprint" ? filteredSummary : filteredBugWise;
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(activeFilteredRows.length / pageSize),
   );
+
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedSummary = useMemo(
+    () =>
+      filteredSummary.slice(
+        (safePage - 1) * pageSize,
+        safePage * pageSize,
+      ),
+    [filteredSummary, safePage, pageSize],
+  );
+
+  const paginatedBugWise = useMemo(
+    () =>
+      filteredBugWise.slice(
+        (safePage - 1) * pageSize,
+        safePage * pageSize,
+      ),
+    [filteredBugWise, safePage, pageSize],
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(
+      Math.max(
+        1,
+        Math.min(page, totalPages),
+      ),
+    );
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [projectId, sprintId, search, reportView]);
 
   const clearFilters = () => {
     setProjectId("");
     setSprintId("");
     setSearch("");
+    setCurrentPage(1);
   };
 
   const handleExport = () => {
@@ -415,7 +455,10 @@ export default function BugReport() {
 
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder={
                   reportView === "sprint"
                     ? "Search project or sprint..."
@@ -427,7 +470,10 @@ export default function BugReport() {
               {search && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
+                  onClick={() => {
+                    setSearch("");
+                    setCurrentPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 >
                   <FaTimes className="text-xs" />
@@ -441,6 +487,7 @@ export default function BugReport() {
               onChange={(event) => {
                 setProjectId(event.target.value);
                 setSprintId("");
+                setCurrentPage(1);
               }}
               className="min-w-[170px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
@@ -456,7 +503,10 @@ export default function BugReport() {
             {/* Sprint */}
             <select
               value={sprintId}
-              onChange={(event) => setSprintId(event.target.value)}
+              onChange={(event) => {
+                setSprintId(event.target.value);
+                setCurrentPage(1);
+              }}
               className="min-w-[170px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="">All Sprints</option>
@@ -536,36 +586,85 @@ export default function BugReport() {
           </div>
         )} */}
 
+        {!loading && !error && (
+          <div className="mb-3 flex items-center px-1 text-xs text-gray-500 dark:text-gray-400">
+            Showing{" "}
+            <span className="mx-1 font-semibold text-gray-700 dark:text-gray-200">
+              {activeFilteredRows.length === 0
+                ? 0
+                : (safePage - 1) * pageSize + 1}
+              {" - "}
+              {Math.min(safePage * pageSize, activeFilteredRows.length)}
+            </span>
+            of{" "}
+            <span className="ml-1 font-semibold text-gray-700 dark:text-gray-200">
+              {activeFilteredRows.length}
+            </span>
+            {reportView === "sprint" ? " sprint summaries" : " bug records"}
+          </div>
+        )}
+
         {/* Report tabs */}
-        <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pt-2 shadow-sm">
+        <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white px-2 pt-2 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <button
             type="button"
-            onClick={() => setReportView("sprint")}
-            className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            onClick={() => {
+              setReportView("sprint");
+              setCurrentPage(1);
+            }}
+            className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               reportView === "sprint"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
             }`}
           >
-            Sprint-wise Report ({filteredSummary.length})
+            <span
+              className={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md ${
+                reportView === "sprint"
+                  ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300"
+                  : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+              }`}
+            >
+              <FaCalendarAlt className="h-3.5 w-3.5" />
+            </span>
+
+            <span>
+              Sprint-wise Report ({filteredSummary.length})
+            </span>
           </button>
 
           <button
             type="button"
-            onClick={() => setReportView("bug")}
-            className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            onClick={() => {
+              setReportView("bug");
+              setCurrentPage(1);
+            }}
+            className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               reportView === "bug"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
             }`}
           >
-            Bug-wise Report ({filteredBugWise.length})
+            <span
+              className={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md ${
+                reportView === "bug"
+                  ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
+                  : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+              }`}
+            >
+              <FaBug className="h-3.5 w-3.5" />
+            </span>
+
+            <span>
+              Bug-wise Report ({filteredBugWise.length})
+            </span>
           </button>
         </div>
 
         {/* Sprint-wise */}
         {reportView === "sprint" && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
+          <>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
             <table className="w-full text-sm text-left border-collapse bg-white dark:bg-gray-900">
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
                 <tr>
@@ -600,7 +699,7 @@ export default function BugReport() {
                     </td>
                   </tr>
                 ) : (
-                  filteredSummary.map((row) => (
+                  paginatedSummary.map((row) => (
                     <tr
                       key={`${row.project_id}-${row.sprint_id}`}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
@@ -650,11 +749,23 @@ export default function BugReport() {
               </tbody>
             </table>
           </div>
+
+            <TablePagination
+              totalItems={filteredSummary.length}
+              currentPage={safePage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </>
         )}
 
         {/* Bug-wise */}
         {reportView === "bug" && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
+          <>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
             <table
               className="w-full text-sm text-left border-collapse bg-white dark:bg-gray-900"
               style={{ minWidth: "1450px" }}
@@ -698,7 +809,7 @@ export default function BugReport() {
                     </td>
                   </tr>
                 ) : (
-                  filteredBugWise.map((row) => (
+                  paginatedBugWise.map((row) => (
                     <tr
                       key={`${row.bug_id}-${row.sprint_id}`}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
@@ -797,6 +908,17 @@ export default function BugReport() {
               </tbody>
             </table>
           </div>
+
+            <TablePagination
+              totalItems={filteredBugWise.length}
+              currentPage={safePage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </>
         )}
 
         {/* Totals */}

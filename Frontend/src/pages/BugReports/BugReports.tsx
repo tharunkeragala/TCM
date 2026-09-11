@@ -107,11 +107,16 @@ export default function BugReports() {
       });
       setBugReports(response.data || []);
       setTotalRecords(response.total || 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading bug reports:", error);
       setAlert({
         show: true,
-        message: "Failed to load bug reports",
+        message:
+          error?.response?.status === 403
+            ? "Access denied. You do not have permission to view bug reports."
+            : error?.response?.data?.message ||
+              error?.response?.data?.error ||
+              "Failed to load bug reports",
         type: "error",
       });
     } finally {
@@ -177,11 +182,16 @@ export default function BugReports() {
       setShowDeleteModal(false);
       setSelectedBug(null);
       loadBugReports();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting bug report:", error);
       setAlert({
         show: true,
-        message: "Failed to delete bug report",
+        message:
+          error?.response?.status === 403
+            ? "Access denied. You do not have permission to delete bug reports."
+            : error?.response?.data?.message ||
+              error?.response?.data?.error ||
+              "Failed to delete bug report",
         type: "error",
       });
     }
@@ -198,10 +208,10 @@ export default function BugReports() {
   return (
     <div>
       <PageMeta
-        title="Log Defect"
+        title="Bug Reports"
         description="Manage bug and issue reports"
       />
-      <PageBreadcrumb pageTitle="Log Defect" />
+      <PageBreadcrumb pageTitle="Bug Reports" />
 
       <div className="mt-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -214,23 +224,27 @@ export default function BugReports() {
         </div>
 
         {alert.show && (
-          <div className="mb-4">
-            <Alert
-              variant={
-                alert.type === "warning" || alert.type === "info"
-                  ? "info"
-                  : alert.type
-              }
-              title={
-                alert.type === "success"
-                  ? "Success"
-                  : alert.type === "error"
-                    ? "Error"
-                    : "Notice"
-              }
-              message={alert.message}
-            />
-          </div>
+          <Alert
+            variant={alert.type}
+            title={
+              alert.type === "success"
+                ? "Success"
+                : alert.type === "error"
+                  ? "Error"
+                  : alert.type === "warning"
+                    ? "Warning"
+                    : "Information"
+            }
+            message={alert.message}
+            isToast
+            duration={3000}
+            onClose={() =>
+              setAlert((previous) => ({
+                ...previous,
+                show: false,
+              }))
+            }
+          />
         )}
 
         <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -315,7 +329,7 @@ export default function BugReports() {
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-              <FaBug className="h-3.5 w-3.5 text-red-500" /> Bugs Reported
+              <FaBug className="h-3.5 w-3.5 text-red-500" /> Bug Reports
             </h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">
               Showing {filteredBugReports.length} of {totalRecords}
