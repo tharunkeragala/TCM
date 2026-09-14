@@ -10,12 +10,17 @@ import {
   FaVideo,
   FaSearch,
   FaTimes,
+  FaPaperPlane,
+  FaClipboardCheck,
 } from "react-icons/fa";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Alert from "../../components/ui/alert/Alert";
 import useFetchWithAuth from "../../hooks/useFetchWithAuth";
+import { usePermissions } from "../../hooks/usePermissions";
 import API from "../../services/api";
+import WorkflowStatusBadge from "../../components/workflow/WorkflowStatusBadge";
+import { testCaseWorkflowAPI } from "../../services/testCaseWorkflowAPI";
 
 interface Project {
   id: number;
@@ -38,7 +43,17 @@ interface TestCase {
   title: string;
   preconditions: string;
   priority: "Low" | "Medium" | "High" | "Critical";
-  status: "Draft" | "Ready" | "Deprecated";
+  status?: string; // legacy DB field; not used by workflow UI
+  workflow_status: "Draft" | "Review" | "Approved";
+  workflow_request_id?: number | null;
+  active_request_status?: "PENDING" | "RETURNED" | null;
+  active_return_comment?: string | null;
+  proposed_suite_id?: number | null;
+  proposed_title?: string | null;
+  proposed_preconditions?: string | null;
+  proposed_priority?: "Low" | "Medium" | "High" | "Critical" | null;
+  proposed_playwright_script?: string | null;
+  proposed_steps?: TestStep[] | null;
   suite_name?: string;
   project_name?: string;
   created_by_name?: string;
@@ -57,10 +72,9 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  Draft:
-    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  Ready: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  Deprecated: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
+  Draft: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  Review: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  Approved: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
 };
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -79,6 +93,8 @@ export default function TestCases() {
   } = useFetchWithAuth<TestCase[]>("/api/test-cases");
   const { data: projects } = useFetchWithAuth<Project[]>("/api/projects");
   const { data: allSuites } = useFetchWithAuth<TestSuite[]>("/api/test-suites");
+  // const { can } = usePermissions();
+  // const canViewApprovals = can("/test-case-approvals", "can_view");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -100,7 +116,6 @@ export default function TestCases() {
     title: "",
     preconditions: "",
     priority: "Medium" as TestCase["priority"],
-    status: "Draft" as TestCase["status"],
     playwright_script: "",
   });
   const [steps, setSteps] = useState<TestStep[]>([emptyStep()]);
@@ -138,7 +153,7 @@ export default function TestCases() {
       const matchProject = !projectFilter || tc.project_name === projectFilter;
       const matchSuite = !suiteFilter || String(tc.suite_id) === suiteFilter;
       const matchPriority = !priorityFilter || tc.priority === priorityFilter;
-      const matchStatus = !statusFilter || tc.status === statusFilter;
+      const matchStatus = !statusFilter || tc.workflow_status === statusFilter;
       const matchScript =
         !scriptFilter ||
         (scriptFilter === "yes"
@@ -277,7 +292,14 @@ export default function TestCases() {
     setSubmitting(true);
     setFormAlert(null);
     try {
-      const payload = { ...formData, steps };
+      const payload = {
+        suite_id: Number(formData.suite_id),
+        title: formData.title.trim(),
+        preconditions: formData.preconditions,
+        priority: formData.priority,
+        playwright_script: formData.playwright_script,
+        steps,
+      };
       const url = editingCase
         ? `/api/test-cases/update/${editingCase.id}`
         : "/api/test-cases/create";
@@ -288,7 +310,13 @@ export default function TestCases() {
       if (res.data.success) {
         setFormAlert({
           type: "success",
-          message: editingCase ? "Test case updated!" : "Test case created!",
+          message: editingCase
+            ? editingCase.active_request_status === "RETURNED"
+              ? "Corrected changes resubmitted. Status is now Pending Review."
+              : editingCase.workflow_status === "Draft"
+                ? "Draft saved. Submit it for review when it is ready."
+                : "Changes sent for approval. Status is now Pending Review."
+            : "Test case created as Draft. Submit it for review when it is ready.",
         });
         setTimeout(() => {
           handleCloseModal();
@@ -306,6 +334,13 @@ export default function TestCases() {
   };
 
   const handleEdit = async (tc: TestCase) => {
+    if (tc.workflow_status === "Review") {
+      setFormAlert(null);
+      alert(
+        "This test case is currently in Review and cannot be edited until a decision is made.",
+      );
+      return;
+    }
     try {
       const res = await API.get(`/api/test-cases/${tc.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -315,17 +350,41 @@ export default function TestCases() {
         setEditingCase(full);
         const suite = allSuites?.find((s) => s.id === full.suite_id);
         setSelectedProjectFilter(suite ? String(suite.project_id) : "");
+        const returned = full.active_request_status === "RETURNED";
         setFormData({
-          suite_id: String(full.suite_id),
-          title: full.title,
-          preconditions: full.preconditions || "",
-          priority: full.priority,
-          status: full.status,
-          playwright_script: full.playwright_script || "",
+          suite_id: String(
+            returned && full.proposed_suite_id
+              ? full.proposed_suite_id
+              : full.suite_id,
+          ),
+          title:
+            returned && full.proposed_title ? full.proposed_title : full.title,
+          preconditions: returned
+            ? full.proposed_preconditions || ""
+            : full.preconditions || "",
+          priority:
+            returned && full.proposed_priority
+              ? full.proposed_priority
+              : full.priority,
+          playwright_script: returned
+            ? full.proposed_playwright_script || ""
+            : full.playwright_script || "",
         });
         setSteps(
-          full.steps && full.steps.length > 0 ? full.steps : [emptyStep()],
+          returned && full.proposed_steps && full.proposed_steps.length > 0
+            ? full.proposed_steps
+            : full.steps && full.steps.length > 0
+              ? full.steps
+              : [emptyStep()],
         );
+        if (returned) {
+          setFormAlert({
+            type: "error",
+            message:
+              full.active_return_comment ||
+              "This change request was returned. Correct it and resubmit.",
+          });
+        }
         setShowModal(true);
       }
     } catch {
@@ -335,7 +394,6 @@ export default function TestCases() {
         title: tc.title,
         preconditions: tc.preconditions || "",
         priority: tc.priority,
-        status: tc.status,
         playwright_script: tc.playwright_script || "",
       });
       setSteps([emptyStep()]);
@@ -381,7 +439,6 @@ export default function TestCases() {
       title: "",
       preconditions: "",
       priority: "Medium",
-      status: "Draft",
       playwright_script: "",
     });
     setSteps([emptyStep()]);
@@ -471,9 +528,9 @@ export default function TestCases() {
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">All Status</option>
-              {["Draft", "Ready", "Deprecated"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
+              <option value="Draft">Draft</option>
+              <option value="Review">Pending Review</option>
+              <option value="Approved">Approved</option>
             </select>
 
             <select
@@ -508,6 +565,14 @@ export default function TestCases() {
               >
                 <FaPlay className="h-3.5 w-3.5" /> Runner
               </Link>
+              {/* {canViewApprovals && (
+                <Link
+                  to="/test-case-approvals"
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                >
+                  <FaClipboardCheck className="h-3.5 w-3.5" /> Approvals
+                </Link>
+              )} */}
               <button
                 onClick={() => {
                   setEditingCase(null);
@@ -625,11 +690,12 @@ export default function TestCases() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[tc.status]}`}
-                          >
-                            {tc.status}
-                          </span>
+                          <WorkflowStatusBadge status={tc.workflow_status} />
+                          {tc.active_request_status === "RETURNED" && (
+                            <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                              Returned for correction
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {tc.playwright_script ? (
@@ -676,17 +742,54 @@ export default function TestCases() {
                             >
                               <FaPlay className="h-3 w-3" />
                             </Link>
-                            <button
-                              onClick={() => handleEdit(tc)}
-                              className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-500 hover:text-blue-700 transition"
-                              title="Edit"
-                            >
-                              <FaEdit className="h-3 w-3" />
-                            </button>
+                            {tc.workflow_status === "Draft" &&
+                              tc.active_request_status !== "RETURNED" && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await testCaseWorkflowAPI.submitForReview(
+                                        tc.id,
+                                      );
+                                      window.location.reload();
+                                    } catch (err: any) {
+                                      alert(
+                                        err.response?.data?.message ||
+                                          "Failed to submit for review.",
+                                      );
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-500 hover:text-indigo-700 transition"
+                                  title="Submit for Review"
+                                >
+                                  <FaPaperPlane className="h-3 w-3" />
+                                </button>
+                              )}
+                            {tc.workflow_status !== "Review" && (
+                              <button
+                                onClick={() => handleEdit(tc)}
+                                className={`p-1.5 rounded-md transition ${
+                                  tc.active_request_status === "RETURNED"
+                                    ? "hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 hover:text-amber-700"
+                                    : "hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-500 hover:text-blue-700"
+                                }`}
+                                title={
+                                  tc.active_request_status === "RETURNED"
+                                    ? "Correct Returned Changes"
+                                    : "Propose Changes"
+                                }
+                              >
+                                <FaEdit className="h-3 w-3" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDeleteClick(tc)}
-                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition"
-                              title="Delete"
+                              disabled={Boolean(tc.workflow_request_id)}
+                              className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={
+                                tc.workflow_request_id
+                                  ? "Resolve workflow request before deleting"
+                                  : "Delete"
+                              }
                             >
                               <FaTrash className="h-3 w-3" />
                             </button>
@@ -945,22 +1048,9 @@ export default function TestCases() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Status
                   </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        status: e.target.value as TestCase["status"],
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {["Draft", "Ready", "Deprecated"].map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                  <WorkflowStatusBadge
+                    status={editingCase?.workflow_status || "Draft"}
+                  />
                 </div>
               </div>
 
@@ -1113,12 +1203,14 @@ export default function TestCases() {
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg"
               >
                 {submitting
-                  ? editingCase
-                    ? "Updating…"
-                    : "Creating…"
-                  : editingCase
-                    ? "Update"
-                    : "Create"}
+                  ? "Saving…"
+                  : !editingCase
+                    ? "Create Draft"
+                    : editingCase.active_request_status === "RETURNED"
+                      ? "Resubmit for Approval"
+                      : editingCase.workflow_status === "Draft"
+                        ? "Save Draft"
+                        : "Submit Changes for Approval"}
               </button>
             </div>
           </div>
@@ -1203,4 +1295,3 @@ export default function TestCases() {
     </div>
   );
 }
-

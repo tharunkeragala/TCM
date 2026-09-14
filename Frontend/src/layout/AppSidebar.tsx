@@ -3,15 +3,18 @@ import { Link, useLocation } from "react-router-dom";
 import API from "../services/api";
 
 import {
-  BoxCubeIcon,
-  CalenderIcon,
-  ChevronDownIcon,
-  GridIcon,
-  ListIcon,
-  PieChartIcon,
-  PlugInIcon,
-  UserCircleIcon,
-} from "../icons";
+  FaBug,
+  FaCalendarAlt,
+  FaChartPie,
+  FaChevronDown,
+  FaClipboardCheck,
+  FaFolderOpen,
+  FaHome,
+  FaTasks,
+  FaUserCircle,
+  FaUsersCog,
+  FaWrench,
+} from "react-icons/fa";
 import { useSidebar } from "../context/SidebarContext";
 
 type SubItem = {
@@ -39,19 +42,19 @@ const navItems: NavItem[] = [
   // =========================
 
   {
-    icon: <GridIcon />,
+    icon: <FaHome />,
     name: "Dashboard",
     path: "/home",
   },
 
   {
-    icon: <CalenderIcon />,
+    icon: <FaCalendarAlt />,
     name: "Calendar",
     path: "/calendar",
   },
 
   {
-    icon: <UserCircleIcon />,
+    icon: <FaUserCircle />,
     name: "User Profile",
     path: "/profile",
   },
@@ -61,13 +64,13 @@ const navItems: NavItem[] = [
   // =========================
 
   {
-    icon: <BoxCubeIcon />,
+    icon: <FaFolderOpen />,
     name: "Projects",
     path: "/projects",
   },
 
   {
-    icon: <ListIcon />,
+    icon: <FaTasks />,
     name: "Tasks",
     path: "/tasks",
   },
@@ -78,7 +81,7 @@ const navItems: NavItem[] = [
 
   {
     name: "Test Repository",
-    icon: <BoxCubeIcon />,
+    icon: <FaClipboardCheck />,
     subItems: [
       {
         name: "Test Suites",
@@ -88,10 +91,10 @@ const navItems: NavItem[] = [
         name: "Test Cases",
         path: "/test-cases",
       },
-      // {
-      //   name: "Recording",
-      //   path: "/recordingengine",
-      // },
+      {
+        name: "Test Case Approval",
+        path: "/test-case-approvals",
+      },
       {
         name: "Recorder",
         path: "/script/recorder",
@@ -128,7 +131,7 @@ const navItems: NavItem[] = [
   // =========================
 
   {
-    icon: <PlugInIcon />,
+    icon: <FaBug />,
     name: "Log Defect",
     path: "/bug-reports",
   },
@@ -139,7 +142,7 @@ const navItems: NavItem[] = [
 
   {
     name: "Reports",
-    icon: <PieChartIcon />,
+    icon: <FaChartPie />,
     subItems: [
       {
         name: "Users",
@@ -162,7 +165,7 @@ const navItems: NavItem[] = [
 
   {
     name: "System Configuration",
-    icon: <PlugInIcon />,
+    icon: <FaUsersCog />,
     subItems: [
       {
         name: "User Management",
@@ -186,7 +189,7 @@ const navItems: NavItem[] = [
 
 const othersItems: NavItem[] = [
   {
-    icon: <PieChartIcon />,
+    icon: <FaChartPie />,
     name: "Charts",
     subItems: [
       {
@@ -201,7 +204,7 @@ const othersItems: NavItem[] = [
   },
 
   {
-    icon: <BoxCubeIcon />,
+    icon: <FaWrench />,
     name: "UI Elements",
     subItems: [
       {
@@ -232,7 +235,7 @@ const othersItems: NavItem[] = [
   },
 
   {
-    icon: <PlugInIcon />,
+    icon: <FaUserCircle />,
     name: "Authentication",
     subItems: [
       {
@@ -382,7 +385,7 @@ const AppSidebar: React.FC = () => {
               <button
                 onClick={() => handleSubmenuToggle(index, menuType)}
                 className={`
-                  w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                   transition-colors duration-150 cursor-pointer
                   ${
                     parentActive || isSubmenuOpen
@@ -392,7 +395,7 @@ const AppSidebar: React.FC = () => {
                 `}
               >
                 <span
-                  className={`flex-shrink-0 w-6 h-6 flex items-center justify-center ${
+                  className={`flex-shrink-0 w-5 h-5 flex items-center justify-center [&>svg]:w-[18px] [&>svg]:h-[18px] ${
                     parentActive || isSubmenuOpen
                       ? "text-slate-100"
                       : "text-slate-300"
@@ -408,8 +411,8 @@ const AppSidebar: React.FC = () => {
                 )}
 
                 {isOpen && (
-                  <ChevronDownIcon
-                    className={`flex-shrink-0 w-[18px] h-[18px] text-slate-400 transition-transform duration-200 ${
+                  <FaChevronDown
+                    className={`flex-shrink-0 w-4 h-4 text-slate-400 transition-transform duration-200 ${
                       isSubmenuOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -420,7 +423,7 @@ const AppSidebar: React.FC = () => {
                 <Link
                   to={nav.path}
                   className={`
-                    flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                     transition-colors duration-150
                     ${
                       isActive(nav.path)
@@ -430,10 +433,8 @@ const AppSidebar: React.FC = () => {
                   `}
                 >
                   <span
-                    className={`flex-shrink-0 w-6 h-6 flex items-center justify-center ${
-                      isActive(nav.path)
-                        ? "text-slate-100"
-                        : "text-slate-300"
+                    className={`flex-shrink-0 w-5 h-5 flex items-center justify-center [&>svg]:w-[18px] [&>svg]:h-[18px] ${
+                      isActive(nav.path) ? "text-slate-100" : "text-slate-300"
                     }`}
                   >
                     {nav.icon}
@@ -457,7 +458,7 @@ const AppSidebar: React.FC = () => {
                     : "0px",
                 }}
               >
-                <ul className="mt-1 ml-9 space-y-0.5 border-l border-white/15 pl-3">
+                <ul className="mt-1 ml-8 space-y-0.5 border-l border-white/15 pl-3">
                   {nav.subItems.map((subItem) => (
                     <li key={subItem.name}>
                       <Link

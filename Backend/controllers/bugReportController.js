@@ -10,17 +10,8 @@ const logAudit = require("./auditController");
 // ===============================
 
 // Get next bug report ID (e.g., BUG-001)
-async function getNextBugReportId(
-  pool,
-  projectId,
-) {
-  const result = await pool
-    .request()
-    .input(
-      "project_id",
-      sql.Int,
-      projectId,
-    )
+async function getNextBugReportId(pool, projectId) {
+  const result = await pool.request().input("project_id", sql.Int, projectId)
     .query(`
       SELECT
         ISNULL(
@@ -36,19 +27,11 @@ async function getNextBugReportId(
       WHERE project_id = @project_id
     `);
 
-  const maxNumber =
-    Number(
-      result.recordset[0]
-        ?.max_number || 0,
-    );
+  const maxNumber = Number(result.recordset[0]?.max_number || 0);
 
-  const nextNumber =
-    maxNumber + 1;
+  const nextNumber = maxNumber + 1;
 
-  const formattedNumber =
-    nextNumber
-      .toString()
-      .padStart(4, "0");
+  const formattedNumber = nextNumber.toString().padStart(4, "0");
 
   return `BUG-${projectId}-${formattedNumber}`;
 }
@@ -76,11 +59,42 @@ const cleanAuditData = (obj = {}) => {
 // Save screenshot to file system
 async function saveScreenshot(file) {
   const screenshotDir = path.join(__dirname, "../screenshots/bug-reports");
+
   try {
     await fs.mkdir(screenshotDir, { recursive: true });
-    const filename = `${uuidv4()}_${Date.now()}.png`;
+
+    const extensionByMimeType = {
+      "image/png": ".png",
+      "image/jpeg": ".jpg",
+      "image/jpg": ".jpg",
+      "image/webp": ".webp",
+      "image/gif": ".gif",
+    };
+
+    const originalExtension = path
+      .extname(file.originalname || "")
+      .toLowerCase();
+
+    const safeOriginalExtension = [
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".webp",
+      ".gif",
+    ].includes(originalExtension)
+      ? originalExtension === ".jpeg"
+        ? ".jpg"
+        : originalExtension
+      : "";
+
+    const extension =
+      extensionByMimeType[file.mimetype] || safeOriginalExtension || ".png";
+
+    const filename = `${uuidv4()}_${Date.now()}${extension}`;
     const filepath = path.join(screenshotDir, filename);
+
     await fs.writeFile(filepath, file.buffer);
+
     return `/screenshots/bug-reports/${filename}`;
   } catch (error) {
     console.error("Screenshot save error:", error);
@@ -157,88 +171,30 @@ exports.createBugReport = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (
-      !project_id ||
-      !function_id ||
-      !title ||
-      !description
-    ) {
+    if (!project_id || !function_id || !title || !description) {
       return res.status(400).json({
         error: "Missing required fields",
       });
     }
 
     // Get next report ID
-    const reportId =
-      await getNextBugReportId(
-        pool,
-        project_id,
-      );
+    const reportId = await getNextBugReportId(pool, project_id);
 
     // Create bug report
     const result = await pool
       .request()
-      .input(
-        "report_id",
-        sql.NVarChar,
-        reportId,
-      )
-      .input(
-        "project_id",
-        sql.Int,
-        project_id,
-      )
-      .input(
-        "project_function_id",
-        sql.Int,
-        function_id,
-      )
-      .input(
-        "sprint_id",
-        sql.Int,
-        sprint_id || null,
-      )
-      .input(
-        "title",
-        sql.NVarChar,
-        title,
-      )
-      .input(
-        "description",
-        sql.NVarChar,
-        description,
-      )
-      .input(
-        "severity",
-        sql.NVarChar,
-        severity || "Medium",
-      )
-      .input(
-        "priority",
-        sql.Int,
-        priority || 3,
-      )
-      .input(
-        "environment",
-        sql.NVarChar,
-        environment || null,
-      )
-      .input(
-        "affected_version",
-        sql.NVarChar,
-        affected_version || null,
-      )
-      .input(
-        "reported_by",
-        sql.Int,
-        userId,
-      )
-      .input(
-        "created_by",
-        sql.Int,
-        userId,
-      )
-      .query(`
+      .input("report_id", sql.NVarChar, reportId)
+      .input("project_id", sql.Int, project_id)
+      .input("project_function_id", sql.Int, function_id)
+      .input("sprint_id", sql.Int, sprint_id || null)
+      .input("title", sql.NVarChar, title)
+      .input("description", sql.NVarChar, description)
+      .input("severity", sql.NVarChar, severity || "Medium")
+      .input("priority", sql.Int, priority || 3)
+      .input("environment", sql.NVarChar, environment || null)
+      .input("affected_version", sql.NVarChar, affected_version || null)
+      .input("reported_by", sql.Int, userId)
+      .input("created_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.bug_reports
           (
             report_id,
@@ -273,8 +229,7 @@ exports.createBugReport = async (req, res) => {
         SELECT SCOPE_IDENTITY() AS id;
       `);
 
-    const bugId =
-      result.recordset[0].id;
+    const bugId = result.recordset[0].id;
 
     // =====================================================
     // FIRST: LOG BUG CREATION
@@ -297,48 +252,22 @@ exports.createBugReport = async (req, res) => {
       },
     });
 
-    await addSystemComment(
-      pool,
-      bugId,
-      "Bug report created",
-      userId,
-    );
+    await addSystemComment(pool, bugId, "Bug report created", userId);
 
     // =====================================================
     // SCREENSHOTS
     // =====================================================
 
-    if (
-      req.files &&
-      req.files.length > 0
-    ) {
+    if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        const screenshotPath =
-          await saveScreenshot(file);
+        const screenshotPath = await saveScreenshot(file);
 
         await pool
           .request()
-          .input(
-            "bug_report_id",
-            sql.Int,
-            bugId,
-          )
-          .input(
-            "screenshot_path",
-            sql.NVarChar,
-            screenshotPath,
-          )
-          .input(
-            "screenshot_name",
-            sql.NVarChar,
-            file.originalname,
-          )
-          .input(
-            "created_by",
-            sql.Int,
-            userId,
-          )
-          .query(`
+          .input("bug_report_id", sql.Int, bugId)
+          .input("screenshot_path", sql.NVarChar, screenshotPath)
+          .input("screenshot_name", sql.NVarChar, file.originalname)
+          .input("created_by", sql.Int, userId).query(`
             INSERT INTO test_case_manager.dbo.bug_screenshots
               (
                 bug_report_id,
@@ -365,12 +294,9 @@ exports.createBugReport = async (req, res) => {
 
     if (test_case_ids) {
       try {
-        parsedTestCaseIds =
-          Array.isArray(test_case_ids)
-            ? test_case_ids
-            : JSON.parse(
-                test_case_ids,
-              );
+        parsedTestCaseIds = Array.isArray(test_case_ids)
+          ? test_case_ids
+          : JSON.parse(test_case_ids);
       } catch (error) {
         console.warn(
           "Invalid test_case_ids received while creating bug:",
@@ -379,41 +305,19 @@ exports.createBugReport = async (req, res) => {
       }
     }
 
-    if (
-      Array.isArray(
-        parsedTestCaseIds,
-      ) &&
-      parsedTestCaseIds.length > 0
-    ) {
+    if (Array.isArray(parsedTestCaseIds) && parsedTestCaseIds.length > 0) {
       const uniqueTestCaseIds = [
         ...new Set(
           parsedTestCaseIds
-            .map((value) =>
-              Number(value),
-            )
-            .filter(
-              (value) =>
-                Number.isInteger(
-                  value,
-                ) &&
-                value > 0,
-            ),
+            .map((value) => Number(value))
+            .filter((value) => Number.isInteger(value) && value > 0),
         ),
       ];
 
-      for (
-        const testCaseId of
-        uniqueTestCaseIds
-      ) {
-        const testCaseResult =
-          await pool
-            .request()
-            .input(
-              "test_case_id",
-              sql.Int,
-              testCaseId,
-            )
-            .query(`
+      for (const testCaseId of uniqueTestCaseIds) {
+        const testCaseResult = await pool
+          .request()
+          .input("test_case_id", sql.Int, testCaseId).query(`
               SELECT
                 tc.id,
                 tc.title
@@ -421,8 +325,7 @@ exports.createBugReport = async (req, res) => {
               WHERE tc.id = @test_case_id
             `);
 
-        const testCase =
-          testCaseResult.recordset[0];
+        const testCase = testCaseResult.recordset[0];
 
         if (!testCase) {
           continue;
@@ -430,22 +333,9 @@ exports.createBugReport = async (req, res) => {
 
         await pool
           .request()
-          .input(
-            "bug_report_id",
-            sql.Int,
-            bugId,
-          )
-          .input(
-            "test_case_id",
-            sql.Int,
-            testCaseId,
-          )
-          .input(
-            "linked_by",
-            sql.Int,
-            userId,
-          )
-          .query(`
+          .input("bug_report_id", sql.Int, bugId)
+          .input("test_case_id", sql.Int, testCaseId)
+          .input("linked_by", sql.Int, userId).query(`
             IF NOT EXISTS (
               SELECT 1
               FROM test_case_manager.dbo.bug_test_case_links
@@ -479,16 +369,12 @@ exports.createBugReport = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message:
-        "Bug report created successfully",
+      message: "Bug report created successfully",
       bugId,
       reportId,
     });
   } catch (error) {
-    console.error(
-      "Create bug report error:",
-      error,
-    );
+    console.error("Create bug report error:", error);
 
     res.status(500).json({
       error: error.message,
@@ -653,9 +539,7 @@ exports.getBugReportById = async (req, res) => {
       `);
 
     // Get linked test cases
-    const linkedTestCases = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
+    const linkedTestCases = await pool.request().input("bug_id", sql.Int, id)
       .query(`
         SELECT
           btc.id AS link_id,
@@ -958,10 +842,7 @@ exports.linkTestCaseToBug = async (req, res) => {
       });
     }
 
-    const bugResult = await pool
-      .request()
-      .input("bug_id", sql.Int, id)
-      .query(`
+    const bugResult = await pool.request().input("bug_id", sql.Int, id).query(`
         SELECT id, report_id
         FROM test_case_manager.dbo.bug_reports
         WHERE id = @bug_id AND is_archived = 0
@@ -976,8 +857,7 @@ exports.linkTestCaseToBug = async (req, res) => {
 
     const testCaseResult = await pool
       .request()
-      .input("test_case_id", sql.Int, test_case_id)
-      .query(`
+      .input("test_case_id", sql.Int, test_case_id).query(`
         SELECT id, title
         FROM test_case_manager.dbo.test_cases
         WHERE id = @test_case_id
@@ -993,8 +873,7 @@ exports.linkTestCaseToBug = async (req, res) => {
     const existingResult = await pool
       .request()
       .input("bug_id", sql.Int, id)
-      .input("test_case_id", sql.Int, test_case_id)
-      .query(`
+      .input("test_case_id", sql.Int, test_case_id).query(`
         SELECT id
         FROM test_case_manager.dbo.bug_test_case_links
         WHERE bug_report_id = @bug_id
@@ -1013,8 +892,7 @@ exports.linkTestCaseToBug = async (req, res) => {
       .request()
       .input("bug_id", sql.Int, id)
       .input("test_case_id", sql.Int, test_case_id)
-      .input("linked_by", sql.Int, userId)
-      .query(`
+      .input("linked_by", sql.Int, userId).query(`
         INSERT INTO test_case_manager.dbo.bug_test_case_links
           (bug_report_id, test_case_id, linked_by)
         OUTPUT INSERTED.id
@@ -1067,8 +945,7 @@ exports.unlinkTestCaseFromBug = async (req, res) => {
     const linkedResult = await pool
       .request()
       .input("bug_id", sql.Int, id)
-      .input("test_case_id", sql.Int, testCaseId)
-      .query(`
+      .input("test_case_id", sql.Int, testCaseId).query(`
         SELECT
           btc.id,
           tc.title
@@ -1091,8 +968,7 @@ exports.unlinkTestCaseFromBug = async (req, res) => {
     await pool
       .request()
       .input("bug_id", sql.Int, id)
-      .input("test_case_id", sql.Int, testCaseId)
-      .query(`
+      .input("test_case_id", sql.Int, testCaseId).query(`
         DELETE FROM test_case_manager.dbo.bug_test_case_links
         WHERE bug_report_id = @bug_id
           AND test_case_id = @test_case_id
@@ -1298,44 +1174,143 @@ exports.addBugComment = async (req, res) => {
 exports.uploadBugScreenshots = async (req, res) => {
   try {
     const pool = await poolPromise;
-    const { id } = req.params;
-    const userId = req.user.id;
+    const bugId = Number(req.params.id);
+    const userId = req.user?.id;
+    const files = req.files || [];
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "No screenshots provided" });
+    if (!Number.isInteger(bugId) || bugId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid bug report ID",
+      });
     }
 
-    const screenshots = [];
-    for (const file of req.files) {
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
+    if (!files.length) {
+      return res.status(400).json({
+        success: false,
+        error: "No screenshots provided",
+      });
+    }
+
+    const bugResult = await pool.request().input("bug_id", sql.Int, bugId)
+      .query(`
+        SELECT
+          id,
+          report_id
+        FROM test_case_manager.dbo.bug_reports
+        WHERE id = @bug_id
+          AND is_archived = 0
+      `);
+
+    if (!bugResult.recordset[0]) {
+      return res.status(404).json({
+        success: false,
+        error: "Bug report not found",
+      });
+    }
+
+    const countResult = await pool.request().input("bug_id", sql.Int, bugId)
+      .query(`
+        SELECT COUNT(*) AS screenshot_count
+        FROM test_case_manager.dbo.bug_screenshots
+        WHERE bug_report_id = @bug_id
+      `);
+
+    const existingCount = Number(
+      countResult.recordset[0]?.screenshot_count || 0,
+    );
+
+    const remainingSlots = Math.max(0, 10 - existingCount);
+
+    if (remainingSlots === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "A maximum of 10 screenshots is allowed for this bug",
+      });
+    }
+
+    if (files.length > remainingSlots) {
+      return res.status(400).json({
+        success: false,
+        error: `Only ${remainingSlots} more screenshot${
+          remainingSlots === 1 ? "" : "s"
+        } can be uploaded`,
+      });
+    }
+
+    const uploadedScreenshots = [];
+
+    for (const file of files) {
       const screenshotPath = await saveScreenshot(file);
-      const result = await pool
+
+      const insertResult = await pool
         .request()
-        .input("bug_report_id", sql.Int, id)
+        .input("bug_report_id", sql.Int, bugId)
         .input("screenshot_path", sql.NVarChar, screenshotPath)
         .input("screenshot_name", sql.NVarChar, file.originalname)
         .input("created_by", sql.Int, userId).query(`
           INSERT INTO test_case_manager.dbo.bug_screenshots
-            (bug_report_id, screenshot_path, screenshot_name, created_by)
+            (
+              bug_report_id,
+              screenshot_path,
+              screenshot_name,
+              created_by
+            )
+          OUTPUT INSERTED.*
           VALUES
-            (@bug_report_id, @screenshot_path, @screenshot_name, @created_by);
-          SELECT SCOPE_IDENTITY() as id;
+            (
+              @bug_report_id,
+              @screenshot_path,
+              @screenshot_name,
+              @created_by
+            )
         `);
 
-      screenshots.push({
-        id: result.recordset[0].id,
-        path: screenshotPath,
-        name: file.originalname,
-      });
+      uploadedScreenshots.push(insertResult.recordset[0]);
     }
+
+    await addSystemComment(
+      pool,
+      bugId,
+      `${uploadedScreenshots.length} screenshot${
+        uploadedScreenshots.length === 1 ? "" : "s"
+      } uploaded`,
+      userId,
+    );
+
+    await logBugAudit(
+      pool,
+      bugId,
+      "Screenshots Uploaded",
+      "screenshots",
+      null,
+      uploadedScreenshots.map((item) => ({
+        id: item.id,
+        screenshot_name: item.screenshot_name,
+        screenshot_path: item.screenshot_path,
+      })),
+      userId,
+    );
 
     res.status(201).json({
       success: true,
       message: "Screenshots uploaded successfully",
-      screenshots,
+      screenshots: uploadedScreenshots,
     });
   } catch (error) {
     console.error("Upload screenshots error:", error);
-    res.status(500).json({ error: error.message });
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
 
@@ -1841,5 +1816,143 @@ exports.deleteBugReport = async (req, res) => {
   } catch (error) {
     console.error("Delete bug report error:", error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+// ===============================
+// DELETE BUG SCREENSHOT
+// ===============================
+exports.deleteBugScreenshot = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const bugId = Number(req.params.id);
+    const screenshotId = Number(req.params.screenshotId);
+    const userId = req.user?.id;
+
+    if (!Number.isInteger(bugId) || bugId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid bug report ID",
+      });
+    }
+
+    if (!Number.isInteger(screenshotId) || screenshotId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid screenshot ID",
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
+    const screenshotResult = await pool
+      .request()
+      .input("bug_id", sql.Int, bugId)
+      .input("screenshot_id", sql.Int, screenshotId).query(`
+        SELECT
+          bs.id,
+          bs.bug_report_id,
+          bs.screenshot_path,
+          bs.screenshot_name
+        FROM test_case_manager.dbo.bug_screenshots bs
+        INNER JOIN test_case_manager.dbo.bug_reports br
+          ON br.id = bs.bug_report_id
+        WHERE bs.id = @screenshot_id
+          AND bs.bug_report_id = @bug_id
+          AND br.is_archived = 0
+      `);
+
+    const screenshot = screenshotResult.recordset[0];
+
+    if (!screenshot) {
+      return res.status(404).json({
+        success: false,
+        error: "Screenshot not found for this bug",
+      });
+    }
+
+    await pool
+      .request()
+      .input("bug_id", sql.Int, bugId)
+      .input("screenshot_id", sql.Int, screenshotId).query(`
+        DELETE FROM test_case_manager.dbo.bug_screenshots
+        WHERE id = @screenshot_id
+          AND bug_report_id = @bug_id
+      `);
+
+    /*
+     * Delete the physical file after the DB record is removed.
+     * Only files inside ../screenshots are eligible for deletion.
+     */
+    try {
+      const relativeScreenshotPath = String(screenshot.screenshot_path || "")
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, "");
+
+      if (relativeScreenshotPath.startsWith("screenshots/")) {
+        const screenshotsRoot = path.resolve(__dirname, "../screenshots");
+
+        const absoluteFilePath = path.resolve(
+          __dirname,
+          "..",
+          relativeScreenshotPath,
+        );
+
+        const isInsideScreenshotsRoot =
+          absoluteFilePath === screenshotsRoot ||
+          absoluteFilePath.startsWith(`${screenshotsRoot}${path.sep}`);
+
+        if (isInsideScreenshotsRoot) {
+          try {
+            await fs.unlink(absoluteFilePath);
+          } catch (fileError) {
+            if (fileError?.code !== "ENOENT") {
+              console.error("Failed to delete screenshot file:", fileError);
+            }
+          }
+        }
+      }
+    } catch (fileCleanupError) {
+      console.error("Screenshot file cleanup error:", fileCleanupError);
+    }
+
+    await addSystemComment(
+      pool,
+      bugId,
+      `Screenshot deleted: ${screenshot.screenshot_name}`,
+      userId,
+    );
+
+    await logBugAudit(
+      pool,
+      bugId,
+      "Screenshot Deleted",
+      "screenshot",
+      {
+        id: screenshot.id,
+        screenshot_name: screenshot.screenshot_name,
+        screenshot_path: screenshot.screenshot_path,
+      },
+      null,
+      userId,
+    );
+
+    return res.json({
+      success: true,
+      message: "Screenshot deleted successfully",
+      screenshotId,
+    });
+  } catch (error) {
+    console.error("Delete bug screenshot error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };

@@ -11,6 +11,7 @@ import PublicRoute from "./components/auth/PublicRoute";
 import ProjectOverview from "./pages/Projects/ProjectOverview";
 import AdvancedAutomation from "./pages/TestManagement/Playwright/AdvancedAutomation";
 import BugReports from "./pages/BugReports/BugReports";
+import TestCaseApprovals from "./pages/TestManagement/TestCaseApprovals";
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/AuthPages/SignIn"));
@@ -154,6 +155,10 @@ export default function App() {
               />
               <Route path="/test-suites" element={<TestSuites />} />
               <Route path="/test-cases" element={<TestCases />} />
+              <Route
+  path="/test-case-approvals"
+  element={<TestCaseApprovals />}
+/>
               <Route path="/test-cases/:id" element={<TestCaseDetails />} />
 
               <Route path="/script/recorder" element={<PlaywrightRecorder />} />

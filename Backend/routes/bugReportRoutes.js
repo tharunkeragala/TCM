@@ -1,13 +1,20 @@
 const express = require("express");
+
 const router = express.Router();
 
 const { verifyToken } = require("../middleware/auth");
+
 const checkPermission = require("../middleware/checkPermission");
+
 const bugReportController = require("../controllers/bugReportController");
+
 const upload = require("../middleware/upload");
 
 const MENU = "/bug-reports";
 
+// ===============================
+// CREATE BUG REPORT
+// ===============================
 router.post(
   "/",
   verifyToken,
@@ -16,6 +23,9 @@ router.post(
   bugReportController.createBugReport,
 );
 
+// ===============================
+// GET ALL BUG REPORTS
+// ===============================
 router.get(
   "/",
   verifyToken,
@@ -23,6 +33,10 @@ router.get(
   bugReportController.getBugReports,
 );
 
+// ===============================
+// BUG REPORT STATISTICS
+// Keep this route before "/:id".
+// ===============================
 router.get(
   "/reports/statistics",
   verifyToken,
@@ -30,6 +44,9 @@ router.get(
   bugReportController.getBugStatistics,
 );
 
+// ===============================
+// GET BUG REPORT BY ID
+// ===============================
 router.get(
   "/:id",
   verifyToken,
@@ -37,6 +54,9 @@ router.get(
   bugReportController.getBugReportById,
 );
 
+// ===============================
+// UPDATE BUG REPORT
+// ===============================
 router.put(
   "/:id",
   verifyToken,
@@ -44,6 +64,9 @@ router.put(
   bugReportController.updateBugReport,
 );
 
+// ===============================
+// DELETE BUG REPORT
+// ===============================
 router.delete(
   "/:id",
   verifyToken,
@@ -51,6 +74,9 @@ router.delete(
   bugReportController.deleteBugReport,
 );
 
+// ===============================
+// RECORD ITERATION
+// ===============================
 router.post(
   "/:id/iterations",
   verifyToken,
@@ -58,6 +84,9 @@ router.post(
   bugReportController.recordBugIteration,
 );
 
+// ===============================
+// GET BUG HISTORY
+// ===============================
 router.get(
   "/:id/history",
   verifyToken,
@@ -65,6 +94,9 @@ router.get(
   bugReportController.getBugHistory,
 );
 
+// ===============================
+// ADD COMMENT
+// ===============================
 router.post(
   "/:id/comments",
   verifyToken,
@@ -72,6 +104,9 @@ router.post(
   bugReportController.addBugComment,
 );
 
+// ===============================
+// UPLOAD SCREENSHOTS
+// ===============================
 router.post(
   "/:id/screenshots",
   verifyToken,
@@ -80,7 +115,16 @@ router.post(
   bugReportController.uploadBugScreenshots,
 );
 
-// Link one test case to a bug.
+router.delete(
+  "/:id/screenshots/:screenshotId",
+  verifyToken,
+  checkPermission(MENU, "can_edit"),
+  bugReportController.deleteBugScreenshot,
+);
+
+// ===============================
+// LINK TEST CASE TO BUG
+// ===============================
 router.post(
   "/:id/test-cases",
   verifyToken,
@@ -88,7 +132,9 @@ router.post(
   bugReportController.linkTestCaseToBug,
 );
 
-// Unlink one test case from a bug.
+// ===============================
+// UNLINK TEST CASE FROM BUG
+// ===============================
 router.delete(
   "/:id/test-cases/:testCaseId",
   verifyToken,

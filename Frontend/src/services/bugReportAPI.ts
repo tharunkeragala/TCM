@@ -158,8 +158,11 @@ export interface BugStatistics {
 export const bugReportAPI = {
   async createBugReport(formData: FormData) {
     const response = await API.post("/api/bug-reports", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     });
+
     return response.data;
   },
 
@@ -172,7 +175,10 @@ export const bugReportAPI = {
     limit?: number;
     offset?: number;
   }) {
-    const response = await API.get("/api/bug-reports", { params: filters });
+    const response = await API.get("/api/bug-reports", {
+      params: filters,
+    });
+
     return response.data;
   },
 
@@ -214,6 +220,7 @@ export const bugReportAPI = {
     },
   ) {
     const response = await API.post(`/api/bug-reports/${id}/iterations`, data);
+
     return response.data;
   },
 
@@ -226,13 +233,29 @@ export const bugReportAPI = {
     const response = await API.post(`/api/bug-reports/${id}/comments`, {
       comment,
     });
+
     return response.data;
   },
 
   async uploadScreenshots(id: number, formData: FormData) {
-    const response = await API.post(`/api/bug-reports/${id}/screenshots`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await API.post(
+      `/api/bug-reports/${id}/screenshots`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    return response.data;
+  },
+
+  async deleteScreenshot(id: number, screenshotId: number) {
+    const response = await API.delete(
+      `/api/bug-reports/${id}/screenshots/${screenshotId}`,
+    );
+
     return response.data;
   },
 
@@ -240,6 +263,7 @@ export const bugReportAPI = {
     const response = await API.post(`/api/bug-reports/${id}/test-cases`, {
       test_case_id: testCaseId,
     });
+
     return response.data;
   },
 
@@ -247,6 +271,7 @@ export const bugReportAPI = {
     const response = await API.delete(
       `/api/bug-reports/${id}/test-cases/${testCaseId}`,
     );
+
     return response.data;
   },
 
@@ -267,6 +292,7 @@ export const bugReportAPI = {
     const response = await API.get("/api/bug-reports/reports/statistics", {
       params: filters,
     });
+
     return response.data;
   },
 };
@@ -283,9 +309,15 @@ export const projectFunctionsAPI = {
   },
 
   async getProjectFunctions(projectId: number, includeArchived = false) {
-    const response = await API.get(`/api/project-functions/project/${projectId}`, {
-      params: { include_archived: includeArchived },
-    });
+    const response = await API.get(
+      `/api/project-functions/project/${projectId}`,
+      {
+        params: {
+          include_archived: includeArchived,
+        },
+      },
+    );
+
     return response.data;
   },
 
@@ -294,7 +326,10 @@ export const projectFunctionsAPI = {
     limit?: number;
     offset?: number;
   }) {
-    const response = await API.get("/api/project-functions", { params: filters });
+    const response = await API.get("/api/project-functions", {
+      params: filters,
+    });
+
     return response.data;
   },
 

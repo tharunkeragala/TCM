@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   // FaComment,
@@ -6,6 +6,8 @@ import {
   FaHistory,
   FaImage,
   FaPlus,
+  FaUpload,
+  FaTrash,
   FaLink,
   FaUnlink,
   FaExternalLinkAlt,
@@ -133,6 +135,62 @@ function getDateTimestamp(value?: string | null) {
   return parseApiDate(value)?.getTime() ?? 0;
 }
 
+function getScreenshotUrl(path?: string | null) {
+  if (!path) return "";
+
+  const value = String(path).trim();
+
+  if (!value) return "";
+
+  // Already a browser-ready URL.
+  if (
+    /^https?:\/\//i.test(value) ||
+    /^data:/i.test(value) ||
+    /^blob:/i.test(value)
+  ) {
+    return value;
+  }
+
+  // Convert Windows paths to URL paths and remove a leading "./".
+  let normalized = value.replace(/\\/g, "/").replace(/^\.\//, "");
+
+  /*
+   * If the DB accidentally contains an absolute filesystem path such as:
+   * C:/app/uploads/bug-screenshots/image.png
+   * only expose the public part beginning at /uploads/.
+   */
+  const uploadsIndex = normalized.toLowerCase().indexOf("/uploads/");
+
+  if (uploadsIndex >= 0) {
+    normalized = normalized.slice(uploadsIndex);
+  } else if (normalized.toLowerCase().startsWith("uploads/")) {
+    normalized = `/${normalized}`;
+  } else if (!normalized.startsWith("/")) {
+    normalized = `/${normalized}`;
+  }
+
+  /*
+   * Prefer an explicitly configured backend URL.
+   *
+   * Examples supported:
+   * VITE_API_BASE_URL=http://localhost:5000
+   * VITE_API_URL=http://localhost:5000/api
+   */
+  const configuredBase =
+    import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "";
+
+  if (configuredBase) {
+    const backendBase = String(configuredBase)
+      .replace(/\/$/, "")
+      .replace(/\/api$/i, "");
+
+    return `${backendBase}${normalized}`;
+  }
+
+  // Same-origin fallback for deployments where frontend/backend share a host.
+  return normalized;
+}
+
 function InfoItem({
   label,
   value,
@@ -160,6 +218,17 @@ export default function BugReportDetailsModal({
 }: BugReportDetailsModalProps) {
   const [bug, setBug] = useState<any>(null);
   const [screenshots, setScreenshots] = useState<BugScreenshot[]>([]);
+  const [selectedScreenshot, setSelectedScreenshot] =
+    useState<BugScreenshot | null>(null);
+  const [failedScreenshotIds, setFailedScreenshotIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [newScreenshots, setNewScreenshots] = useState<File[]>([]);
+  const [screenshotUploadLoading, setScreenshotUploadLoading] = useState(false);
+  const [screenshotDeleteLoading, setScreenshotDeleteLoading] = useState(false);
+  const [screenshotPendingDelete, setScreenshotPendingDelete] =
+    useState<BugScreenshot | null>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
   const [history, setHistory] = useState<BugHistory[]>([]);
   const [summary, setSummary] = useState<BugReportSummary[]>([]);
   const [comments, setComments] = useState<BugComment[]>([]);
@@ -280,6 +349,16 @@ export default function BugReportDetailsModal({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
 
+      if (screenshotPendingDelete) {
+        setScreenshotPendingDelete(null);
+        return;
+      }
+
+      if (selectedScreenshot) {
+        setSelectedScreenshot(null);
+        return;
+      }
+
       if (selectedTestCaseDetails) {
         setSelectedTestCaseDetails(null);
         return;
@@ -291,7 +370,12 @@ export default function BugReportDetailsModal({
     document.addEventListener("keydown", handleEscape);
 
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [onClose, selectedTestCaseDetails]);
+  }, [
+    onClose,
+    screenshotPendingDelete,
+    selectedScreenshot,
+    selectedTestCaseDetails,
+  ]);
 
   const loadBugDetails = async () => {
     try {
@@ -458,6 +542,139 @@ export default function BugReportDetailsModal({
       showToast("Failed to load test case details", "error");
     } finally {
       setTestCaseDetailsLoading(false);
+    }
+  };
+
+  const handleScreenshotSelection = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const selectedFiles = Array.from(event.target.files || []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+
+    if (selectedFiles.length === 0) {
+      setNewScreenshots([]);
+      return;
+    }
+
+    const remainingSlots = Math.max(0, 10 - screenshots.length);
+
+    if (remainingSlots === 0) {
+      showToast(
+        "A maximum of 10 screenshots is allowed for this bug.",
+        "warning",
+      );
+      event.target.value = "";
+      return;
+    }
+
+    const filesToUse = selectedFiles.slice(0, remainingSlots);
+
+    if (selectedFiles.length > remainingSlots) {
+      showToast(
+        `Only ${remainingSlots} more screenshot${
+          remainingSlots === 1 ? "" : "s"
+        } can be added.`,
+        "warning",
+      );
+    }
+
+    setNewScreenshots(filesToUse);
+  };
+
+  const handleUploadScreenshots = async () => {
+    if (newScreenshots.length === 0) {
+      showToast("Please select at least one screenshot.", "warning");
+      return;
+    }
+
+    try {
+      setScreenshotUploadLoading(true);
+
+      const payload = new FormData();
+
+      newScreenshots.forEach((file) => {
+        payload.append("screenshots", file);
+      });
+
+      await bugReportAPI.uploadScreenshots(bugId, payload);
+
+      setNewScreenshots([]);
+
+      if (screenshotInputRef.current) {
+        screenshotInputRef.current.value = "";
+      }
+
+      setFailedScreenshotIds(new Set());
+
+      await loadBugDetails();
+      onUpdate();
+
+      showToast(
+        `Screenshot${
+          newScreenshots.length === 1 ? "" : "s"
+        } uploaded successfully.`,
+        "success",
+      );
+    } catch (error: any) {
+      console.error("Error uploading screenshots:", error);
+
+      showToast(
+        error?.response?.status === 403
+          ? "Access denied. You do not have permission to upload screenshots."
+          : error?.response?.data?.message ||
+              error?.response?.data?.error ||
+              "Failed to upload screenshots.",
+        "error",
+      );
+    } finally {
+      setScreenshotUploadLoading(false);
+    }
+  };
+
+  const handleRemoveSelectedScreenshot = (index: number) => {
+    setNewScreenshots((current) =>
+      current.filter((_, fileIndex) => fileIndex !== index),
+    );
+  };
+
+  const handleDeleteScreenshot = async () => {
+    if (!screenshotPendingDelete) return;
+
+    try {
+      setScreenshotDeleteLoading(true);
+
+      await bugReportAPI.deleteScreenshot(bugId, screenshotPendingDelete.id);
+
+      if (selectedScreenshot?.id === screenshotPendingDelete.id) {
+        setSelectedScreenshot(null);
+      }
+
+      setFailedScreenshotIds((previous) => {
+        const next = new Set(previous);
+        next.delete(screenshotPendingDelete.id);
+        return next;
+      });
+
+      setScreenshotPendingDelete(null);
+
+      await loadBugDetails();
+      onUpdate();
+
+      showToast("Screenshot deleted successfully.", "success");
+    } catch (error: any) {
+      console.error("Error deleting screenshot:", error);
+
+      showToast(
+        error?.response?.status === 403
+          ? "Access denied. You do not have permission to delete screenshots."
+          : error?.response?.data?.message ||
+              error?.response?.data?.error ||
+              "Failed to delete screenshot.",
+        "error",
+      );
+    } finally {
+      setScreenshotDeleteLoading(false);
     }
   };
 
@@ -813,41 +1030,210 @@ export default function BugReportDetailsModal({
                 </div>
 
                 {/* Screenshots */}
-                {screenshots.length > 0 && (
-                  <div className="rounded-2xl border border-gray-200 p-5 dark:border-gray-700">
-                    <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                      <FaImage className="h-3.5 w-3.5 text-purple-500" />
-                      Screenshots ({screenshots.length})
-                    </h3>
+                <div className="rounded-2xl border border-gray-200 p-5 dark:border-gray-700">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        <FaImage className="h-3.5 w-3.5 text-purple-500" />
+                        Screenshots ({screenshots.length})
+                      </h3>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {screenshots.map((screenshot) => (
-                        <div
-                          key={screenshot.id}
-                          className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700"
-                        >
-                          <img
-                            src={screenshot.screenshot_path}
-                            alt={screenshot.screenshot_name}
-                            className="h-52 w-full bg-gray-50 object-cover dark:bg-gray-800"
-                          />
-
-                          <div className="px-3 py-2">
-                            <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
-                              {screenshot.screenshot_name}
-                            </p>
-
-                            {screenshot.description && (
-                              <p className="mt-1 text-xs text-gray-400">
-                                {screenshot.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                        Upload JPG, PNG, or other image files. Maximum 10
+                        screenshots per bug.
+                      </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => screenshotInputRef.current?.click()}
+                      disabled={
+                        screenshotUploadLoading || screenshots.length >= 10
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FaUpload className="h-3.5 w-3.5" />
+                      Add Screenshots
+                    </button>
+
+                    <input
+                      ref={screenshotInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleScreenshotSelection}
+                      className="hidden"
+                    />
                   </div>
-                )}
+
+                  {newScreenshots.length > 0 && (
+                    <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-900/10">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          {newScreenshots.length} screenshot
+                          {newScreenshots.length === 1 ? "" : "s"} selected
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewScreenshots([]);
+                              if (screenshotInputRef.current) {
+                                screenshotInputRef.current.value = "";
+                              }
+                            }}
+                            disabled={screenshotUploadLoading}
+                            className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                          >
+                            Clear
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleUploadScreenshots}
+                            disabled={
+                              screenshotUploadLoading ||
+                              newScreenshots.length === 0
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <FaUpload className="h-3 w-3" />
+                            {screenshotUploadLoading ? "Uploading…" : "Upload"}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {newScreenshots.map((file, index) => (
+                          <div
+                            key={`${file.name}-${file.lastModified}-${index}`}
+                            className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs dark:bg-gray-800"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-gray-700 dark:text-gray-200">
+                                {file.name}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-gray-400">
+                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveSelectedScreenshot(index)
+                              }
+                              disabled={screenshotUploadLoading}
+                              className="flex-shrink-0 rounded-md p-1.5 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50 dark:hover:bg-red-900/30"
+                              title="Remove selected screenshot"
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {screenshots.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center dark:border-gray-700">
+                      <FaImage className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600" />
+
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        No screenshots uploaded yet.
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                        Use “Add Screenshots” to attach evidence to this bug.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {screenshots.map((screenshot) => {
+                        const screenshotUrl = getScreenshotUrl(
+                          screenshot.screenshot_path,
+                        );
+
+                        const imageFailed = failedScreenshotIds.has(
+                          screenshot.id,
+                        );
+
+                        return (
+                          <div
+                            key={screenshot.id}
+                            className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700"
+                          >
+                            {!imageFailed && screenshotUrl ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedScreenshot(screenshot)
+                                }
+                                className="block w-full cursor-zoom-in bg-gray-50 dark:bg-gray-800"
+                                title="Click to preview screenshot"
+                              >
+                                <img
+                                  src={screenshotUrl}
+                                  alt={screenshot.screenshot_name}
+                                  loading="lazy"
+                                  onError={() =>
+                                    setFailedScreenshotIds((previous) => {
+                                      const next = new Set(previous);
+                                      next.add(screenshot.id);
+                                      return next;
+                                    })
+                                  }
+                                  className="h-52 w-full object-contain"
+                                />
+                              </button>
+                            ) : (
+                              <div className="flex h-52 w-full flex-col items-center justify-center gap-2 bg-gray-50 px-4 text-center dark:bg-gray-800">
+                                <FaImage className="h-7 w-7 text-gray-300 dark:text-gray-600" />
+
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                  Screenshot preview unavailable
+                                </p>
+
+                                <p className="max-w-full break-all text-[10px] text-gray-400 dark:text-gray-500">
+                                  {screenshot.screenshot_path ||
+                                    "No image path"}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="flex items-start justify-between gap-3 px-3 py-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+                                  {screenshot.screenshot_name}
+                                </p>
+
+                                {screenshot.description && (
+                                  <p className="mt-1 text-xs text-gray-400">
+                                    {screenshot.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setScreenshotPendingDelete(screenshot)
+                                }
+                                disabled={screenshotDeleteLoading}
+                                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-900/20"
+                                title="Delete screenshot"
+                                aria-label={`Delete ${screenshot.screenshot_name}`}
+                              >
+                                <FaTrash className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1167,6 +1553,108 @@ export default function BugReportDetailsModal({
             </button>
           </div>
         </div>
+
+        {screenshotPendingDelete && (
+          <div
+            className="fixed inset-0 z-[1000002] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                !screenshotDeleteLoading
+              ) {
+                setScreenshotPendingDelete(null);
+              }
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-gray-900">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                  <FaTrash className="h-4 w-4" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    Delete Screenshot
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-5 text-gray-500 dark:text-gray-400">
+                    Are you sure you want to delete this screenshot? This
+                    removes it from the bug report and deletes the stored file.
+                  </p>
+
+                  <p className="mt-2 truncate rounded-lg bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    {screenshotPendingDelete.screenshot_name}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScreenshotPendingDelete(null)}
+                  disabled={screenshotDeleteLoading}
+                  className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteScreenshot}
+                  disabled={screenshotDeleteLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FaTrash className="h-3.5 w-3.5" />
+                  {screenshotDeleteLoading ? "Deleting…" : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedScreenshot && (
+          <div
+            className="fixed inset-0 z-[1000001] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setSelectedScreenshot(null);
+              }
+            }}
+          >
+            <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+              <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {selectedScreenshot.screenshot_name}
+                  </p>
+
+                  {selectedScreenshot.description && (
+                    <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
+                      {selectedScreenshot.description}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedScreenshot(null)}
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-xl font-bold text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                  aria-label="Close screenshot preview"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-gray-100 p-4 dark:bg-gray-950">
+                <img
+                  src={getScreenshotUrl(selectedScreenshot.screenshot_path)}
+                  alt={selectedScreenshot.screenshot_name}
+                  className="max-h-[78vh] max-w-full object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {selectedTestCaseDetails && (
           <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">

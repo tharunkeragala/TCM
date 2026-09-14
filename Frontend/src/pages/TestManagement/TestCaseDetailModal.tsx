@@ -1,22 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FaTimes, FaExternalLinkAlt, FaClipboardList, FaHistory } from "react-icons/fa";
+import {
+  FaTimes,
+  FaExternalLinkAlt,
+  FaClipboardList,
+  FaHistory,
+} from "react-icons/fa";
 import Alert from "../../components/ui/alert/Alert";
 import API from "../../services/api";
+import WorkflowStatusBadge from "../../components/workflow/WorkflowStatusBadge";
 
-const getToken = () => localStorage.getItem("token") || sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
   Medium: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   High: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
   Critical: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  Draft: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  Ready: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  Deprecated: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
 };
 
 interface TestStep {
@@ -29,7 +30,8 @@ export interface TestCaseDetailData {
   id: number;
   title: string;
   priority: string;
-  status: string;
+  status?: string; // legacy field
+  workflow_status: "Draft" | "Review" | "Approved";
   preconditions?: string;
   owning_suite_id?: number;
   owning_suite_name?: string;
@@ -99,7 +101,10 @@ export default function TestCaseDetailModal({
   };
 
   const formatActor = (entry: ActivityEntry) =>
-    entry.performed_by_name || entry.performed_by || entry.username || "Someone";
+    entry.performed_by_name ||
+    entry.performed_by ||
+    entry.username ||
+    "Someone";
 
   const formatDescription = (entry: ActivityEntry) =>
     entry.description || entry.action || "Updated this test case";
@@ -138,7 +143,9 @@ export default function TestCaseDetailModal({
         <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_300px]">
           {/* Left: title, steps, activity */}
           <div className="overflow-y-auto p-6 border-r border-gray-100 dark:border-gray-800 space-y-6">
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{testCase.title}</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {testCase.title}
+            </h1>
 
             {testCase.owning_suite_id !== undefined &&
               currentSuiteId !== undefined &&
@@ -166,7 +173,9 @@ export default function TestCaseDetailModal({
                 Test Steps ({testCase.steps.length})
               </h3>
               {testCase.steps.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 italic">No steps defined.</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                  No steps defined.
+                </p>
               ) : (
                 <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <table className="w-full text-sm">
@@ -180,8 +189,12 @@ export default function TestCaseDetailModal({
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                       {testCase.steps.map((step) => (
                         <tr key={step.step_number}>
-                          <td className="py-2.5 px-3 text-gray-400 align-top">{step.step_number}</td>
-                          <td className="py-2.5 px-3 text-gray-700 dark:text-gray-300 align-top">{step.action}</td>
+                          <td className="py-2.5 px-3 text-gray-400 align-top">
+                            {step.step_number}
+                          </td>
+                          <td className="py-2.5 px-3 text-gray-700 dark:text-gray-300 align-top">
+                            {step.action}
+                          </td>
                           <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400 align-top">
                             {step.expected_result || "—"}
                           </td>
@@ -199,11 +212,17 @@ export default function TestCaseDetailModal({
               </h3>
 
               {activityLoading ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500">Loading…</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Loading…
+                </p>
               ) : activityError ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500">{activityError}</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  {activityError}
+                </p>
               ) : activity.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 italic">No activity recorded yet.</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                  No activity recorded yet.
+                </p>
               ) : (
                 <ul className="space-y-3">
                   {activity.map((entry, i) => {
@@ -211,10 +230,16 @@ export default function TestCaseDetailModal({
                     return (
                       <li key={entry.id ?? i} className="text-sm">
                         <p className="text-gray-700 dark:text-gray-300">
-                          <span className="font-medium text-gray-900 dark:text-white">{formatActor(entry)}</span>{" "}
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatActor(entry)}
+                          </span>{" "}
                           {formatDescription(entry)}
                         </p>
-                        {ts && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{ts}</p>}
+                        {ts && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                            {ts}
+                          </p>
+                        )}
                       </li>
                     );
                   })}
@@ -229,16 +254,16 @@ export default function TestCaseDetailModal({
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1.5">
                 Status
               </p>
-              <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[testCase.status] || ""}`}>
-                {testCase.status}
-              </span>
+              <WorkflowStatusBadge status={testCase.workflow_status} />
             </div>
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1.5">
                 Priority
               </p>
-              <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${PRIORITY_COLORS[testCase.priority] || ""}`}>
+              <span
+                className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${PRIORITY_COLORS[testCase.priority] || ""}`}
+              >
                 {testCase.priority}
               </span>
             </div>
@@ -260,7 +285,9 @@ export default function TestCaseDetailModal({
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">
                   Project
                 </p>
-                <p className="text-sm text-gray-800 dark:text-gray-200">{projectName}</p>
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  {projectName}
+                </p>
               </div>
             )}
 
@@ -269,7 +296,9 @@ export default function TestCaseDetailModal({
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">
                   Sprint
                 </p>
-                <p className="text-sm text-gray-800 dark:text-gray-200">{sprintName}</p>
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  {sprintName}
+                </p>
               </div>
             )}
 
@@ -278,7 +307,9 @@ export default function TestCaseDetailModal({
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">
                   Linked By
                 </p>
-                <p className="text-sm text-gray-800 dark:text-gray-200">{testCase.linked_by_name}</p>
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  {testCase.linked_by_name}
+                </p>
                 {testCase.linked_at && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     {new Date(testCase.linked_at).toLocaleString()}
