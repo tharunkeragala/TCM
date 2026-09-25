@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  FaFilePdf, FaFileWord, FaFileExcel, FaFileImage, FaFileArchive, FaFileAlt,
-  FaDownload, FaTrash, FaStickyNote,
+  FaFilePdf,
+  FaFileWord,
+  FaFileExcel,
+  FaFileImage,
+  FaFileArchive,
+  FaFileAlt,
+  FaDownload,
+  FaTrash,
+  FaStickyNote,
 } from "react-icons/fa";
 import API from "../../services/api";
 import DocumentUploader from "../../components/common/DocumentUploader";
+import DOMPurify from "dompurify";
 
 interface ProjectDoc {
   id: number;
@@ -24,7 +32,8 @@ interface ProjectNote {
   created_at: string;
 }
 
-const getToken = () => localStorage.getItem("token") || sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 function formatBytes(bytes: number) {
   if (!bytes) return "0 B";
@@ -36,9 +45,12 @@ function formatBytes(bytes: number) {
 function fileIcon(mime: string) {
   if (mime?.includes("pdf")) return <FaFilePdf className="text-red-500" />;
   if (mime?.includes("word")) return <FaFileWord className="text-blue-500" />;
-  if (mime?.includes("sheet") || mime?.includes("excel")) return <FaFileExcel className="text-green-600" />;
-  if (mime?.startsWith("image/")) return <FaFileImage className="text-purple-500" />;
-  if (mime?.includes("zip")) return <FaFileArchive className="text-amber-500" />;
+  if (mime?.includes("sheet") || mime?.includes("excel"))
+    return <FaFileExcel className="text-green-600" />;
+  if (mime?.startsWith("image/"))
+    return <FaFileImage className="text-purple-500" />;
+  if (mime?.includes("zip"))
+    return <FaFileArchive className="text-amber-500" />;
   return <FaFileAlt className="text-gray-400" />;
 }
 
@@ -51,7 +63,9 @@ export default function ProjectDetailModal({
   onClose: () => void;
   onEdit: () => void;
 }) {
-  const [tab, setTab] = useState<"overview" | "documents" | "notes">("overview");
+  const [tab, setTab] = useState<"overview" | "documents" | "notes">(
+    "overview",
+  );
   const [docs, setDocs] = useState<ProjectDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -102,7 +116,7 @@ export default function ProjectDetailModal({
       const res = await API.post(
         `/api/projects/${project.id}/notes`,
         { note_text: text },
-        { headers: { Authorization: `Bearer ${getToken()}` } }
+        { headers: { Authorization: `Bearer ${getToken()}` } },
       );
       if (res.data.success) {
         setNotes((prev) => [res.data.data, ...prev]);
@@ -155,7 +169,9 @@ export default function ProjectDetailModal({
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{project.project_name}</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {project.project_name}
+            </h2>
             <span
               className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
                 project.is_active
@@ -166,7 +182,10 @@ export default function ProjectDetailModal({
               {project.is_active ? "Active" : "Inactive"}
             </span>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+          >
             &times;
           </button>
         </div>
@@ -185,8 +204,8 @@ export default function ProjectDetailModal({
               {t === "overview"
                 ? "Overview"
                 : t === "documents"
-                ? `Documents (${docs.length})`
-                : `Notes (${notes.length})`}
+                  ? `Documents (${docs.length})`
+                  : `Notes (${notes.length})`}
             </button>
           ))}
         </div>
@@ -194,24 +213,90 @@ export default function ProjectDetailModal({
         {tab === "overview" && (
           <div className="space-y-4">
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Description</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300">{project.description || "—"}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                Description
+              </p>
+
+              {project.description ? (
+                <div
+                  className="
+                    rounded-lg bg-gray-50 p-3 text-sm leading-relaxed text-gray-700
+                    dark:bg-gray-800 dark:text-gray-300
+                    [&_p]:my-1.5
+                    [&_p:first-child]:mt-0
+                    [&_p:last-child]:mb-0
+                    [&_strong]:font-semibold
+                    [&_em]:italic
+                    [&_ul]:my-2
+                    [&_ul]:list-disc
+                    [&_ul]:pl-5
+                    [&_ol]:my-2
+                    [&_ol]:list-decimal
+                    [&_ol]:pl-5
+                    [&_li]:my-0.5
+                    [&_blockquote]:my-2
+                    [&_blockquote]:border-l-4
+                    [&_blockquote]:border-gray-300
+                    [&_blockquote]:pl-3
+                    [&_blockquote]:italic
+                    [&_blockquote]:text-gray-500
+                    dark:[&_blockquote]:border-gray-600
+                    dark:[&_blockquote]:text-gray-400
+                    [&_a]:font-medium
+                    [&_a]:text-blue-600
+                    [&_a]:underline
+                    [&_a]:underline-offset-2
+                    dark:[&_a]:text-blue-400
+                    [&_h1]:my-2
+                    [&_h1]:text-xl
+                    [&_h1]:font-bold
+                    [&_h2]:my-2
+                    [&_h2]:text-lg
+                    [&_h2]:font-semibold
+                    [&_h3]:my-2
+                    [&_h3]:text-base
+                    [&_h3]:font-semibold
+                  "
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(project.description),
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-gray-400">—</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
                 ["Created By", project.created_by_name],
-                ["Created At", project.created_at ? new Date(project.created_at).toLocaleString() : "—"],
+                [
+                  "Created At",
+                  project.created_at
+                    ? new Date(project.created_at).toLocaleString()
+                    : "—",
+                ],
                 ["Last Updated By", project.updated_by_name],
-                ["Last Updated At", project.updated_at ? new Date(project.updated_at).toLocaleString() : "—"],
+                [
+                  "Last Updated At",
+                  project.updated_at
+                    ? new Date(project.updated_at).toLocaleString()
+                    : "—",
+                ],
               ].map(([label, value]) => (
                 <div key={label as string}>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">{label}</p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">{value || "—"}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {label}
+                  </p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {value || "—"}
+                  </p>
                 </div>
               ))}
             </div>
             <div className="flex justify-end pt-2">
-              <button onClick={onEdit} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+              <button
+                onClick={onEdit}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+              >
                 Edit Project
               </button>
             </div>
@@ -223,20 +308,37 @@ export default function ProjectDetailModal({
             <DocumentUploader projectId={project.id} onUploaded={fetchDocs} />
             <div className="mt-4 space-y-2">
               {loadingDocs ? (
-                <p className="text-sm text-gray-400 text-center py-4">Loading documents…</p>
+                <p className="text-sm text-gray-400 text-center py-4">
+                  Loading documents…
+                </p>
               ) : docs.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4 italic">No documents uploaded yet.</p>
+                <p className="text-sm text-gray-400 text-center py-4 italic">
+                  No documents uploaded yet.
+                </p>
               ) : (
                 docs.map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
-                    <span className="text-lg flex-shrink-0">{fileIcon(doc.mime_type)}</span>
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+                  >
+                    <span className="text-lg flex-shrink-0">
+                      {fileIcon(doc.mime_type)}
+                    </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{doc.original_name}</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                        {doc.original_name}
+                      </p>
                       <p className="text-[11px] text-gray-400">
-                        {formatBytes(doc.file_size)} · {doc.uploaded_by_name || "Unknown"} · {new Date(doc.created_at).toLocaleDateString()}
+                        {formatBytes(doc.file_size)} ·{" "}
+                        {doc.uploaded_by_name || "Unknown"} ·{" "}
+                        {new Date(doc.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <button onClick={() => handleDownload(doc)} className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600" title="Download">
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                      title="Download"
+                    >
                       <FaDownload className="w-3.5 h-3.5" />
                     </button>
                     <button
@@ -281,9 +383,13 @@ export default function ProjectDetailModal({
 
             <div className="mt-4 space-y-2">
               {loadingNotes ? (
-                <p className="text-sm text-gray-400 text-center py-4">Loading notes…</p>
+                <p className="text-sm text-gray-400 text-center py-4">
+                  Loading notes…
+                </p>
               ) : notes.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4 italic">No notes yet.</p>
+                <p className="text-sm text-gray-400 text-center py-4 italic">
+                  No notes yet.
+                </p>
               ) : (
                 notes.map((note) => (
                   <div

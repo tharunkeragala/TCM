@@ -90,9 +90,38 @@ export default function TaskAccordionRow({
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Task code */}
-            <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-brand-100 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400 whitespace-nowrap flex-shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(task);
+              }}
+              className="
+    px-2 py-0.5
+    text-xs font-bold
+    rounded-md
+    bg-brand-100
+    text-brand-700
+    dark:bg-brand-500/10
+    dark:text-brand-400
+    whitespace-nowrap
+    flex-shrink-0
+    transition-colors
+    hover:bg-brand-200
+    hover:text-brand-800
+    dark:hover:bg-brand-500/20
+    dark:hover:text-brand-300
+    cursor-pointer
+
+    focus:outline-none
+    focus:ring-0
+    focus-visible:outline-none
+    focus-visible:ring-0
+  "
+              title="View task"
+            >
               {task.task_code}
-            </span>
+            </button>
 
             {/* Title */}
             <span className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-[180px]">
@@ -155,7 +184,6 @@ export default function TaskAccordionRow({
           className="flex items-center gap-3 flex-shrink-0 ml-1"
           onClick={(e) => e.stopPropagation()}
         >
-          
           <button
             onClick={() => onView(task)}
             className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"

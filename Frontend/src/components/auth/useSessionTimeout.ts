@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 const LAST_ACTIVITY_KEY = "lastActivity";
 
 export default function useSessionTimeout() {

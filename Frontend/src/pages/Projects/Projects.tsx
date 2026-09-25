@@ -20,6 +20,8 @@ import Alert from "../../components/ui/alert/Alert";
 import useFetchWithAuth from "../../hooks/useFetchWithAuth";
 import API from "../../services/api";
 import ProjectDetailModal from "./ProjectDetailModal";
+import RichTextEditor from "../../components/common/RichTextEditor";
+import DOMPurify from "dompurify";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Project {
@@ -91,6 +93,20 @@ const emptyStep = (): TestStep => ({
 
 const getToken = () =>
   localStorage.getItem("token") || sessionStorage.getItem("token");
+
+const richTextToPlainText = (html?: string) => {
+  if (!html) return "";
+
+  const clean = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  });
+
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = clean;
+
+  return textarea.value.replace(/\s+/g, " ").trim();
+};
 
 // ─── Reusable Toggle Switch ───────────────────────────────────────────────────
 export function Toggle({
@@ -290,9 +306,50 @@ export function TestCaseViewModal({
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                 Preconditions
               </p>
-              <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                {tc.preconditions}
-              </p>
+
+              <div
+                className="
+                  rounded-lg bg-gray-50 p-3 text-sm leading-relaxed text-gray-700
+                  dark:bg-gray-800 dark:text-gray-300
+                  [&_p]:my-1.5
+                  [&_p:first-child]:mt-0
+                  [&_p:last-child]:mb-0
+                  [&_strong]:font-semibold
+                  [&_em]:italic
+                  [&_ul]:my-2
+                  [&_ul]:list-disc
+                  [&_ul]:pl-5
+                  [&_ol]:my-2
+                  [&_ol]:list-decimal
+                  [&_ol]:pl-5
+                  [&_li]:my-0.5
+                  [&_blockquote]:my-2
+                  [&_blockquote]:border-l-4
+                  [&_blockquote]:border-gray-300
+                  [&_blockquote]:pl-3
+                  [&_blockquote]:italic
+                  [&_blockquote]:text-gray-500
+                  dark:[&_blockquote]:border-gray-600
+                  dark:[&_blockquote]:text-gray-400
+                  [&_a]:font-medium
+                  [&_a]:text-blue-600
+                  [&_a]:underline
+                  [&_a]:underline-offset-2
+                  dark:[&_a]:text-blue-400
+                  [&_h1]:my-2
+                  [&_h1]:text-xl
+                  [&_h1]:font-bold
+                  [&_h2]:my-2
+                  [&_h2]:text-lg
+                  [&_h2]:font-semibold
+                  [&_h3]:my-2
+                  [&_h3]:text-base
+                  [&_h3]:font-semibold
+                "
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(tc.preconditions),
+                }}
+              />
             </div>
           )}
           {tc.steps && tc.steps.length > 0 && (
@@ -505,14 +562,16 @@ export function TestCaseFormModal({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Preconditions
           </label>
-          <textarea
+
+          <RichTextEditor
             value={formData.preconditions}
-            onChange={(e) =>
-              setFormData({ ...formData, preconditions: e.target.value })
+            onChange={(preconditions) =>
+              setFormData({
+                ...formData,
+                preconditions,
+              })
             }
             placeholder="e.g. User must be registered"
-            rows={2}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
 
@@ -1300,8 +1359,11 @@ function ProjectAccordion({
               {project.is_active ? "Active" : "Inactive"}
             </span>
             {project.description && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 truncate hidden sm:block max-w-xs">
-                {project.description}
+              <span
+                className="text-xs text-gray-400 dark:text-gray-500 truncate hidden sm:block max-w-xs"
+                title={richTextToPlainText(project.description)}
+              >
+                {richTextToPlainText(project.description)}
               </span>
             )}
           </div>
@@ -1521,14 +1583,16 @@ function ProjectFormModal({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Description
           </label>
-          <textarea
+
+          <RichTextEditor
             value={formData.description}
-            onChange={(e) =>
-              setFormData({ ...formData, description: e.target.value })
+            onChange={(description) =>
+              setFormData({
+                ...formData,
+                description,
+              })
             }
             placeholder="Optional description..."
-            rows={3}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
         <div className="mb-6 flex items-center gap-3">

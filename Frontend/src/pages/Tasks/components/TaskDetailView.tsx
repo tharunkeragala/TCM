@@ -7,6 +7,7 @@ import { formatDateTime } from "../../../utils/dateUtils";
 import Alert from "../../../components/ui/alert/Alert";
 import StatusBadge from "./badges/StatusBadge";
 import PriorityBadge from "./badges/PriorityBadge";
+import DOMPurify from "dompurify";
 
 // ─── Shared class helpers ─────────────────────────────────────────────────────
 const INPUT_CLS =
@@ -165,9 +166,60 @@ export default function TaskDetailView({
       {task.description && (
         <div>
           <p className={SECTION_TITLE}>Description</p>
-          <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-lg leading-relaxed">
-            {task.description}
-          </p>
+
+          <div
+            className="
+              rounded-lg bg-gray-50 px-4 py-3
+              text-sm leading-relaxed text-gray-700
+              dark:bg-gray-800 dark:text-gray-300
+              [&_p]:my-1.5
+              [&_p:first-child]:mt-0
+              [&_p:last-child]:mb-0
+              [&_strong]:font-semibold
+              [&_em]:italic
+              [&_ul]:my-2
+              [&_ul]:list-disc
+              [&_ul]:pl-5
+              [&_ol]:my-2
+              [&_ol]:list-decimal
+              [&_ol]:pl-5
+              [&_li]:my-0.5
+              [&_blockquote]:my-2
+              [&_blockquote]:border-l-4
+              [&_blockquote]:border-gray-300
+              [&_blockquote]:pl-3
+              [&_blockquote]:italic
+              [&_blockquote]:text-gray-500
+              dark:[&_blockquote]:border-gray-600
+              dark:[&_blockquote]:text-gray-400
+              [&_a]:font-medium
+              [&_a]:text-brand-600
+              [&_a]:underline
+              [&_a]:underline-offset-2
+              hover:[&_a]:text-brand-700
+              dark:[&_a]:text-brand-400
+              dark:hover:[&_a]:text-brand-300
+              [&_h1]:my-2
+              [&_h1]:text-xl
+              [&_h1]:font-bold
+              [&_h2]:my-2
+              [&_h2]:text-lg
+              [&_h2]:font-semibold
+              [&_h3]:my-2
+              [&_h3]:text-base
+              [&_h3]:font-semibold
+              [&_code]:rounded
+              [&_code]:bg-gray-200
+              [&_code]:px-1
+              [&_code]:py-0.5
+              [&_code]:font-mono
+              [&_code]:text-xs
+              dark:[&_code]:bg-gray-700
+            "
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(task.description),
+            }}
+          />
         </div>
       )}
 

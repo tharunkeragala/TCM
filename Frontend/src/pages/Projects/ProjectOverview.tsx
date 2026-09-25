@@ -32,9 +32,9 @@ import useFetchWithAuth from "../../hooks/useFetchWithAuth";
 import { usePermissions } from "../../hooks/usePermissions";
 import DocumentUploader from "../../components/common/DocumentUploader";
 import DiagramOverviewCard from "../../components/projects/DiagramOverviewCard";
+import RichTextEditor from "../../components/common/RichTextEditor";
+import DOMPurify from "dompurify";
 
-// Reused as-is from Projects.tsx — same suite/test-case create/edit/delete
-// UI the Projects page already uses.
 import {
   DeleteModal as ConfirmDeleteModal,
   SuiteFormModal,
@@ -42,7 +42,6 @@ import {
   TestCaseViewModal,
 } from "./Projects";
 
-// Reused as-is from the Tasks feature.
 import CreateEditModal from "../Tasks/components/modals/CreateEditModal";
 import TaskDeleteModal from "../Tasks/components/modals/DeleteModal";
 import TaskViewModal from "../Tasks/components/modals/ViewModal";
@@ -55,11 +54,8 @@ import type {
   TestSuite,
 } from "../Tasks/types";
 
-// Reused as-is from the Sprints feature — requires `export` added to both
-// in Sprints.tsx (see note).
 import { SprintFormModal, DeleteSprintModal } from "../TestManagement/Sprints";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
 interface Project {
   id: number;
   project_name: string;
@@ -164,10 +160,6 @@ const PRIORITY_COLORS: Record<string, string> = {
   Critical: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
-// Single semantic scheme reused across every status badge on this page —
-// gray = not started / retired, blue = in progress, amber = paused / needs
-// attention, green = done / good, red = cancelled / stopped. Keeps Suites,
-// Test Cases, Sprints and Tasks reading the same way at a glance.
 const STATUS_COLORS: Record<string, string> = {
   Draft: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   Ready: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
@@ -184,20 +176,17 @@ const STATUS_COLORS: Record<string, string> = {
   Active: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
 };
 
-// Active/Inactive toggle badges (Suites, Project) — kept separate since
-// these are binary on/off states, not workflow stages.
 const ACTIVE_COLORS: Record<string, string> = {
   true: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   false: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
-// Segment colors for the dashboard breakdown bars — flat bg classes that
-// mirror STATUS_COLORS exactly so the legend dots match the badges below.
 const CASE_SEGMENT_COLORS: Record<string, string> = {
   Draft: "bg-amber-400",
   Ready: "bg-green-500",
   Deprecated: "bg-gray-400",
 };
+
 const TASK_SEGMENT_COLORS: Record<string, string> = {
   Pending: "bg-gray-400",
   "In Progress": "bg-blue-500",
@@ -205,11 +194,59 @@ const TASK_SEGMENT_COLORS: Record<string, string> = {
   "On Hold": "bg-amber-400",
   Cancelled: "bg-red-500",
 };
+
 const SPRINT_SEGMENT_COLORS: Record<string, string> = {
   Planned: "bg-gray-400",
   Active: "bg-blue-500",
   Completed: "bg-green-500",
 };
+
+const RICH_TEXT_VIEW_CLS = `
+  text-sm leading-relaxed text-gray-600 dark:text-gray-300
+  [&_p]:my-1.5
+  [&_p:first-child]:mt-0
+  [&_p:last-child]:mb-0
+  [&_strong]:font-semibold
+  [&_em]:italic
+  [&_ul]:my-2
+  [&_ul]:list-disc
+  [&_ul]:pl-5
+  [&_ol]:my-2
+  [&_ol]:list-decimal
+  [&_ol]:pl-5
+  [&_li]:my-0.5
+  [&_blockquote]:my-2
+  [&_blockquote]:border-l-4
+  [&_blockquote]:border-gray-300
+  [&_blockquote]:pl-3
+  [&_blockquote]:italic
+  [&_blockquote]:text-gray-500
+  dark:[&_blockquote]:border-gray-600
+  dark:[&_blockquote]:text-gray-400
+  [&_a]:font-medium
+  [&_a]:text-blue-600
+  [&_a]:underline
+  [&_a]:underline-offset-2
+  hover:[&_a]:text-blue-700
+  dark:[&_a]:text-blue-400
+  dark:hover:[&_a]:text-blue-300
+  [&_h1]:my-2
+  [&_h1]:text-xl
+  [&_h1]:font-bold
+  [&_h2]:my-2
+  [&_h2]:text-lg
+  [&_h2]:font-semibold
+  [&_h3]:my-2
+  [&_h3]:text-base
+  [&_h3]:font-semibold
+  [&_code]:rounded
+  [&_code]:bg-gray-200
+  [&_code]:px-1
+  [&_code]:py-0.5
+  [&_code]:font-mono
+  [&_code]:text-xs
+  dark:[&_code]:bg-gray-700
+`;
 
 function formatBytes(bytes: number) {
   if (!bytes) return "0 B";
@@ -249,7 +286,6 @@ const emptyTaskForm = (projectId: string): TaskFormData =>
     tags: "",
   }) as TaskFormData;
 
-// ─── Stat tile ────────────────────────────────────────────────────────────────
 function StatTile({
   label,
   value,
@@ -274,7 +310,6 @@ function StatTile({
   );
 }
 
-// ─── Status breakdown card (segmented bar + legend) ────────────────────────
 function StatusBreakdownCard({
   title,
   icon,
@@ -287,6 +322,7 @@ function StatusBreakdownCard({
   colors: Record<string, string>;
 }) {
   const total = segments.reduce((sum, s) => sum + s.count, 0);
+
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
       <div className="flex items-center gap-2 mb-3">
@@ -298,6 +334,7 @@ function StatusBreakdownCard({
           {total} total
         </span>
       </div>
+
       <div className="flex h-2 w-full rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
         {total === 0 ? (
           <div className="w-full h-full" />
@@ -313,6 +350,7 @@ function StatusBreakdownCard({
             ))
         )}
       </div>
+
       <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
         {segments.map((s) => (
           <span
@@ -320,7 +358,9 @@ function StatusBreakdownCard({
             className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"
           >
             <span
-              className={`w-2 h-2 rounded-full ${colors[s.label] || "bg-gray-300"}`}
+              className={`w-2 h-2 rounded-full ${
+                colors[s.label] || "bg-gray-300"
+              }`}
             />
             {s.label}
             <span className="font-medium text-gray-700 dark:text-gray-300">
@@ -333,7 +373,6 @@ function StatusBreakdownCard({
   );
 }
 
-// ─── Section shell (used for every list block in the main column) ─────────
 function Section({
   title,
   icon,
@@ -357,6 +396,7 @@ function Section({
         </h2>
         {action}
       </div>
+
       {isEmpty ? (
         <p className="text-sm text-gray-400 italic py-6 text-center">
           {emptyText}
@@ -368,10 +408,6 @@ function Section({
   );
 }
 
-// ─── Scroll fade wrapper ────────────────────────────────────────────────────
-// Uses the application-wide scrollbar rules from global CSS. The wrapper
-// only controls scrolling and edge fades; it does not override scrollbar
-// colors, widths, tracks, or hover styles locally.
 function ScrollFade({
   className = "",
   children,
@@ -396,6 +432,7 @@ function ScrollFade({
   useEffect(() => {
     const scrollEl = scrollRef.current;
     const contentEl = contentRef.current;
+
     if (!scrollEl || !contentEl) return;
 
     updateFade();
@@ -450,7 +487,6 @@ function ScrollFade({
   );
 }
 
-// ─── Main Component ─────────────────────────────────────────────────────────
 export default function ProjectOverview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -459,27 +495,29 @@ export default function ProjectOverview() {
   const canProjects = (
     a: "can_view" | "can_create" | "can_edit" | "can_delete",
   ) => can("/projects", a);
+
   const canSuites = (
     a: "can_view" | "can_create" | "can_edit" | "can_delete",
   ) => can("/test-suites", a);
+
   const canCases = (a: "can_view" | "can_create" | "can_edit" | "can_delete") =>
     can("/test-cases", a);
+
   const canTasks = (a: "can_view" | "can_create" | "can_edit" | "can_delete") =>
     can("/tasks", a);
+
   const canSprints = (
     a: "can_view" | "can_create" | "can_edit" | "can_delete",
   ) => can("/sprints", a);
+
   const canFunctions = (
     a: "can_view" | "can_create" | "can_edit" | "can_delete",
   ) => can("/project-functions", a);
 
-  // Only the four list sections are tabbed now — stats, breakdown bars,
-  // assignees, documents, and notes stay always-visible as they were.
   const [mainTab, setMainTab] = useState<
     "suites" | "cases" | "sprints" | "tasks" | "functions" | "diagram"
   >("tasks");
 
-  // ── Overview data ──────────────────────────────────────────────────────────
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -508,11 +546,15 @@ export default function ProjectOverview() {
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     setError("");
+
     try {
       const res = await API.get(`/api/projects/${id}/overview`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (res.data.success) setOverview(res.data.data);
+
+      if (res.data.success) {
+        setOverview(res.data.data);
+      }
     } catch (err: any) {
       setError(
         err.response?.data?.message || "Failed to load project overview.",
@@ -526,13 +568,14 @@ export default function ProjectOverview() {
     fetchOverview();
   }, [fetchOverview]);
 
-  // ── Test cases (global fetch, filtered to this project's suites) ───────────
   const { data: allTestCases, refetch: refetchCases } =
     useFetchWithAuth<TestCase[]>("/api/test-cases");
+
   const projectSuiteIds = useMemo(
     () => new Set((overview?.suites ?? []).map((s) => s.id)),
     [overview],
   );
+
   const projectTestCases = useMemo(
     () => (allTestCases ?? []).filter((tc) => projectSuiteIds.has(tc.suite_id)),
     [allTestCases, projectSuiteIds],
@@ -544,10 +587,8 @@ export default function ProjectOverview() {
     );
   }, [overview]);
 
-  // ── Users (for task assignees) ─────────────────────────────────────────────
   const { data: users } = useFetchWithAuth<User[]>("/api/users");
 
-  // ── Project functions ──────────────────────────────────────────────────────
   const [projectFunctions, setProjectFunctions] = useState<ProjectFunction[]>(
     [],
   );
@@ -560,9 +601,11 @@ export default function ProjectOverview() {
   const [functionCategory, setFunctionCategory] = useState("");
   const [functionSubmitting, setFunctionSubmitting] = useState(false);
   const [functionError, setFunctionError] = useState("");
+
   const [deleteFunction, setDeleteFunction] = useState<ProjectFunction | null>(
     null,
   );
+
   const [deletingFunctionId, setDeletingFunctionId] = useState<number | null>(
     null,
   );
@@ -704,9 +747,7 @@ export default function ProjectOverview() {
       });
 
       setDeleteFunction(null);
-
       showToast("Project function deleted successfully.", "success");
-
       await fetchProjectFunctions();
     } catch (err: any) {
       showToast(
@@ -722,18 +763,21 @@ export default function ProjectOverview() {
     }
   };
 
-  // ── Documents (loaded eagerly now — right-rail panel, not a tab) ───────────
   const [docs, setDocs] = useState<ProjectDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
 
   const fetchDocs = useCallback(async () => {
     setLoadingDocs(true);
+
     try {
       const res = await API.get(`/api/projects/${id}/documents`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (res.data.success) setDocs(res.data.data);
+
+      if (res.data.success) {
+        setDocs(res.data.data);
+      }
     } finally {
       setLoadingDocs(false);
     }
@@ -748,20 +792,25 @@ export default function ProjectOverview() {
       headers: { Authorization: `Bearer ${getToken()}` },
       responseType: "blob",
     });
+
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const link = document.createElement("a");
+
     link.href = url;
     link.download = doc.original_name;
     link.click();
+
     window.URL.revokeObjectURL(url);
   };
 
   const handleDeleteDoc = async (doc: ProjectDoc) => {
     setDeletingDocId(doc.id);
+
     try {
       await API.delete(`/api/projects/documents/${doc.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       setDocs((prev) => prev.filter((d) => d.id !== doc.id));
       fetchOverview();
     } finally {
@@ -769,7 +818,6 @@ export default function ProjectOverview() {
     }
   };
 
-  // ── Notes (loaded eagerly — right-rail panel, same pattern as Documents) ───
   const [notes, setNotes] = useState<ProjectNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [newNote, setNewNote] = useState("");
@@ -789,7 +837,6 @@ export default function ProjectOverview() {
       }
     } catch (err: any) {
       console.error("Failed to load project notes:", err);
-
       setNotes([]);
 
       showToast(
@@ -829,7 +876,6 @@ export default function ProjectOverview() {
       if (res.data.success) {
         setNotes((prev) => [res.data.data, ...prev]);
         setNewNote("");
-
         showToast("Project note added successfully.", "success");
       }
     } catch (err: any) {
@@ -877,39 +923,50 @@ export default function ProjectOverview() {
     }
   };
 
-  // ── Suite modals ────────────────────────────────────────────────────────────
   const [addSuiteModal, setAddSuiteModal] = useState(false);
   const [editSuite, setEditSuite] = useState<Suite | null>(null);
   const [deleteSuite, setDeleteSuite] = useState<Suite | null>(null);
+
   const [deleteSuiteAlert, setDeleteSuiteAlert] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
   const [deletingSuiteInProgress, setDeletingSuiteInProgress] = useState(false);
   const [suiteCaseCount, setSuiteCaseCount] = useState(0);
 
   const openDeleteSuite = async (suite: Suite) => {
     setDeleteSuiteAlert(null);
+
     try {
       const res = await API.get(`/api/test-suites/${suite.id}/case-count`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       setSuiteCaseCount(res.data.success ? (res.data.count ?? 0) : 0);
     } catch {
       setSuiteCaseCount(0);
     }
+
     setDeleteSuite(suite);
   };
 
   const confirmDeleteSuite = async () => {
     if (!deleteSuite) return;
+
     setDeletingSuiteInProgress(true);
     setDeleteSuiteAlert(null);
+
     try {
       await API.delete(`/api/test-suites/delete/${deleteSuite.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      setDeleteSuiteAlert({ type: "success", message: "Suite deleted." });
+
+      setDeleteSuiteAlert({
+        type: "success",
+        message: "Suite deleted.",
+      });
+
       setTimeout(() => {
         setDeleteSuite(null);
         fetchOverview();
@@ -924,15 +981,16 @@ export default function ProjectOverview() {
     }
   };
 
-  // ── Test case modals ────────────────────────────────────────────────────────
   const [addCaseSuiteId, setAddCaseSuiteId] = useState<number | null>(null);
-  const [addCaseModal, setAddCaseModal] = useState(false); // top-level "Add Test Case" (no suite preselected)
+  const [addCaseModal, setAddCaseModal] = useState(false);
   const [editCase, setEditCase] = useState<TestCase | null>(null);
   const [deleteCase, setDeleteCase] = useState<TestCase | null>(null);
+
   const [deleteCaseAlert, setDeleteCaseAlert] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
   const [deletingCaseInProgress, setDeletingCaseInProgress] = useState(false);
   const [viewingCase, setViewingCase] = useState<TestCase | null>(null);
 
@@ -941,6 +999,7 @@ export default function ProjectOverview() {
       const res = await API.get(`/api/test-cases/${tc.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       setViewingCase(res.data.success ? res.data.data : tc);
     } catch {
       setViewingCase(tc);
@@ -952,6 +1011,7 @@ export default function ProjectOverview() {
       const res = await API.get(`/api/test-cases/${tc.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       setEditCase(res.data.success ? res.data.data : tc);
     } catch {
       setEditCase(tc);
@@ -960,13 +1020,20 @@ export default function ProjectOverview() {
 
   const confirmDeleteCase = async () => {
     if (!deleteCase) return;
+
     setDeletingCaseInProgress(true);
     setDeleteCaseAlert(null);
+
     try {
       await API.delete(`/api/test-cases/delete/${deleteCase.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      setDeleteCaseAlert({ type: "success", message: "Test case deleted." });
+
+      setDeleteCaseAlert({
+        type: "success",
+        message: "Test case deleted.",
+      });
+
       setTimeout(() => {
         setDeleteCase(null);
         refetchCases?.();
@@ -982,25 +1049,27 @@ export default function ProjectOverview() {
     }
   };
 
-  // ── Sprint modals ───────────────────────────────────────────────────────────
   const [addSprintModal, setAddSprintModal] = useState(false);
   const [editSprint, setEditSprint] = useState<Sprint | null>(null);
   const [deleteSprint, setDeleteSprint] = useState<Sprint | null>(null);
 
-  // ── Task modals (reusing the existing Tasks CreateEditModal/DeleteModal/ViewModal) ─
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
   const [taskFormData, setTaskFormData] = useState<TaskFormData>(
     emptyTaskForm(id!),
   );
+
   const [taskAssignees, setTaskAssignees] = useState<number[]>([]);
   const [taskFormAlert, setTaskFormAlert] = useState<AlertState | null>(null);
   const [taskSubmitting, setTaskSubmitting] = useState(false);
 
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+
   const [deleteTaskAlert, setDeleteTaskAlert] = useState<AlertState | null>(
     null,
   );
+
   const [deletingTaskInProgress, setDeletingTaskInProgress] = useState(false);
 
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
@@ -1011,6 +1080,7 @@ export default function ProjectOverview() {
     try {
       const stored =
         localStorage.getItem("user") || sessionStorage.getItem("user");
+
       return stored ? JSON.parse(stored).id : 0;
     } catch {
       return 0;
@@ -1027,6 +1097,7 @@ export default function ProjectOverview() {
 
   const openEditTask = (task: Task) => {
     setEditingTask(task);
+
     setTaskFormData({
       title: task.title,
       description: (task as any).description || "",
@@ -1037,35 +1108,50 @@ export default function ProjectOverview() {
       suite_id: String((task as any).suite_id ?? ""),
       tags: (task as any).tags || "",
     } as TaskFormData);
-    setTaskAssignees([]); // populated below once full detail loads
+
+    setTaskAssignees([]);
     setTaskFormAlert(null);
+
     (async () => {
       try {
         const res = await API.get(`/api/tasks/${task.id}`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
+
         if (res.data.success) {
           const assigneeIds = (res.data.data.assignments || [])
             .filter((a: any) => a.role === "Assignee")
             .map((a: any) => a.user_id);
+
           setTaskAssignees(assigneeIds);
         }
       } catch {
-        /* non-fatal — modal still usable without prefilled assignees */
+        /* non-fatal */
       }
     })();
+
     setShowTaskModal(true);
   };
 
   const handleSaveTask = async () => {
     if (!taskFormData.title?.trim()) {
-      setTaskFormAlert({ type: "error", message: "Title is required." });
+      setTaskFormAlert({
+        type: "error",
+        message: "Title is required.",
+      });
+
       return;
     }
+
     setTaskSubmitting(true);
     setTaskFormAlert(null);
+
     try {
-      const payload = { ...taskFormData, assignees: taskAssignees };
+      const payload = {
+        ...taskFormData,
+        assignees: taskAssignees,
+      };
+
       const res = editingTask
         ? await API.put(`/api/tasks/update/${editingTask.id}`, payload, {
             headers: { Authorization: `Bearer ${getToken()}` },
@@ -1073,11 +1159,13 @@ export default function ProjectOverview() {
         : await API.post("/api/tasks/create", payload, {
             headers: { Authorization: `Bearer ${getToken()}` },
           });
+
       if (res.data.success) {
         setTaskFormAlert({
           type: "success",
           message: editingTask ? "Task updated!" : "Task created!",
         });
+
         setTimeout(() => {
           setShowTaskModal(false);
           fetchOverview();
@@ -1095,13 +1183,20 @@ export default function ProjectOverview() {
 
   const confirmDeleteTask = async () => {
     if (!deletingTask) return;
+
     setDeletingTaskInProgress(true);
     setDeleteTaskAlert(null);
+
     try {
       await API.delete(`/api/tasks/delete/${deletingTask.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      setDeleteTaskAlert({ type: "success", message: "Task deleted." });
+
+      setDeleteTaskAlert({
+        type: "success",
+        message: "Task deleted.",
+      });
+
       setTimeout(() => {
         setDeletingTask(null);
         fetchOverview();
@@ -1133,7 +1228,6 @@ export default function ProjectOverview() {
     }
   };
 
-  // ── Close active modal with ESC key ─────────────────────────────────────────
   useEffect(() => {
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -1233,7 +1327,6 @@ export default function ProjectOverview() {
     editSuite,
   ]);
 
-  // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="py-16 text-center text-gray-500 dark:text-gray-400">
@@ -1256,7 +1349,6 @@ export default function ProjectOverview() {
 
   const { project, suites, tasks, sprints, assignees, stats } = overview;
 
-  // ── Status breakdown datasets ───────────────────────────────────────────────
   const caseStatusSegments = ["Draft", "Ready", "Deprecated"].map((label) => ({
     label,
     count: projectTestCases.filter((tc) => tc.status === label).length,
@@ -1269,6 +1361,7 @@ export default function ProjectOverview() {
     "On Hold",
     "Cancelled",
   ];
+
   const taskStatusSegments = taskStatusLabels.map((label) => ({
     label,
     count: (tasks as any[]).filter((t) => t.status === label).length,
@@ -1310,13 +1403,13 @@ export default function ProjectOverview() {
       <PageMeta title={project.project_name} description="Project overview" />
       <PageBreadcrumb pageTitle="Project Overview" />
 
-      {/* Header */}
       <div className="mt-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
         <button
           onClick={() => navigate("/projects")}
           className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 mb-3"
         >
-          <FaArrowLeft className="w-3 h-3" /> Back to Projects
+          <FaArrowLeft className="w-3 h-3" />
+          Back to Projects
         </button>
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] gap-4">
@@ -1327,8 +1420,11 @@ export default function ProjectOverview() {
                   <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
                     {project.project_name}
                   </h1>
+
                   <span
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-full ${ACTIVE_COLORS[String(project.is_active)]}`}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                      ACTIVE_COLORS[String(project.is_active)]
+                    }`}
                   >
                     {project.is_active ? "Active" : "Inactive"}
                   </span>
@@ -1340,10 +1436,18 @@ export default function ProjectOverview() {
                   </p>
 
                   <ScrollFade className="mt-1 max-h-24 overflow-y-auto pr-2 py-1">
-                    <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                      {project.description ||
-                        "No description has been added for this project."}
-                    </p>
+                    {project.description ? (
+                      <div
+                        className={RICH_TEXT_VIEW_CLS}
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(project.description),
+                        }}
+                      />
+                    ) : (
+                      <p className="text-sm leading-6 text-gray-400 italic">
+                        No description has been added for this project.
+                      </p>
+                    )}
                   </ScrollFade>
                 </div>
 
@@ -1354,6 +1458,7 @@ export default function ProjectOverview() {
                       ? ` · ${new Date(project.created_at).toLocaleDateString()}`
                       : ""}
                   </span>
+
                   {project.updated_at && (
                     <span>
                       Updated by {project.updated_by_name || "—"} ·{" "}
@@ -1369,16 +1474,18 @@ export default function ProjectOverview() {
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-xl transition-colors flex-shrink-0"
                   title="Edit from the Projects list"
                 >
-                  <FaEdit className="w-3.5 h-3.5" /> Edit
+                  <FaEdit className="w-3.5 h-3.5" />
+                  Edit
                 </button>
               )}
             </div>
 
             <div className="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
-                <FaUsers className="w-3.5 h-3.5" /> Project Assignees (
-                {assignees.length})
+                <FaUsers className="w-3.5 h-3.5" />
+                Project Assignees ({assignees.length})
               </p>
+
               {assignees.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">
                   No assignees are linked to project tasks yet.
@@ -1393,6 +1500,7 @@ export default function ProjectOverview() {
                       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold">
                         {a.username.charAt(0).toUpperCase()}
                       </div>
+
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
                         {a.username}
                       </span>
@@ -1406,7 +1514,8 @@ export default function ProjectOverview() {
           <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
             <div className="flex items-center justify-between mb-3">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                <FaStickyNote className="w-3.5 h-3.5" /> Notes
+                <FaStickyNote className="w-3.5 h-3.5" />
+                Notes
               </p>
 
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -1414,7 +1523,6 @@ export default function ProjectOverview() {
               </span>
             </div>
 
-            {/* Add Note */}
             <div className="flex gap-2">
               <div className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 overflow-hidden">
                 <textarea
@@ -1441,7 +1549,6 @@ export default function ProjectOverview() {
               </button>
             </div>
 
-            {/* Scrollable Notes */}
             <ScrollFade className="mt-4 max-h-60 overflow-y-auto pr-1 py-1">
               {loadingNotes ? (
                 <p className="text-sm text-gray-400 text-center py-4">
@@ -1487,7 +1594,6 @@ export default function ProjectOverview() {
           </div>
         </div>
 
-        {/* Stat tiles */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mt-5">
           <StatTile
             label="Tasks"
@@ -1520,7 +1626,6 @@ export default function ProjectOverview() {
           />
         </div>
 
-        {/* Status breakdown row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
           <StatusBreakdownCard
             title="Test Case Status"
@@ -1528,12 +1633,14 @@ export default function ProjectOverview() {
             segments={caseStatusSegments}
             colors={CASE_SEGMENT_COLORS}
           />
+
           <StatusBreakdownCard
             title="Sprint Status"
             icon={<FaBolt className="w-3.5 h-3.5" />}
             segments={sprintStatusSegments}
             colors={SPRINT_SEGMENT_COLORS}
           />
+
           <StatusBreakdownCard
             title="Task Status"
             icon={<FaTasks className="w-3.5 h-3.5" />}
@@ -1543,11 +1650,8 @@ export default function ProjectOverview() {
         </div>
       </div>
 
-      {/* Body — two column, everything on one page */}
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Main column */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Tab bar */}
           <div className="flex gap-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pt-2 overflow-x-auto">
             {[
               {
@@ -1596,7 +1700,6 @@ export default function ProjectOverview() {
             ))}
           </div>
 
-          {/* ==================== Suites ==================== */}
           {mainTab === "suites" && (
             <Section
               title={`Test Suites (${stats.suite_count})`}
@@ -1645,7 +1748,6 @@ export default function ProjectOverview() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Add Test Case */}
                         {canCases("can_create") && (
                           <button
                             type="button"
@@ -1657,7 +1759,6 @@ export default function ProjectOverview() {
                           </button>
                         )}
 
-                        {/* Edit */}
                         {canSuites("can_edit") && (
                           <button
                             type="button"
@@ -1669,7 +1770,6 @@ export default function ProjectOverview() {
                           </button>
                         )}
 
-                        {/* Delete */}
                         {canSuites("can_delete") && (
                           <button
                             type="button"
@@ -1688,7 +1788,6 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* ==================== Test Cases ==================== */}
           {mainTab === "cases" && (
             <Section
               title={`Test Cases (${stats.test_case_count})`}
@@ -1735,7 +1834,6 @@ export default function ProjectOverview() {
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <FaClipboardList className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
 
-                          {/* Title + Suite - Same Line */}
                           <div className="min-w-0 flex-1 flex items-center gap-2">
                             <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                               {tc.title}
@@ -1750,7 +1848,6 @@ export default function ProjectOverview() {
                             </div>
                           </div>
 
-                          {/* Priority */}
                           <span
                             className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
                               PRIORITY_COLORS[tc.priority]
@@ -1759,7 +1856,6 @@ export default function ProjectOverview() {
                             {tc.priority}
                           </span>
 
-                          {/* Status */}
                           <span
                             className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
                               STATUS_COLORS[tc.status]
@@ -1774,7 +1870,6 @@ export default function ProjectOverview() {
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                         >
-                          {/* Edit */}
                           {canCases("can_edit") && (
                             <button
                               type="button"
@@ -1789,7 +1884,6 @@ export default function ProjectOverview() {
                             </button>
                           )}
 
-                          {/* Delete */}
                           {canCases("can_delete") && (
                             <button
                               type="button"
@@ -1812,7 +1906,6 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* ==================== Sprints ==================== */}
           {mainTab === "sprints" && (
             <Section
               title={`Sprints (${stats.sprint_count})`}
@@ -1869,7 +1962,6 @@ export default function ProjectOverview() {
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                         >
-                          {/* Edit */}
                           {canSprints("can_edit") && (
                             <button
                               type="button"
@@ -1881,7 +1973,6 @@ export default function ProjectOverview() {
                             </button>
                           )}
 
-                          {/* Delete */}
                           {canSprints("can_delete") && (
                             <button
                               type="button"
@@ -1901,7 +1992,6 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* ==================== Tasks ==================== */}
           {mainTab === "tasks" && (
             <Section
               title={`Tasks (${stats.task_count})`}
@@ -1939,17 +2029,14 @@ export default function ProjectOverview() {
                       className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/10 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        {/* Task Code */}
                         <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-mono text-[10px] flex-shrink-0">
                           {task.task_code}
                         </span>
 
-                        {/* Task Title */}
                         <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                           {task.title}
                         </span>
 
-                        {/* Priority */}
                         <span
                           className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
                             PRIORITY_COLORS[task.priority]
@@ -1958,7 +2045,6 @@ export default function ProjectOverview() {
                           {task.priority}
                         </span>
 
-                        {/* Status */}
                         <span
                           className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
                             STATUS_COLORS[task.status] || ""
@@ -1967,7 +2053,6 @@ export default function ProjectOverview() {
                           {task.status}
                         </span>
 
-                        {/* Assignees */}
                         {task.assignees && (
                           <span className="text-xs text-gray-400 flex-shrink-0 truncate max-w-[160px]">
                             {task.assignees}
@@ -1980,7 +2065,6 @@ export default function ProjectOverview() {
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                       >
-                        {/* Edit */}
                         {canTasks("can_edit") && (
                           <button
                             type="button"
@@ -1995,7 +2079,6 @@ export default function ProjectOverview() {
                           </button>
                         )}
 
-                        {/* Delete */}
                         {canTasks("can_delete") && (
                           <button
                             type="button"
@@ -2017,7 +2100,6 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* ==================== Project Functions ==================== */}
           {mainTab === "functions" && (
             <Section
               title={`Project Functions (${projectFunctions.length})`}
@@ -2073,9 +2155,29 @@ export default function ProjectOverview() {
                             </div>
 
                             {projectFunction.description && (
-                              <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
-                                {projectFunction.description}
-                              </p>
+                              <div
+                                className="
+                                  mt-0.5 max-h-10 overflow-hidden
+                                  text-xs leading-5 text-gray-400 dark:text-gray-500
+                                  [&_p]:m-0
+                                  [&_strong]:font-semibold
+                                  [&_em]:italic
+                                  [&_ul]:my-0
+                                  [&_ul]:list-disc
+                                  [&_ul]:pl-4
+                                  [&_ol]:my-0
+                                  [&_ol]:list-decimal
+                                  [&_ol]:pl-4
+                                  [&_li]:my-0
+                                  [&_a]:text-blue-500
+                                  [&_a]:underline
+                                "
+                                dangerouslySetInnerHTML={{
+                                  __html: DOMPurify.sanitize(
+                                    projectFunction.description,
+                                  ),
+                                }}
+                              />
                             )}
                           </div>
                         </div>
@@ -2116,7 +2218,6 @@ export default function ProjectOverview() {
             </Section>
           )}
 
-          {/* ==================== Diagram ==================== */}
           {mainTab === "diagram" && (
             <Section
               title="Flow Diagram"
@@ -2132,17 +2233,13 @@ export default function ProjectOverview() {
           )}
         </div>
 
-        {/* Right rail */}
         <div className="space-y-4">
-          {/* <DiagramOverviewCard projectId={String(project.id)} projectName={project.project_name} /> */}
-          {/* Documents */}
           <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
-              <FaFileAlt className="w-3.5 h-3.5" /> Documents (
-              {stats.document_count})
+              <FaFileAlt className="w-3.5 h-3.5" />
+              Documents ({stats.document_count})
             </p>
 
-            {/* Scrollable document list */}
             <ScrollFade className="mt-4 max-h-60 overflow-y-auto pr-1 py-1">
               {loadingDocs ? (
                 <p className="text-sm text-gray-400 text-center py-4">
@@ -2199,7 +2296,6 @@ export default function ProjectOverview() {
               )}
             </ScrollFade>
 
-            {/* Upload stays outside scroll */}
             {canProjects("can_edit") && (
               <div className="mt-3">
                 <DocumentUploader
@@ -2215,7 +2311,6 @@ export default function ProjectOverview() {
         </div>
       </div>
 
-      {/* ── Project function delete confirmation ── */}
       {deleteFunction && (
         <ConfirmDeleteModal
           title="Delete Project Function"
@@ -2238,7 +2333,6 @@ export default function ProjectOverview() {
         />
       )}
 
-      {/* ── Project function modal ── */}
       {functionModalOpen && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
@@ -2306,13 +2400,11 @@ export default function ProjectOverview() {
                   Description
                 </label>
 
-                <textarea
+                <RichTextEditor
                   value={functionDescription}
-                  onChange={(e) => setFunctionDescription(e.target.value)}
-                  disabled={functionSubmitting}
-                  rows={4}
+                  onChange={setFunctionDescription}
                   placeholder="Describe this project function or module."
-                  className="w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  disabled={functionSubmitting}
                 />
               </div>
             </div>
@@ -2344,7 +2436,6 @@ export default function ProjectOverview() {
         </div>
       )}
 
-      {/* ── Suite modals ── */}
       {(addSuiteModal || editSuite) && (
         <SuiteFormModal
           editing={editSuite}
@@ -2375,7 +2466,6 @@ export default function ProjectOverview() {
         />
       )}
 
-      {/* ── Test case modals ── */}
       {(addCaseSuiteId !== null || addCaseModal || editCase) && (
         <TestCaseFormModal
           editing={editCase}
@@ -2415,7 +2505,6 @@ export default function ProjectOverview() {
         />
       )}
 
-      {/* ── Sprint modals (reused from the Sprints feature) ── */}
       {(addSprintModal || editSprint) && (
         <SprintFormModal
           editing={editSprint}
@@ -2437,7 +2526,6 @@ export default function ProjectOverview() {
         />
       )}
 
-      {/* ── Task modals (reused from the Tasks feature) ── */}
       <CreateEditModal
         showModal={showTaskModal}
         editingTask={editingTask}

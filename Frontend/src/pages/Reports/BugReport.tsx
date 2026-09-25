@@ -15,7 +15,7 @@ import { bugReportAPI } from "../../services/bugReportAPI";
 import TablePagination from "../../components/common/TablePagination";
 
 interface BugReportSummaryRow {
-  sprint_id: number;
+  sprint_id?: number | null;
   sprint_name?: string | null;
   project_id: number;
   project_name?: string | null;
@@ -37,7 +37,7 @@ interface BugWiseReportRow {
   title: string;
   project_id: number;
   project_name?: string | null;
-  sprint_id: number;
+  sprint_id?: number | null;
   sprint_name?: string | null;
   severity: string;
   bug_status: string;
@@ -240,7 +240,6 @@ export default function BugReport() {
         row.function_name,
         row.assigned_to_name,
         row.severity,
-        row.bug_status,
         row.latest_status,
       ]
         .filter(Boolean)
@@ -308,7 +307,9 @@ export default function BugReport() {
       const rows = filteredSummary.map((row, index) => ({
         "#": index + 1,
         Project: row.project_name ?? `Project ${row.project_id}`,
-        Sprint: row.sprint_name ?? `Sprint ${row.sprint_id}`,
+        Sprint:
+          row.sprint_name ||
+          (row.sprint_id ? `Sprint ${row.sprint_id}` : "Unassigned Sprint"),
         Bugs: numberValue(row.bug_count),
         Pass: numberValue(row.pass_count),
         Fail: numberValue(row.fail_count),
@@ -338,17 +339,18 @@ export default function BugReport() {
         "Bug ID": row.report_id,
         Title: row.title,
         Project: row.project_name ?? `Project ${row.project_id}`,
-        Sprint: row.sprint_name ?? `Sprint ${row.sprint_id}`,
+        Sprint:
+          row.sprint_name ||
+          (row.sprint_id ? `Sprint ${row.sprint_id}` : "-"),
         Function: row.function_name ?? "-",
         Severity: row.severity,
-        "Bug Status": row.bug_status,
+        "Bug Status": row.latest_status ?? "-",
         Priority: row.priority,
         "Assigned To": row.assigned_to_name ?? "Unassigned",
         Pass: numberValue(row.pass_count),
         Fail: numberValue(row.fail_count),
         Blocked: numberValue(row.blocked_count),
         "No Test": numberValue(row.no_test_count),
-        "Latest Cycle Status": row.latest_status ?? "-",
         "Latest Status Date": formatDate(row.latest_status_date),
       }));
 
@@ -369,7 +371,6 @@ export default function BugReport() {
         { wch: 10 },
         { wch: 10 },
         { wch: 10 },
-        { wch: 18 },
         { wch: 20 },
       ];
 
@@ -701,7 +702,7 @@ export default function BugReport() {
                 ) : (
                   paginatedSummary.map((row) => (
                     <tr
-                      key={`${row.project_id}-${row.sprint_id}`}
+                      key={`${row.project_id}-${row.sprint_id ?? "unassigned"}`}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700 dark:text-gray-200">
@@ -709,7 +710,10 @@ export default function BugReport() {
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {row.sprint_name ?? `Sprint ${row.sprint_id}`}
+                        {row.sprint_name ||
+                          (row.sprint_id
+                            ? `Sprint ${row.sprint_id}`
+                            : "Unassigned Sprint")}
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold text-gray-700 dark:text-gray-200">
@@ -768,7 +772,7 @@ export default function BugReport() {
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-x-auto">
             <table
               className="w-full text-sm text-left border-collapse bg-white dark:bg-gray-900"
-              style={{ minWidth: "1450px" }}
+              style={{ minWidth: "1350px" }}
             >
               <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs tracking-wider sticky top-0 z-10">
                 <tr>
@@ -784,7 +788,6 @@ export default function BugReport() {
                   <th className="px-4 py-3">Fail</th>
                   <th className="px-4 py-3">Blocked</th>
                   <th className="px-4 py-3">No Test</th>
-                  <th className="px-4 py-3">Latest Cycle</th>
                   <th className="px-4 py-3">Latest Update</th>
                 </tr>
               </thead>
@@ -793,7 +796,7 @@ export default function BugReport() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={14}
+                      colSpan={13}
                       className="px-4 py-10 text-center text-gray-400"
                     >
                       Loading report...
@@ -802,7 +805,7 @@ export default function BugReport() {
                 ) : filteredBugWise.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={14}
+                      colSpan={13}
                       className="px-4 py-10 text-center text-gray-400"
                     >
                       No bug-wise report data available
@@ -811,7 +814,7 @@ export default function BugReport() {
                 ) : (
                   paginatedBugWise.map((row) => (
                     <tr
-                      key={`${row.bug_id}-${row.sprint_id}`}
+                      key={`${row.bug_id}-${row.sprint_id ?? "no-sprint"}`}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -834,7 +837,8 @@ export default function BugReport() {
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                        {row.sprint_name ?? `Sprint ${row.sprint_id}`}
+                        {row.sprint_name ||
+                          (row.sprint_id ? `Sprint ${row.sprint_id}` : "—")}
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
@@ -853,11 +857,11 @@ export default function BugReport() {
 
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-1 text-xs rounded-md font-medium whitespace-nowrap ${bugStatusBadge(
-                            row.bug_status,
+                          className={`px-2 py-1 text-xs rounded-md font-medium whitespace-nowrap ${cycleBadge(
+                            row.latest_status,
                           )}`}
                         >
-                          {row.bug_status}
+                          {row.latest_status || "—"}
                         </span>
                       </td>
 
@@ -887,16 +891,6 @@ export default function BugReport() {
                         className={`px-4 py-3 whitespace-nowrap text-xs font-semibold ${STATUS_COLORS.noTest}`}
                       >
                         {numberValue(row.no_test_count)}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-md font-medium whitespace-nowrap ${cycleBadge(
-                            row.latest_status,
-                          )}`}
-                        >
-                          {row.latest_status || "—"}
-                        </span>
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">

@@ -1384,11 +1384,14 @@ exports.getBugStatistics = async (req, res) => {
 
     if (sprint_id) {
       statsWhere += `
-        AND EXISTS (
-          SELECT 1
-          FROM test_case_manager.dbo.bug_report_summary filter_brs
-          WHERE filter_brs.bug_report_id = br.id
-            AND filter_brs.sprint_id = @stats_sprint_id
+        AND (
+          br.sprint_id = @stats_sprint_id
+          OR EXISTS (
+            SELECT 1
+            FROM test_case_manager.dbo.bug_report_summary filter_brs
+            WHERE filter_brs.bug_report_id = br.id
+              AND filter_brs.sprint_id = @stats_sprint_id
+          )
         )
       `;
 
@@ -1516,14 +1519,17 @@ exports.getBugStatistics = async (req, res) => {
     `);
 
     // ============================================================
-    // 3. SPRINT-WISE SUMMARY REPORT
+    // 3. SPRINT-WISE SUMMARY REPORT - ALL BUGS
     // ============================================================
     //
-    // One row:
-    // Project + Sprint
+    // Every non-archived bug is represented here.
     //
-    // Example:
-    // Project A | Sprint 01 | 10 Bugs | 8 Pass | 2 Fail
+    // If a bug has cycle/sprint summary data, that sprint is used.
+    // If it has no summary yet, its original bug_reports.sprint_id is used.
+    // If it has neither, it is grouped under an unassigned sprint.
+    //
+    // Bug status (Open / In Progress / Resolved / Closed / Reopened, etc.)
+    // does NOT exclude the bug from this report.
     //
     const summaryRequest = pool.request();
 
@@ -1541,7 +1547,10 @@ exports.getBugStatistics = async (req, res) => {
 
     if (sprint_id) {
       summaryWhere += `
-        AND brs.sprint_id = @summary_sprint_id
+        AND (
+          br.sprint_id = @summary_sprint_id
+          OR brs.sprint_id IS NOT NULL
+        )
       `;
 
       summaryRequest.input("summary_sprint_id", sql.Int, Number(sprint_id));
@@ -1549,35 +1558,23 @@ exports.getBugStatistics = async (req, res) => {
 
     const summary = await summaryRequest.query(`
       SELECT
-        brs.sprint_id,
-        s.sprint_name,
+        COALESCE(brs.sprint_id, br.sprint_id) AS sprint_id,
+
+        COALESCE(
+          summary_sprint.sprint_name,
+          original_sprint.sprint_name,
+          'Unassigned Sprint'
+        ) AS sprint_name,
 
         br.project_id,
         p.project_name,
 
-        COUNT(
-          DISTINCT brs.bug_report_id
-        ) AS bug_count,
+        COUNT(DISTINCT br.id) AS bug_count,
 
-        COALESCE(
-          SUM(brs.pass_count),
-          0
-        ) AS pass_count,
-
-        COALESCE(
-          SUM(brs.fail_count),
-          0
-        ) AS fail_count,
-
-        COALESCE(
-          SUM(brs.blocked_count),
-          0
-        ) AS blocked_count,
-
-        COALESCE(
-          SUM(brs.no_test_count),
-          0
-        ) AS no_test_count,
+        COALESCE(SUM(brs.pass_count), 0) AS pass_count,
+        COALESCE(SUM(brs.fail_count), 0) AS fail_count,
+        COALESCE(SUM(brs.blocked_count), 0) AS blocked_count,
+        COALESCE(SUM(brs.no_test_count), 0) AS no_test_count,
 
         SUM(
           CASE
@@ -1607,45 +1604,52 @@ exports.getBugStatistics = async (req, res) => {
           END
         ) AS latest_no_test,
 
-        MAX(
-          brs.latest_status_date
-        ) AS latest_status_date
+        MAX(brs.latest_status_date) AS latest_status_date
 
-      FROM test_case_manager.dbo.bug_report_summary brs
+      FROM test_case_manager.dbo.bug_reports br
 
-      INNER JOIN test_case_manager.dbo.bug_reports br
-        ON br.id = brs.bug_report_id
+      LEFT JOIN test_case_manager.dbo.bug_report_summary brs
+        ON brs.bug_report_id = br.id
+        ${sprint_id ? `AND brs.sprint_id = @summary_sprint_id` : ""}
 
       LEFT JOIN test_case_manager.dbo.projects p
         ON p.id = br.project_id
 
-      LEFT JOIN test_case_manager.dbo.sprints s
-        ON s.id = brs.sprint_id
+      LEFT JOIN test_case_manager.dbo.sprints summary_sprint
+        ON summary_sprint.id = brs.sprint_id
+
+      LEFT JOIN test_case_manager.dbo.sprints original_sprint
+        ON original_sprint.id = br.sprint_id
 
       ${summaryWhere}
 
       GROUP BY
-        brs.sprint_id,
-        s.sprint_name,
+        COALESCE(brs.sprint_id, br.sprint_id),
+        COALESCE(
+          summary_sprint.sprint_name,
+          original_sprint.sprint_name,
+          'Unassigned Sprint'
+        ),
         br.project_id,
         p.project_name
 
       ORDER BY
         MAX(brs.latest_status_date) DESC,
-        s.sprint_name,
+        COALESCE(
+          summary_sprint.sprint_name,
+          original_sprint.sprint_name,
+          'Unassigned Sprint'
+        ),
         p.project_name
     `);
 
     // ============================================================
-    // 4. BUG-WISE REPORT
+    // 4. BUG-WISE REPORT - ALL BUGS
     // ============================================================
     //
-    // One row:
-    // Bug + Sprint
-    //
-    // This is intentionally based on bug_report_summary.
-    // If BUG-1 was tested in Sprint 1 and Sprint 2, it will appear
-    // once for Sprint 1 and once for Sprint 2.
+    // All non-archived bugs are returned here.
+    // Cycle/status data is optional, so a bug is NOT excluded when
+    // it has no bug_report_summary or bug_history record yet.
     //
     const bugWiseRequest = pool.request();
 
@@ -1663,7 +1667,10 @@ exports.getBugStatistics = async (req, res) => {
 
     if (sprint_id) {
       bugWiseWhere += `
-        AND brs.sprint_id = @bugwise_sprint_id
+        AND (
+          br.sprint_id = @bugwise_sprint_id
+          OR brs.sprint_id IS NOT NULL
+        )
       `;
 
       bugWiseRequest.input("bugwise_sprint_id", sql.Int, Number(sprint_id));
@@ -1678,8 +1685,8 @@ exports.getBugStatistics = async (req, res) => {
         br.project_id,
         p.project_name,
 
-        brs.sprint_id,
-        s.sprint_name,
+        COALESCE(brs.sprint_id, br.sprint_id) AS sprint_id,
+        COALESCE(summary_sprint.sprint_name, original_sprint.sprint_name) AS sprint_name,
 
         br.severity,
         br.status AS bug_status,
@@ -1690,25 +1697,10 @@ exports.getBugStatistics = async (req, res) => {
         br.assigned_to,
         u.username AS assigned_to_name,
 
-        COALESCE(
-          brs.pass_count,
-          0
-        ) AS pass_count,
-
-        COALESCE(
-          brs.fail_count,
-          0
-        ) AS fail_count,
-
-        COALESCE(
-          brs.blocked_count,
-          0
-        ) AS blocked_count,
-
-        COALESCE(
-          brs.no_test_count,
-          0
-        ) AS no_test_count,
+        COALESCE(brs.pass_count, 0) AS pass_count,
+        COALESCE(brs.fail_count, 0) AS fail_count,
+        COALESCE(brs.blocked_count, 0) AS blocked_count,
+        COALESCE(brs.no_test_count, 0) AS no_test_count,
 
         brs.latest_status,
         brs.latest_status_date,
@@ -1716,16 +1708,20 @@ exports.getBugStatistics = async (req, res) => {
         br.first_reported_date,
         br.updated_at
 
-      FROM test_case_manager.dbo.bug_report_summary brs
+      FROM test_case_manager.dbo.bug_reports br
 
-      INNER JOIN test_case_manager.dbo.bug_reports br
-        ON br.id = brs.bug_report_id
+      LEFT JOIN test_case_manager.dbo.bug_report_summary brs
+        ON brs.bug_report_id = br.id
+        ${sprint_id ? `AND brs.sprint_id = @bugwise_sprint_id` : ""}
 
       LEFT JOIN test_case_manager.dbo.projects p
         ON p.id = br.project_id
 
-      LEFT JOIN test_case_manager.dbo.sprints s
-        ON s.id = brs.sprint_id
+      LEFT JOIN test_case_manager.dbo.sprints summary_sprint
+        ON summary_sprint.id = brs.sprint_id
+
+      LEFT JOIN test_case_manager.dbo.sprints original_sprint
+        ON original_sprint.id = br.sprint_id
 
       LEFT JOIN test_case_manager.dbo.project_functions pf
         ON pf.id = br.project_function_id
@@ -1736,8 +1732,8 @@ exports.getBugStatistics = async (req, res) => {
       ${bugWiseWhere}
 
       ORDER BY
-        brs.latest_status_date DESC,
         br.id DESC,
+        brs.latest_status_date DESC,
         brs.sprint_id DESC
     `);
 

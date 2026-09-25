@@ -12,6 +12,7 @@ import ProjectOverview from "./pages/Projects/ProjectOverview";
 import AdvancedAutomation from "./pages/TestManagement/Playwright/AdvancedAutomation";
 import BugReports from "./pages/BugReports/BugReports";
 import TestCaseApprovals from "./pages/TestManagement/TestCaseApprovals";
+import TestDataSources from "./pages/TestDataSources";
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/AuthPages/SignIn"));
@@ -137,6 +138,7 @@ export default function App() {
               <Route path="/departments" element={<Departments />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/teams" element={<Teams />} />
+              <Route path="/test-data-sources" element={<TestDataSources />} />
               <Route path="/sprints" element={<Sprints />} />
               <Route path="/sprints/:id" element={<Sprintboard />} />
 

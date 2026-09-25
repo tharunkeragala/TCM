@@ -197,23 +197,34 @@ exports.uploadTestData = async (req, res) => {
     const sourceResult = await new sql.Request(transaction)
       .input("testCaseId", sql.Int, testCaseId)
       .input("sourceType", sql.NVarChar(50), sourceType)
-      .input("sourcePath", sql.NVarChar(sql.MAX), absolutePath).query(`
+      .input("sourcePath", sql.NVarChar(sql.MAX), absolutePath)
+      .input("originalFileName", sql.NVarChar(255), file.originalname)
+      .input("storedFileName", sql.NVarChar(255), file.filename).query(`
           INSERT INTO dbo.test_data_sources
           (
             test_case_id,
             data_source_type,
-            source_path
+            source_path,
+            original_file_name,
+            stored_file_name,
+            created_at
           )
-          OUTPUT INSERTED.id
+          OUTPUT
+            INSERTED.id,
+            INSERTED.created_at
           VALUES
           (
             @testCaseId,
             @sourceType,
-            @sourcePath
+            @sourcePath,
+            @originalFileName,
+            @storedFileName,
+            SYSUTCDATETIME()
           )
         `);
 
     const sourceId = sourceResult.recordset[0].id;
+    const createdAt = sourceResult.recordset[0].created_at;
 
     for (let index = 0; index < rows.length; index += 1) {
       await new sql.Request(transaction)
@@ -254,6 +265,8 @@ exports.uploadTestData = async (req, res) => {
         sourceType,
 
         rowCount: rows.length,
+
+        createdAt,
 
         preview: rows.slice(0, 50),
 
@@ -309,6 +322,9 @@ exports.getSavedDataSources = async (req, res) => {
             s.test_case_id,
             s.data_source_type,
             s.source_path,
+            s.original_file_name,
+            s.stored_file_name,
+            s.created_at,
             COUNT(r.id) AS row_count
           FROM dbo.test_data_sources s
           LEFT JOIN dbo.test_data_rows r
@@ -318,8 +334,13 @@ exports.getSavedDataSources = async (req, res) => {
             s.id,
             s.test_case_id,
             s.data_source_type,
-            s.source_path
-          ORDER BY s.id DESC
+            s.source_path,
+            s.original_file_name,
+            s.stored_file_name,
+            s.created_at
+          ORDER BY
+            s.created_at DESC,
+            s.id DESC
         `);
 
     const sources = result.recordset.map((row) => ({
@@ -331,11 +352,17 @@ exports.getSavedDataSources = async (req, res) => {
 
       sourcePath: row.source_path,
 
-      fileName: row.source_path
-        ? path.basename(row.source_path)
-        : `Source #${row.id}`,
+      fileName:
+        row.original_file_name ||
+        (row.source_path
+          ? path.basename(row.source_path)
+          : `Source #${row.id}`),
+
+      storedFileName: row.stored_file_name || null,
 
       rowCount: Number(row.row_count) || 0,
+
+      createdAt: row.created_at,
     }));
 
     return res.status(200).json({
@@ -384,7 +411,10 @@ exports.getSavedDataSource = async (req, res) => {
             id,
             test_case_id,
             data_source_type,
-            source_path
+            source_path,
+            original_file_name,
+            stored_file_name,
+            created_at
           FROM dbo.test_data_sources
           WHERE id = @sourceId
         `);
@@ -446,9 +476,15 @@ exports.getSavedDataSource = async (req, res) => {
 
         sourcePath: source.source_path,
 
-        fileName: source.source_path
-          ? path.basename(source.source_path)
-          : `Source #${source.id}`,
+        fileName:
+          source.original_file_name ||
+          (source.source_path
+            ? path.basename(source.source_path)
+            : `Source #${source.id}`),
+
+        storedFileName: source.stored_file_name || null,
+
+        createdAt: source.created_at,
 
         /*
          * Actual persisted row count.
@@ -1347,6 +1383,231 @@ exports.runParameterizedTest = async (req, res) => {
       success: false,
 
       error: error.message || "Failed to execute parameterized test.",
+    });
+  }
+};
+
+// ==========================================================================
+// SYSTEM CONFIGURATION - DATASET MASTER
+// Add these functions to dataTestingController.js
+// ==========================================================================
+
+/* -------------------------------------------------------------------------- */
+/* Get ALL saved datasets                                                     */
+/* GET /data-drive/sources                                                    */
+/* -------------------------------------------------------------------------- */
+
+exports.getAllSavedDataSources = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    const result = await pool.request().query(`
+      SELECT
+        s.id,
+        s.test_case_id,
+        s.data_source_type,
+        s.source_path,
+        s.original_file_name,
+        s.stored_file_name,
+        s.created_at,
+
+        tc.title AS test_case_title,
+
+        COUNT(r.id) AS row_count
+
+      FROM dbo.test_data_sources s
+
+      INNER JOIN dbo.test_cases tc
+        ON tc.id = s.test_case_id
+
+      LEFT JOIN dbo.test_data_rows r
+        ON r.data_source_id = s.id
+
+      GROUP BY
+        s.id,
+        s.test_case_id,
+        s.data_source_type,
+        s.source_path,
+        s.original_file_name,
+        s.stored_file_name,
+        s.created_at,
+        tc.title
+
+      ORDER BY
+        s.created_at DESC,
+        s.id DESC
+    `);
+
+    const sources = result.recordset.map((row) => ({
+      id: row.id,
+
+      testCaseId: row.test_case_id,
+
+      testCaseTitle: row.test_case_title,
+
+      testCaseCode: null,
+
+      sourceType: row.data_source_type,
+
+      sourcePath: row.source_path,
+
+      fileName:
+        row.original_file_name ||
+        (row.source_path
+          ? path.basename(row.source_path)
+          : `Source #${row.id}`),
+
+      storedFileName: row.stored_file_name || null,
+
+      rowCount: Number(row.row_count) || 0,
+
+      createdAt: row.created_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+
+      data: {
+        sources,
+        count: sources.length,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "[dataTestingController] getAllSavedDataSources error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      error: error.message || "Failed to load saved test data sources.",
+    });
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* Delete one saved dataset                                                   */
+/* DELETE /data-drive/source/:sourceId                                        */
+/* -------------------------------------------------------------------------- */
+
+exports.deleteSavedDataSource = async (req, res) => {
+  const sourceId = Number(req.params.sourceId);
+
+  if (!sourceId || sourceId <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: "Valid sourceId is required.",
+    });
+  }
+
+  let transaction = null;
+
+  try {
+    const pool = await poolPromise;
+
+    const sourceResult = await pool
+      .request()
+      .input("sourceId", sql.Int, sourceId).query(`
+        SELECT
+          id,
+          test_case_id,
+          data_source_type,
+          source_path
+        FROM dbo.test_data_sources
+        WHERE id = @sourceId
+      `);
+
+    if (!sourceResult.recordset.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Saved data source was not found.",
+      });
+    }
+
+    const source = sourceResult.recordset[0];
+
+    transaction = new sql.Transaction(pool);
+
+    await transaction.begin();
+
+    await new sql.Request(transaction).input("sourceId", sql.Int, sourceId)
+      .query(`
+        DELETE FROM dbo.test_data_rows
+        WHERE data_source_id = @sourceId
+      `);
+
+    const deleteSourceResult = await new sql.Request(transaction).input(
+      "sourceId",
+      sql.Int,
+      sourceId,
+    ).query(`
+        DELETE FROM dbo.test_data_sources
+        OUTPUT DELETED.id
+        WHERE id = @sourceId
+      `);
+
+    if (!deleteSourceResult.recordset.length) {
+      await transaction.rollback();
+      transaction = null;
+
+      return res.status(404).json({
+        success: false,
+        error: "Saved data source was not found.",
+      });
+    }
+
+    await transaction.commit();
+    transaction = null;
+
+    /*
+     * Remove the physical upload only after the DB transaction succeeds.
+     *
+     * The supplied upload controller stores an absolute source_path.
+     * We resolve it before deleting and ignore ENOENT so an already-missing
+     * physical file does not cause the database delete to fail.
+     */
+    if (source.source_path) {
+      try {
+        const absolutePath = path.resolve(source.source_path);
+
+        if (fs.existsSync(absolutePath)) {
+          await fs.promises.unlink(absolutePath);
+        }
+      } catch (fileError) {
+        console.warn(
+          "[dataTestingController] Dataset DB rows were deleted, but physical file cleanup failed:",
+          fileError.message,
+        );
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      data: {
+        sourceId,
+        testCaseId: source.test_case_id,
+      },
+    });
+  } catch (error) {
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch {
+        // Ignore rollback failure.
+      }
+    }
+
+    console.error(
+      "[dataTestingController] deleteSavedDataSource error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      error: error.message || "Failed to delete saved test data source.",
     });
   }
 };

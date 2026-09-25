@@ -880,3 +880,44 @@ span.flatpickr-weekday,
     background: transparent;
   }
 }
+
+/* TipTap / ProseMirror rich text editor */
+
+.rich-text-editor-content ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin: 0.5rem 0 !important;
+}
+
+.rich-text-editor-content ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin: 0.5rem 0 !important;
+}
+
+.rich-text-editor-content li {
+  display: list-item !important;
+  margin: 0.25rem 0 !important;
+}
+
+.rich-text-editor-content ul ul {
+  list-style-type: circle !important;
+  margin-left: 1rem !important;
+}
+
+.rich-text-editor-content ul ul ul {
+  list-style-type: square !important;
+}
+
+.rich-text-editor-content ol ol {
+  list-style-type: lower-alpha !important;
+  margin-left: 1rem !important;
+}
+
+.rich-text-editor-content ol ol ol {
+  list-style-type: lower-roman !important;
+}
+
+.rich-text-editor-content li p {
+  margin: 0 !important;
+}

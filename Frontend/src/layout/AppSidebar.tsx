@@ -183,6 +183,10 @@ const navItems: NavItem[] = [
         name: "Teams",
         path: "/teams",
       },
+      {
+        name: "Test Data Sources",
+        path: "/test-data-sources",
+      },
     ],
   },
 ];

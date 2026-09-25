@@ -658,7 +658,7 @@ exports.updateTask = async (req, res) => {
       }
     }
 
-    const username = req.user?.username || `User ${userId}`;
+    const username = await getUsername(pool, userId);
     await insertSystemComment(pool, id, `Task details updated by ${username}`);
 
     // Build comparable snapshots (only editable fields, no metadata)
