@@ -2,9 +2,7 @@ const { chromium } = require("playwright");
 const { poolPromise, sql } = require("../config/db");
 const path = require("path");
 const fs = require("fs");
-
 const { broadcast } = require("./wsHub");
-
 const dataEngineService = require("./dataEngineService");
 const { VariableEngine } = require("./variableEngine");
 const conditionalExecutor = require("./conditionalExecutor");
@@ -12,35 +10,39 @@ const keywordEngine = require("./keywordEngine");
 const apiTestingEngine = require("./apiTestingService");
 const selfHealingEngine = require("./selfHealingEngine");
 const testMaintenanceEngine = require("./testMaintenanceEngine");
-
 /* -------------------------------------------------------------------------- */
-/* Configuration                                                              */
+/* Configuration                                                              */
 /* -------------------------------------------------------------------------- */
-
-const DEFAULT_NAVIGATION_TIMEOUT = Number(
-  process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT || 5000,
+const DEFAULT_NAVIGATION_TIMEOUT = Math.max(
+  Number(process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT || 15000),
+  5000,
 );
 
-const DEFAULT_ACTION_TIMEOUT = Number(
-  process.env.PLAYWRIGHT_ACTION_TIMEOUT || 300,
+const DEFAULT_ACTION_TIMEOUT = Math.max(
+  Number(process.env.PLAYWRIGHT_ACTION_TIMEOUT || 5000),
+  1000,
 );
 
-const DEFAULT_NETWORK_IDLE_TIMEOUT = Number(
-  process.env.PLAYWRIGHT_NETWORK_IDLE_TIMEOUT || 100,
+const DEFAULT_ELEMENT_TIMEOUT = Math.max(
+  Number(process.env.PLAYWRIGHT_ELEMENT_TIMEOUT || 15000),
+  5000,
+);
+
+const DEFAULT_NETWORK_IDLE_TIMEOUT = Math.max(
+  Number(process.env.PLAYWRIGHT_NETWORK_IDLE_TIMEOUT || 1500),
+  500,
 );
 
 const DEFAULT_PAGE_SETTLE_DELAY = Number(
-  process.env.PLAYWRIGHT_PAGE_SETTLE_DELAY || 500,
+  process.env.PLAYWRIGHT_PAGE_SETTLE_DELAY || 0,
 );
 
 const DEFAULT_ACTION_SETTLE_DELAY = Number(
-  process.env.PLAYWRIGHT_ACTION_SETTLE_DELAY || 200,
+  process.env.PLAYWRIGHT_ACTION_SETTLE_DELAY || 0,
 );
 
 const DEFAULT_TYPE_DELAY = Number(process.env.PLAYWRIGHT_TYPE_DELAY || 50);
-
 const DEFAULT_SLOW_MO = Number(process.env.PLAYWRIGHT_SLOW_MO || 0);
-
 const screenshotsDir = path.join(__dirname, "..", "screenshots");
 
 if (!fs.existsSync(screenshotsDir)) {
@@ -50,11 +52,10 @@ if (!fs.existsSync(screenshotsDir)) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Active run control                                                         */
+/* Active run control                                                         */
 /* -------------------------------------------------------------------------- */
 
 const activeRuns = {};
-
 function cancelRun(runId) {
   const controller = activeRuns[runId];
 
@@ -68,7 +69,7 @@ function cancelRun(runId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Selector utilities                                                         */
+/* Selector utilities                                                         */
 /* -------------------------------------------------------------------------- */
 
 function normalizeSelector(raw) {
@@ -179,13 +180,14 @@ function escapeCssIdentifier(value) {
   }
 
   return String(value).replace(
-    /([ !"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g,
-    "\\$1",
+    /([ !"#$%&'()\*+,./:;<=>?@[\\\\\\]^`{|}\~])/g,
+
+    "\\\\$1",
   );
 }
 
 function escapeAttributeValue(value) {
-  return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return String(value).replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\\\"');
 }
 
 function parseSelectorArgument(arg) {
@@ -211,7 +213,7 @@ function parseSelectorArgument(arg) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Script parser                                                              */
+/* Script parser                                                              */
 /* -------------------------------------------------------------------------- */
 
 function parseTestScript(script = "") {
@@ -223,126 +225,87 @@ function parseTestScript(script = "") {
 
   for (const line of lines) {
     const trimmed = line.trim();
-
     let match;
 
     if (
       (match = trimmed.match(
-        /await page\.goto\(\s*['"`](.+?)['"`](?:\s*,[\s\S]*)?\)/,
+        /await\s+page\.goto\(\s*['"`](.+?)['"`](?:\s*,\s*\{[\s\S]*\})?\s*\);?$/,
       ))
     ) {
-      steps.push({
-        action: "navigate",
-        value: match[1],
-        raw: trimmed,
-      });
+      steps.push({ action: "navigate", value: match[1], raw: trimmed });
     } else if (
       (match = trimmed.match(
-        /await page\.click\((.+?)\s*(?:,\s*\{[\s\S]*\})?\);?$/,
+        /await\s+page\.click\((.+?)(?:\s*,\s*\{[\s\S]*\})?\s*\);?$/,
       ))
     ) {
       steps.push({
         action: "click",
-
         selector: parseSelectorArgument(match[1]),
-
         raw: trimmed,
       });
     } else if (
       (match = trimmed.match(
-        /await page\.fill\((.+?),\s*['"`]([\s\S]*?)['"`]\s*(?:,\s*\{[\s\S]*\})?\);?$/,
+        /await\s+page\.fill\((.+?),\s*['"`]([\s\S]*?)['"`](?:\s*,\s*\{[\s\S]*\})?\s*\);?$/,
       ))
     ) {
       steps.push({
         action: "fill",
-
         selector: parseSelectorArgument(match[1]),
-
         value: match[2],
-
         raw: trimmed,
       });
     } else if (
       (match = trimmed.match(
-        /await page\.type\((.+?),\s*['"`]([\s\S]*?)['"`]\s*(?:,\s*\{[\s\S]*\})?\);?$/,
+        /await\s+page\.type\((.+?),\s*['"`]([\s\S]*?)['"`](?:\s*,\s*\{[\s\S]*\})?\s*\);?$/,
       ))
     ) {
       steps.push({
         action: "type",
-
         selector: parseSelectorArgument(match[1]),
-
         value: match[2],
-
         raw: trimmed,
       });
     } else if (
       (match = trimmed.match(
-        /await page\.selectOption\((.+?),\s*['"`]([\s\S]*?)['"`]\s*(?:,\s*\{[\s\S]*\})?\);?$/,
+        /await\s+page\.selectOption\((.+?),\s*['"`]([\s\S]*?)['"`](?:\s*,\s*\{[\s\S]*\})?\s*\);?$/,
       ))
     ) {
       steps.push({
         action: "select",
-
         selector: parseSelectorArgument(match[1]),
-
         value: match[2],
-
         raw: trimmed,
       });
     } else if (
       (match = trimmed.match(
-        /await page\.waitForSelector\((.+?)(?:,\s*\{[\s\S]*\})?\);?$/,
+        /await\s+page\.waitForSelector\((.+?)(?:\s*,\s*\{[\s\S]*\})?\s*\);?$/,
       ))
     ) {
       steps.push({
         action: "waitForSelector",
-
         selector: parseSelectorArgument(match[1]),
-
-        raw: trimmed,
-      });
-    } else if ((match = trimmed.match(/await page\.waitForTimeout\((\d+)\)/))) {
-      steps.push({
-        action: "wait",
-        value: match[1],
         raw: trimmed,
       });
     } else if (
-      (match = trimmed.match(
-        /await expect\(page\)\.toHaveTitle\(['"`](.+?)['"`]\)/,
-      ))
+      (match = trimmed.match(/await\s+page\.waitForTimeout\((\d+)\)\s*;?$/))
     ) {
-      steps.push({
-        action: "assertTitle",
-
-        value: match[1],
-
-        raw: trimmed,
-      });
+      steps.push({ action: "wait", value: match[1], raw: trimmed });
     } else if (
       (match = trimmed.match(
-        /await expect\(page\)\.toHaveURL\(['"`](.+?)['"`]\)/,
+        /await\s+expect\(page\)\.toHaveTitle\(\s*['"`](.+?)['"`]\s*\)\s*;?$/,
       ))
     ) {
-      steps.push({
-        action: "assertUrl",
-
-        value: match[1],
-
-        raw: trimmed,
-      });
-    } else if (trimmed.match(/await page\.screenshot\(/)) {
-      steps.push({
-        action: "screenshot",
-
-        raw: trimmed,
-      });
+      steps.push({ action: "assertTitle", value: match[1], raw: trimmed });
+    } else if (
+      (match = trimmed.match(
+        /await\s+expect\(page\)\.toHaveURL\(\s*['"`](.+?)['"`]\s*\)\s*;?$/,
+      ))
+    ) {
+      steps.push({ action: "assertUrl", value: match[1], raw: trimmed });
+    } else if (/await\s+page\.screenshot\(/.test(trimmed)) {
+      steps.push({ action: "screenshot", raw: trimmed });
     } else {
-      steps.push({
-        action: "custom",
-        raw: trimmed,
-      });
+      steps.push({ action: "custom", raw: trimmed });
     }
   }
 
@@ -354,7 +317,7 @@ function parsePlaywrightScriptSteps(script) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Browser launch utilities                                                   */
+/* Browser launch utilities                                                   */
 /* -------------------------------------------------------------------------- */
 
 function findBrowserExecutable() {
@@ -365,10 +328,13 @@ function findBrowserExecutable() {
   }
 
   const possibleBrowserPaths = [
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\\Program Files\\\Google\\\Chrome\\\Application\\\chrome.exe",
+
+    "C:\\\Program Files (x86)\\\Google\\\Chrome\\\Application\\\chrome.exe",
+
+    "C:\\\Program Files\\\Microsoft\\\Edge\\\Application\\\msedge.exe",
+
+    "C:\\\Program Files (x86)\\\Microsoft\\\Edge\\\Application\\\msedge.exe",
   ];
 
   return (
@@ -415,6 +381,7 @@ async function createBrowserSession(runId) {
   const context = await browser.newContext({
     viewport: {
       width: 1280,
+
       height: 720,
     },
 
@@ -433,113 +400,332 @@ async function createBrowserSession(runId) {
 
   return {
     browser,
+
     context,
+
     page,
+
     cdpClient,
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Page waits                                                                 */
+/* Page waits                                                                 */
 /* -------------------------------------------------------------------------- */
 
-async function waitForPageReady(page, options = {}) {
-  const {
-    navigationTimeout = DEFAULT_NAVIGATION_TIMEOUT,
-
-    networkIdleTimeout = DEFAULT_NETWORK_IDLE_TIMEOUT,
-
-    settleDelay = DEFAULT_PAGE_SETTLE_DELAY,
-  } = options;
-
-  await page.waitForLoadState("domcontentloaded", {
-    timeout: navigationTimeout,
-  });
-
+async function waitForDocumentReady(
+  page,
+  timeout = DEFAULT_NAVIGATION_TIMEOUT,
+) {
   await page
-    .waitForLoadState("load", {
-      timeout: navigationTimeout,
-    })
+    .waitForFunction(
+      () =>
+        document.readyState === "interactive" ||
+        document.readyState === "complete",
+      null,
+      { timeout },
+    )
     .catch(() => {});
 
-  await page.locator("body").waitFor({
-    state: "visible",
+  await page
+    .locator("body")
+    .waitFor({ state: "visible", timeout })
+    .catch(() => {});
+}
 
-    timeout: navigationTimeout,
-  });
+async function waitForDomStable(page, options = {}) {
+  const timeout = Math.max(Number(options.timeout || 3000), 500);
+  const stableFor = Math.max(Number(options.stableFor || 250), 100);
+  const pollInterval = Math.max(Number(options.pollInterval || 100), 50);
+
+  const startedAt = Date.now();
+  let previousSignature = null;
+  let stableSince = null;
+
+  while (Date.now() - startedAt < timeout) {
+    const signature = await page
+      .evaluate(() => {
+        const body = document.body;
+        if (!body) return "NO_BODY";
+
+        return [
+          document.readyState,
+          body.childElementCount,
+          body.innerText.length,
+          document.documentElement.scrollHeight,
+          document.documentElement.scrollWidth,
+        ].join(":");
+      })
+      .catch(() => null);
+
+    if (signature && signature === previousSignature) {
+      if (stableSince == null) stableSince = Date.now();
+
+      if (Date.now() - stableSince >= stableFor) {
+        return true;
+      }
+    } else {
+      previousSignature = signature;
+      stableSince = Date.now();
+    }
+
+    await page.waitForTimeout(pollInterval);
+  }
+
+  return false;
+}
+
+async function waitForAppReady(page, options = {}) {
+  const navigationTimeout = Math.max(
+    Number(options.navigationTimeout || DEFAULT_NAVIGATION_TIMEOUT),
+    5000,
+  );
+
+  const networkIdleTimeout = Math.max(
+    Number(options.networkIdleTimeout || DEFAULT_NETWORK_IDLE_TIMEOUT),
+    500,
+  );
+
+  const settleDelay = Math.max(Number(options.settleDelay ?? 0), 0);
+
+  await waitForDocumentReady(page, navigationTimeout);
 
   await page
-    .waitForLoadState("networkidle", {
-      timeout: networkIdleTimeout,
-    })
+    .waitForLoadState("networkidle", { timeout: networkIdleTimeout })
     .catch(() => {});
+
+  await waitForDomStable(page, {
+    timeout: Math.min(navigationTimeout, 4000),
+    stableFor: 250,
+    pollInterval: 100,
+  });
 
   if (settleDelay > 0) {
     await page.waitForTimeout(settleDelay);
   }
 }
 
-async function waitForLocatorReady(page, selector, options = {}) {
-  const {
-    state = "visible",
-
-    timeout = DEFAULT_ACTION_TIMEOUT,
-  } = options;
-
-  const locator = resolveLocator(page, selector).first();
-
-  await locator.waitFor({
-    state,
-    timeout,
+async function waitForPageReady(page, options = {}) {
+  await waitForAppReady(page, {
+    navigationTimeout: options.navigationTimeout || DEFAULT_NAVIGATION_TIMEOUT,
+    networkIdleTimeout:
+      options.networkIdleTimeout || DEFAULT_NETWORK_IDLE_TIMEOUT,
+    settleDelay: options.settleDelay ?? 0,
   });
+}
+
+async function waitForLocatorReady(page, selector, options = {}) {
+  const state = options.state || "visible";
+  const timeout = Math.max(
+    Number(options.timeout || DEFAULT_ELEMENT_TIMEOUT),
+    1000,
+  );
+
+  const pollInterval = Math.max(Number(options.pollInterval || 150), 50);
+  const deadline = Date.now() + timeout;
+  const locator = resolveLocator(page, selector).first();
+  let lastError = null;
+
+  await waitForDocumentReady(
+    page,
+    Math.min(timeout, DEFAULT_NAVIGATION_TIMEOUT),
+  ).catch(() => {});
+
+  while (Date.now() < deadline) {
+    const remaining = Math.max(deadline - Date.now(), 1);
+
+    try {
+      if (state === "visible") {
+        if (await locator.isVisible().catch(() => false)) {
+          return locator;
+        }
+      } else if (state === "attached") {
+        if ((await locator.count().catch(() => 0)) > 0) {
+          return locator;
+        }
+      } else if (state === "hidden") {
+        if (!(await locator.isVisible().catch(() => false))) {
+          return locator;
+        }
+      } else if (state === "detached") {
+        if ((await locator.count().catch(() => 0)) === 0) {
+          return locator;
+        }
+      } else {
+        await locator.waitFor({
+          state,
+          timeout: Math.min(remaining, 1000),
+        });
+        return locator;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (remaining > 500) {
+      await waitForDomStable(page, {
+        timeout: Math.min(remaining, 1000),
+        stableFor: 150,
+        pollInterval: 75,
+      }).catch(() => {});
+    }
+
+    const sleepFor = Math.min(pollInterval, Math.max(deadline - Date.now(), 1));
+
+    if (sleepFor > 0) {
+      await page.waitForTimeout(sleepFor);
+    }
+  }
+
+  try {
+    await locator.waitFor({ state, timeout: 1 });
+    return locator;
+  } catch (error) {
+    lastError = error;
+  }
+
+  throw (
+    lastError ||
+    new Error(
+      `Locator did not become ${state} within ${timeout}ms: ${JSON.stringify(selector)}`,
+    )
+  );
+}
+
+function normalizeClickSelector(selector) {
+  const normalized = normalizeSelector(selector);
+
+  if (!normalized || typeof normalized !== "object" || !normalized.xpath) {
+    return selector;
+  }
+
+  let xpath = String(normalized.xpath).trim();
+  const nonActionableTail = /\/(?:svg|path|use|g|i|span)(?:\[[^\]]+\])?$/i;
+
+  while (nonActionableTail.test(xpath)) {
+    xpath = xpath.replace(nonActionableTail, "");
+  }
+
+  if (xpath !== normalized.xpath) {
+    return `xpath=${xpath}`;
+  }
+
+  return selector;
+}
+
+async function waitForClickLocatorReady(page, selector, options = {}) {
+  const clickSelector = normalizeClickSelector(selector);
+
+  try {
+    return await waitForLocatorReady(page, clickSelector, {
+      ...options,
+      state: "visible",
+    });
+  } catch (error) {
+    if (String(clickSelector) !== String(selector)) {
+      return waitForLocatorReady(page, selector, {
+        ...options,
+        state: "visible",
+      });
+    }
+
+    throw error;
+  }
+}
+
+async function getActionableClickLocator(locator) {
+  try {
+    const tagName = await locator.evaluate((element) =>
+      element.tagName ? element.tagName.toLowerCase() : "",
+    );
+
+    const role = await locator.getAttribute("role").catch(() => null);
+
+    if (
+      tagName === "button" ||
+      tagName === "a" ||
+      role === "button" ||
+      role === "link"
+    ) {
+      return locator;
+    }
+
+    const actionableAncestor = locator.locator(
+      'xpath=ancestor-or-self::*[self::button or self::a or @role="button" or @role="link"][1]',
+    );
+
+    if ((await actionableAncestor.count()) > 0) {
+      return actionableAncestor.first();
+    }
+  } catch {
+    // Fall back to the original recorded locator.
+  }
 
   return locator;
 }
 
 async function waitAfterAction(page, options = {}) {
-  const {
-    settleDelay = DEFAULT_ACTION_SETTLE_DELAY,
+  const networkIdleTimeout = Math.max(
+    Number(options.networkIdleTimeout || DEFAULT_NETWORK_IDLE_TIMEOUT),
+    500,
+  );
 
-    networkIdleTimeout = 3000,
-  } = options;
-
-  await page
-    .waitForLoadState("domcontentloaded", {
-      timeout: 5000,
-    })
-    .catch(() => {});
-
-  await page
-    .waitForLoadState("networkidle", {
-      timeout: networkIdleTimeout,
-    })
-    .catch(() => {});
-
-  if (settleDelay > 0) {
-    await page.waitForTimeout(settleDelay);
-  }
+  await waitForAppReady(page, {
+    navigationTimeout: Number(
+      options.navigationTimeout || DEFAULT_NAVIGATION_TIMEOUT,
+    ),
+    networkIdleTimeout,
+    settleDelay: Number(options.settleDelay ?? 0),
+  });
 }
 
-async function clickAndWait(page, locator) {
-  await Promise.all([
-    page
-      .waitForNavigation({
-        waitUntil: "domcontentloaded",
+async function clickAndWait(page, locator, options = {}) {
+  const actionTimeout = Math.max(
+    Number(options.actionTimeout || DEFAULT_ACTION_TIMEOUT),
+    1000,
+  );
 
-        timeout: 3000,
+  const navigationTimeout = Math.max(
+    Number(options.navigationTimeout || DEFAULT_NAVIGATION_TIMEOUT),
+    5000,
+  );
+
+  const clickableLocator = await getActionableClickLocator(locator);
+  await clickableLocator.scrollIntoViewIfNeeded().catch(() => {});
+
+  const beforeUrl = page.url();
+
+  const navigationPromise = page
+    .waitForNavigation({
+      waitUntil: "domcontentloaded",
+      timeout: navigationTimeout,
+    })
+    .catch(() => null);
+
+  await clickableLocator.click({
+    timeout: actionTimeout,
+    noWaitAfter: true,
+  });
+
+  await Promise.race([
+    navigationPromise,
+    page
+      .waitForFunction((url) => location.href !== url, beforeUrl, {
+        timeout: Math.min(navigationTimeout, 2500),
       })
       .catch(() => null),
-
-    locator.click({
-      timeout: DEFAULT_ACTION_TIMEOUT,
-    }),
+    page.waitForTimeout(350),
   ]);
 
-  await waitAfterAction(page);
+  await waitAfterAction(page, {
+    navigationTimeout,
+    networkIdleTimeout: DEFAULT_NETWORK_IDLE_TIMEOUT,
+    settleDelay: 0,
+  });
 }
 
 /* -------------------------------------------------------------------------- */
-/* Live screencast                                                            */
+/* Live screencast                                                            */
 /* -------------------------------------------------------------------------- */
 
 async function startLiveScreencast(context, page, runId) {
@@ -548,7 +734,9 @@ async function startLiveScreencast(context, page, runId) {
 
     await client.send("Page.startScreencast", {
       format: "jpeg",
+
       quality: 60,
+
       everyNthFrame: 1,
     });
 
@@ -574,6 +762,7 @@ async function startLiveScreencast(context, page, runId) {
   } catch (error) {
     console.warn(
       `[Playwright run ${runId}] Unable to start live screencast:`,
+
       error.message,
     );
 
@@ -582,7 +771,7 @@ async function startLiveScreencast(context, page, runId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Browser diagnostics                                                        */
+/* Browser diagnostics                                                        */
 /* -------------------------------------------------------------------------- */
 
 function attachBrowserLogging(page, runId) {
@@ -620,7 +809,7 @@ function attachBrowserLogging(page, runId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Original single test runner                                                */
+/* Original single test runner                                                */
 /* -------------------------------------------------------------------------- */
 
 async function runTestCase(testCaseId, userId = null) {
@@ -628,13 +817,14 @@ async function runTestCase(testCaseId, userId = null) {
 
   const testCaseResult = await pool.request().input("id", sql.Int, testCaseId)
     .query(`
-        SELECT
-          id,
-          title,
-          playwright_script
-        FROM dbo.test_cases
-        WHERE id = @id
-      `);
+
+        SELECT
+          id,
+          title,
+          playwright_script
+        FROM dbo.test_cases
+        WHERE id = @id
+      `);
 
   if (!testCaseResult.recordset.length) {
     throw new Error("Test case not found.");
@@ -650,32 +840,32 @@ async function runTestCase(testCaseId, userId = null) {
   }
 
   const runResult = await pool
+
     .request()
     .input("test_case_id", sql.Int, testCaseId)
     .input("status", sql.VarChar, "running")
     .input("started_at", sql.DateTime, new Date())
     .input("created_by", sql.Int, userId).query(`
-        INSERT INTO dbo.playwright_test_runs
-        (
-          test_case_id,
-          status,
-          started_at,
-          created_by
-        )
-        OUTPUT INSERTED.id
-        VALUES
-        (
-          @test_case_id,
-          @status,
-          @started_at,
-          @created_by
-        )
-      `);
+
+        INSERT INTO dbo.playwright_test_runs
+        (
+          test_case_id,
+          status,
+          started_at,
+          created_by
+        )
+        OUTPUT INSERTED.id
+        VALUES
+        (
+          @test_case_id,
+          @status,
+          @started_at,
+          @created_by
+        )
+      `);
 
   const runId = runResult.recordset[0].id;
-
   const startedAtMs = Date.now();
-
   const abortController = new AbortController();
 
   activeRuns[runId] = abortController;
@@ -695,28 +885,21 @@ async function runTestCase(testCaseId, userId = null) {
 
   try {
     const session = await createBrowserSession(runId);
-
     browser = session.browser;
-
     context = session.context;
-
     const page = session.page;
 
     for (let stepIndex = 0; stepIndex < steps.length; stepIndex += 1) {
       if (isAborted()) {
         broadcast({
           type: "run_aborted",
-
           runId,
-
           stoppedAtStep: stepIndex + 1,
         });
-
         break;
       }
 
       const step = steps[stepIndex];
-
       const stepStartedAt = Date.now();
 
       const stepId = await createStepRunningRecord(
@@ -728,15 +911,10 @@ async function runTestCase(testCaseId, userId = null) {
 
       broadcast({
         type: "step_started",
-
         runId,
-
         stepId,
-
         stepNum: stepIndex + 1,
-
         step,
-
         total: steps.length,
       });
 
@@ -744,11 +922,8 @@ async function runTestCase(testCaseId, userId = null) {
 
       try {
         await executeBasicStep(page, step);
-
         await captureScreenshot(page, screenshotInfo.absolutePath);
-
         const duration = Date.now() - stepStartedAt;
-
         await updateExistingStepRecord(
           pool,
           stepId,
@@ -759,17 +934,11 @@ async function runTestCase(testCaseId, userId = null) {
 
         broadcast({
           type: "step_completed",
-
           runId,
-
           stepId,
-
           stepNum: stepIndex + 1,
-
           status: "passed",
-
           duration_ms: duration,
-
           screenshotPath: screenshotInfo.publicPath,
         });
       } catch (error) {
@@ -788,19 +957,12 @@ async function runTestCase(testCaseId, userId = null) {
 
         broadcast({
           type: "step_failed",
-
           runId,
-
           stepId,
-
           stepNum: stepIndex + 1,
-
           status: "failed",
-
           duration_ms: duration,
-
           error: error.message,
-
           screenshotPath: screenshotInfo.publicPath,
         });
 
@@ -809,18 +971,14 @@ async function runTestCase(testCaseId, userId = null) {
     }
 
     const finalStatus = isAborted() ? "aborted" : "passed";
-
     const duration = Date.now() - startedAtMs;
 
     await updateRunRecord(pool, runId, finalStatus, duration);
 
     broadcast({
       type: "run_completed",
-
       runId,
-
       status: finalStatus,
-
       duration,
     });
   } catch (error) {
@@ -830,13 +988,9 @@ async function runTestCase(testCaseId, userId = null) {
 
     broadcast({
       type: "run_completed",
-
       runId,
-
       status: "failed",
-
       error: error.message,
-
       duration,
     });
   } finally {
@@ -855,7 +1009,7 @@ async function runTestCase(testCaseId, userId = null) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Enhanced data-driven runner                                                */
+/* Enhanced data-driven runner                                                */
 /* -------------------------------------------------------------------------- */
 
 async function runEnhancedTestCase(testCaseId, options = {}) {
@@ -863,14 +1017,14 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
   const testCaseResult = await pool.request().input("id", sql.Int, testCaseId)
     .query(`
-        SELECT
-          id,
-          title,
-          playwright_script,
-          test_type
-        FROM dbo.test_cases
-        WHERE id = @id
-      `);
+        SELECT
+          id,
+          title,
+          playwright_script,
+          test_type
+        FROM dbo.test_cases
+        WHERE id = @id
+      `);
 
   if (!testCaseResult.recordset.length) {
     throw new Error("Test case not found.");
@@ -883,26 +1037,24 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
     !String(testCase.playwright_script).trim()
   ) {
     throw new Error("This test case does not have a Playwright script.");
-  }
+  } /*
+   \* UPDATED:
+   \*
+   \* testCaseId is supplied so we can
+   \* verify the selected dataset belongs
+   \* to this test case.
+   */
 
-  /*
-   * UPDATED:
-   *
-   * testCaseId is supplied so we can
-   * verify the selected dataset belongs
-   * to this test case.
-   */
   const dataPoints = await resolveDataPoints(
     pool,
     testCaseId,
     options.dataSourceId,
-  );
+  ); /*
+   \* Mapping rows should normally already
+   \* be loaded by the controller from the
+   \* selected mappingSetId.
+   */
 
-  /*
-   * Mapping rows should normally already
-   * be loaded by the controller from the
-   * selected mappingSetId.
-   */
   const parameterMappings = Array.isArray(options.parameterMappings)
     ? options.parameterMappings
     : [];
@@ -920,26 +1072,17 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
     );
 
     runIds.push(runId);
-
     const abortController = new AbortController();
-
     activeRuns[runId] = abortController;
-
     const isAborted = () => abortController.signal.aborted;
-
     const variableEngine = new VariableEngine();
-
     variableEngine.setVariables(dataPoint);
 
     broadcast({
       type: "run_started",
-
       runId,
-
       testCaseId,
-
       dataIndex,
-
       totalIterations: dataPoints.length,
     });
 
@@ -947,44 +1090,40 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
     let browser = null;
     let context = null;
-
     let locatorRecoveries = 0;
-
     let runFailed = false;
-
     let lastError = null;
-
     try {
-      let processedScript = testCase.playwright_script;
+      let processedScript = testCase.playwright_script; /*
 
-      /*
-       * Mapping-set substitution.
-       *
-       * Example mapping set:
-       *
-       * Login Data Mapping
-       *
-       * {{username}} -> username
-       * {{password}} -> password
-       *
-       * Both rows are applied together
-       * for each data iteration.
-       */
+       \* Mapping-set substitution.
+       \*
+       \* Example mapping set:
+       \*
+       \* Login Data Mapping
+       \*
+       \* {{username}} -> username
+       \* {{password}} -> password
+       \*
+       \* Both rows are applied together
+       \* for each data iteration.
+       */
+
       if (parameterMappings.length > 0) {
         processedScript = dataEngineService.substituteVariables(
           processedScript,
           dataPoint,
           parameterMappings,
         );
-      }
+      } /*
+       \* Keep automatic nested variable
+       \* substitution for scripts using
+       \* {{customer.name}} directly.
+       */
 
-      /*
-       * Keep automatic nested variable
-       * substitution for scripts using
-       * {{customer.name}} directly.
-       */
       processedScript = dataEngineService.substituteNestedVariables(
         processedScript,
+
         dataPoint,
       );
 
@@ -1040,16 +1179,23 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
           step.condition &&
           !conditionalExecutor.evaluateCondition(
             step.condition,
+
             variableEngine.getVariables(),
           )
         ) {
           await recordEnhancedStepResult(
             pool,
+
             runId,
+
             stepIndex + 1,
+
             step,
+
             "skipped",
+
             Date.now() - stepStartedAt,
+
             {
               reason: "Condition evaluated to false.",
             },
@@ -1071,11 +1217,17 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
           await recordEnhancedStepResult(
             pool,
+
             runId,
+
             stepIndex + 1,
+
             step,
+
             "passed",
+
             Date.now() - stepStartedAt,
+
             result || {},
           );
         } catch (error) {
@@ -1089,11 +1241,17 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
           await recordEnhancedStepResult(
             pool,
+
             runId,
+
             stepIndex + 1,
+
             step,
+
             "failed",
+
             Date.now() - stepStartedAt,
+
             {
               error: error.message,
 
@@ -1117,10 +1275,15 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
       await finalizeEnhancedRun(
         pool,
+
         runId,
+
         finalStatus,
+
         locatorRecoveries,
+
         lastError?.message || null,
+
         duration,
       );
 
@@ -1142,10 +1305,15 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 
       await finalizeEnhancedRun(
         pool,
+
         runId,
+
         "failed",
+
         locatorRecoveries,
+
         error.message,
+
         duration,
       );
 
@@ -1178,15 +1346,21 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
   }
 
   await testMaintenanceEngine
+
     .versionScript(
       testCaseId,
+
       testCase.playwright_script,
+
       "Enhanced run executed",
+
       options.userId,
     )
+
     .catch((error) => {
       console.warn(
         "Unable to save test version:",
+
         error.message,
       );
     });
@@ -1195,7 +1369,9 @@ async function runEnhancedTestCase(testCaseId, options = {}) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Basic step execution                                                       */
+
+/* Basic step execution                                                       */
+
 /* -------------------------------------------------------------------------- */
 
 async function executeBasicStep(page, step) {
@@ -1217,7 +1393,9 @@ async function executeBasicStep(page, step) {
     }
 
     case "click": {
-      const locator = await waitForLocatorReady(page, step.selector);
+      const locator = await waitForClickLocatorReady(page, step.selector, {
+        timeout: Number(step.timeout) || DEFAULT_ELEMENT_TIMEOUT,
+      });
 
       await locator.scrollIntoViewIfNeeded();
 
@@ -1272,7 +1450,7 @@ async function executeBasicStep(page, step) {
       await waitForLocatorReady(page, step.selector, {
         state: "visible",
 
-        timeout: Number(step.timeout) || DEFAULT_ACTION_TIMEOUT,
+        timeout: Number(step.timeout) || DEFAULT_ELEMENT_TIMEOUT,
       });
 
       return;
@@ -1310,6 +1488,7 @@ async function executeBasicStep(page, step) {
       return;
 
     case "custom":
+
     default:
       console.warn(
         "[Playwright runner] Unsupported script line:",
@@ -1320,7 +1499,9 @@ async function executeBasicStep(page, step) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Enhanced step execution                                                    */
+
+/* Enhanced step execution                                                    */
+
 /* -------------------------------------------------------------------------- */
 
 async function executeStep(page, rawStep, context) {
@@ -1364,7 +1545,7 @@ async function executeStep(page, rawStep, context) {
       await waitForLocatorReady(page, step.selector, {
         state: "visible",
 
-        timeout: Number(step.timeout) || DEFAULT_ACTION_TIMEOUT,
+        timeout: Number(step.timeout) || DEFAULT_ELEMENT_TIMEOUT,
       });
 
       return {
@@ -1373,11 +1554,15 @@ async function executeStep(page, rawStep, context) {
     }
 
     case "click":
+
     case "fill":
+
     case "type":
+
     case "select":
       return executeEnhancedLocatorAction(page, step, {
         testCaseId,
+
         onLocatorHealed,
       });
 
@@ -1427,6 +1612,7 @@ async function executeStep(page, rawStep, context) {
     case "api_request": {
       const apiResult = await apiTestingEngine.executeRequest(
         step.apiEndpoint,
+
         variables,
       );
 
@@ -1440,6 +1626,7 @@ async function executeStep(page, rawStep, context) {
       if (step.extractRules) {
         const extracted = apiTestingEngine.extractFromResponse(
           apiResult.body,
+
           step.extractRules,
         );
 
@@ -1449,6 +1636,7 @@ async function executeStep(page, rawStep, context) {
       if (step.assertions) {
         const validations = apiTestingEngine.validateResponse(
           apiResult,
+
           step.assertions,
         );
 
@@ -1509,7 +1697,9 @@ async function executeStep(page, rawStep, context) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Enhanced locator / self healing                                            */
+
+/* Enhanced locator / self healing                                            */
+
 /* -------------------------------------------------------------------------- */
 
 async function executeEnhancedLocatorAction(page, step, context) {
@@ -1526,11 +1716,14 @@ async function executeEnhancedLocatorAction(page, step, context) {
   let usedFallback = false;
 
   try {
-    locator = await waitForLocatorReady(page, step.selector, {
-      state: "visible",
-
-      timeout: Number(step.timeout) || DEFAULT_ACTION_TIMEOUT,
-    });
+    locator = await (step.action === "click"
+      ? waitForClickLocatorReady(page, step.selector, {
+          timeout: Number(step.timeout) || DEFAULT_ELEMENT_TIMEOUT,
+        })
+      : waitForLocatorReady(page, step.selector, {
+          state: "visible",
+          timeout: Number(step.timeout) || DEFAULT_ELEMENT_TIMEOUT,
+        }));
   } catch (primaryError) {
     const alternatives = await selfHealingEngine.generateAlternativeLocators(
       step.elementInfo || {},
@@ -1538,7 +1731,9 @@ async function executeEnhancedLocatorAction(page, step, context) {
 
     const healingResult = await findElementWithFallback(
       page,
+
       step.selector,
+
       alternatives,
     );
 
@@ -1559,13 +1754,14 @@ async function executeEnhancedLocatorAction(page, step, context) {
     await locator.waitFor({
       state: "visible",
 
-      timeout: DEFAULT_ACTION_TIMEOUT,
+      timeout: DEFAULT_ELEMENT_TIMEOUT,
     });
 
     if (usedFallback) {
       onLocatorHealed();
 
       await testMaintenanceEngine
+
         .trackLocatorChange(
           testCaseId,
 
@@ -1575,6 +1771,7 @@ async function executeEnhancedLocatorAction(page, step, context) {
 
           "SELF_HEALED",
         )
+
         .catch((error) => {
           console.warn(
             "[Enhanced runner] Unable to record healed locator:",
@@ -1633,7 +1830,9 @@ async function executeEnhancedLocatorAction(page, step, context) {
 
 async function findElementWithFallback(
   page,
+
   primarySelector,
+
   alternatives = [],
 ) {
   const candidates = [
@@ -1680,30 +1879,52 @@ async function findElementWithFallback(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Data loading                                                               */
+
+/* Data loading                                                               */
+
 /* -------------------------------------------------------------------------- */
 
-/**
- * IMPORTANT:
- *
- * Uploaded CSV/XLSX/JSON rows are already stored in:
- *
- *   dbo.test_data_rows
- *
- * We therefore do NOT reopen source_path during execution.
- *
- * This makes saved datasets reusable even if:
- *   - the original upload file no longer exists
- *   - the backend restarted
- *   - the original path was temporary
- *
- * The selected dataset is also verified against test_case_id.
- */
+/*\*
+
+ \* IMPORTANT:
+
+ \*
+
+ \* Uploaded CSV/XLSX/JSON rows are already stored in:
+
+ \*
+
+ \*   dbo.test_data_rows
+
+ \*
+
+ \* We therefore do NOT reopen source_path during execution.
+
+ \*
+
+ \* This makes saved datasets reusable even if:
+
+ \*   - the original upload file no longer exists
+
+ \*   - the backend restarted
+
+ \*   - the original path was temporary
+
+ \*
+
+ \* The selected dataset is also verified against test_case_id.
+
+ */
+
 async function resolveDataPoints(pool, testCaseId, dataSourceId) {
   /*
-   * No selected data source means one
-   * standard execution with empty data.
-   */
+
+   \* No selected data source means one
+
+   \* standard execution with empty data.
+
+   */
+
   if (!dataSourceId) {
     return [{}];
   }
@@ -1718,55 +1939,65 @@ async function resolveDataPoints(pool, testCaseId, dataSourceId) {
 
   if (!numericTestCaseId || numericTestCaseId <= 0) {
     throw new Error("Invalid test case ID.");
-  }
-
-  /* ---------------------------------------------------------------------- */
-  /* Verify selected data source                                            */
-  /* ---------------------------------------------------------------------- */
+  } /* ---------------------------------------------------------------------- */ /* Verify selected data source                                            */ /* ---------------------------------------------------------------------- */
 
   const sourceResult = await pool
+
     .request()
+
     .input("dataSourceId", sql.Int, numericSourceId).query(`
-        SELECT
-          id,
-          test_case_id,
-          data_source_type,
-          source_path
-        FROM dbo.test_data_sources
-        WHERE id = @dataSourceId
-      `);
+
+        SELECT
+
+          id,
+
+          test_case_id,
+
+          data_source_type,
+
+          source_path
+
+        FROM dbo.test_data_sources
+
+        WHERE id = @dataSourceId
+
+      `);
 
   if (!sourceResult.recordset.length) {
     throw new Error(`Data source ${numericSourceId} was not found.`);
   }
 
-  const dataSource = sourceResult.recordset[0];
-
-  /* ---------------------------------------------------------------------- */
-  /* Verify ownership                                                       */
-  /* ---------------------------------------------------------------------- */
+  const dataSource =
+    sourceResult
+      .recordset[0]; /* ---------------------------------------------------------------------- */ /* Verify ownership                                                       */ /* ---------------------------------------------------------------------- */
 
   if (Number(dataSource.test_case_id) !== numericTestCaseId) {
     throw new Error(
       `Data source ${numericSourceId} does not belong to test case ${numericTestCaseId}.`,
     );
-  }
-
-  /* ---------------------------------------------------------------------- */
-  /* Load all persisted data rows                                           */
-  /* ---------------------------------------------------------------------- */
+  } /* ---------------------------------------------------------------------- */ /* Load all persisted data rows                                           */ /* ---------------------------------------------------------------------- */
 
   const rowsResult = await pool
+
     .request()
+
     .input("dataSourceId", sql.Int, numericSourceId).query(`
-        SELECT
-          id,
-          row_number,
-          data
-        FROM dbo.test_data_rows
-        WHERE data_source_id = @dataSourceId
-        ORDER BY row_number ASC, id ASC
-      `);
+
+        SELECT
+
+          id,
+
+          row_number,
+
+          data
+
+        FROM dbo.test_data_rows
+
+        WHERE data_source_id = @dataSourceId
+
+        ORDER BY row_number ASC, id ASC
+
+      `);
 
   if (!rowsResult.recordset.length) {
     throw new Error(
@@ -1781,12 +2012,14 @@ async function resolveDataPoints(pool, testCaseId, dataSourceId) {
   for (const row of rowsResult.recordset) {
     try {
       const parsed =
-        typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+        typeof row.data === "string" ? JSON.parse(row.data) : row.data; /*
 
-      /*
-       * Data-driven rows need to be
-       * normal objects.
-       */
+       \* Data-driven rows need to be
+
+       \* normal objects.
+
+       */
+
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         invalidRows.push(row.row_number);
 
@@ -1799,6 +2032,7 @@ async function resolveDataPoints(pool, testCaseId, dataSourceId) {
 
       console.warn(
         `Invalid JSON in data source ${numericSourceId}, row ${row.row_number}:`,
+
         error.message,
       );
     }
@@ -1826,7 +2060,9 @@ async function resolveDataPoints(pool, testCaseId, dataSourceId) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Screenshot helpers                                                         */
+
+/* Screenshot helpers                                                         */
+
 /* -------------------------------------------------------------------------- */
 
 function getStepScreenshotInfo(runId, stepNumber) {
@@ -1872,172 +2108,291 @@ async function captureScreenshot(page, screenshotPath) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Database helpers                                                           */
+
+/* Database helpers                                                           */
+
 /* -------------------------------------------------------------------------- */
 
 async function createStepRunningRecord(pool, runId, stepNumber, step) {
   const result = await pool
+
     .request()
+
     .input("run_id", sql.Int, runId)
+
     .input("step_number", sql.Int, stepNumber)
+
     .input("action", sql.VarChar, step.action || step.keyword || "custom")
+
     .input(
       "selector",
+
       sql.NVarChar(sql.MAX),
 
       step.selector == null ? null : JSON.stringify(step.selector),
     )
+
     .input(
       "value",
+
       sql.NVarChar(sql.MAX),
 
       step.value || null,
     )
+
     .input("status", sql.VarChar, "running").query(`
-        INSERT INTO dbo.playwright_test_run_steps
-        (
-          run_id,
-          step_number,
-          action,
-          selector,
-          value,
-          status
-        )
-        OUTPUT INSERTED.id
-        VALUES
-        (
-          @run_id,
-          @step_number,
-          @action,
-          @selector,
-          @value,
-          @status
-        )
-      `);
+
+        INSERT INTO dbo.playwright_test_run_steps
+
+        (
+
+          run_id,
+
+          step_number,
+
+          action,
+
+          selector,
+
+          value,
+
+          status
+
+        )
+
+        OUTPUT INSERTED.id
+
+        VALUES
+
+        (
+
+          @run_id,
+
+          @step_number,
+
+          @action,
+
+          @selector,
+
+          @value,
+
+          @status
+
+        )
+
+      `);
 
   return result.recordset[0].id;
 }
 
 async function updateExistingStepRecord(
   pool,
+
   stepId,
+
   status,
+
   duration,
+
   screenshotPath,
+
   errorMessage = null,
 ) {
   await pool
+
     .request()
+
     .input("id", sql.Int, stepId)
+
     .input("status", sql.VarChar, status)
+
     .input("duration_ms", sql.Int, duration)
+
     .input("error_message", sql.NVarChar(sql.MAX), errorMessage)
+
     .input("screenshot_path", sql.NVarChar(sql.MAX), screenshotPath).query(`
-      UPDATE dbo.playwright_test_run_steps
-      SET
-        status = @status,
-        duration_ms = @duration_ms,
-        error_message = @error_message,
-        screenshot_path = @screenshot_path
-      WHERE id = @id
-    `);
+
+      UPDATE dbo.playwright_test_run_steps
+
+      SET
+
+        status = @status,
+
+        duration_ms = @duration_ms,
+
+        error_message = @error_message,
+
+        screenshot_path = @screenshot_path
+
+      WHERE id = @id
+
+    `);
 }
 
 async function createEnhancedRunRecord(pool, testCaseId, userId, dataIndex) {
   const result = await pool
+
     .request()
+
     .input("test_case_id", sql.Int, testCaseId)
+
     .input("status", sql.VarChar, "running")
+
     .input("started_at", sql.DateTime, new Date())
+
     .input("created_by", sql.Int, userId || null)
+
     .input("data_index", sql.Int, dataIndex).query(`
-        INSERT INTO dbo.playwright_test_runs
-        (
-          test_case_id,
-          status,
-          started_at,
-          created_by,
-          data_index
-        )
-        OUTPUT INSERTED.id
-        VALUES
-        (
-          @test_case_id,
-          @status,
-          @started_at,
-          @created_by,
-          @data_index
-        )
-      `);
+
+        INSERT INTO dbo.playwright_test_runs
+
+        (
+
+          test_case_id,
+
+          status,
+
+          started_at,
+
+          created_by,
+
+          data_index
+
+        )
+
+        OUTPUT INSERTED.id
+
+        VALUES
+
+        (
+
+          @test_case_id,
+
+          @status,
+
+          @started_at,
+
+          @created_by,
+
+          @data_index
+
+        )
+
+      `);
 
   return result.recordset[0].id;
 }
 
 async function recordEnhancedStepResult(
   pool,
+
   runId,
+
   stepNumber,
+
   step,
+
   status,
+
   duration,
+
   extra = {},
 ) {
   await pool
+
     .request()
+
     .input("run_id", sql.Int, runId)
+
     .input("step_number", sql.Int, stepNumber)
+
     .input("action", sql.VarChar, step.action || step.keyword || "custom")
+
     .input(
       "selector",
+
       sql.NVarChar(sql.MAX),
 
       step.selector ? JSON.stringify(step.selector) : null,
     )
+
     .input(
       "value",
+
       sql.NVarChar(sql.MAX),
 
       step.value || null,
     )
+
     .input("status", sql.VarChar, status)
+
     .input("duration_ms", sql.Int, duration)
+
     .input(
       "error_message",
+
       sql.NVarChar(sql.MAX),
 
       extra.error || extra.reason || null,
     )
+
     .input(
       "screenshot_path",
+
       sql.NVarChar(sql.MAX),
 
       extra.screenshotPath || null,
     ).query(`
-      INSERT INTO dbo.playwright_test_run_steps
-      (
-        run_id,
-        step_number,
-        action,
-        selector,
-        value,
-        status,
-        duration_ms,
-        error_message,
-        screenshot_path
-      )
-      VALUES
-      (
-        @run_id,
-        @step_number,
-        @action,
-        @selector,
-        @value,
-        @status,
-        @duration_ms,
-        @error_message,
-        @screenshot_path
-      )
-    `);
+
+      INSERT INTO dbo.playwright_test_run_steps
+
+      (
+
+        run_id,
+
+        step_number,
+
+        action,
+
+        selector,
+
+        value,
+
+        status,
+
+        duration_ms,
+
+        error_message,
+
+        screenshot_path
+
+      )
+
+      VALUES
+
+      (
+
+        @run_id,
+
+        @step_number,
+
+        @action,
+
+        @selector,
+
+        @value,
+
+        @status,
+
+        @duration_ms,
+
+        @error_message,
+
+        @screenshot_path
+
+      )
+
+    `);
 
   broadcast({
     type:
@@ -2065,57 +2420,98 @@ async function recordEnhancedStepResult(
 
 async function updateRunRecord(
   pool,
+
   runId,
+
   status,
+
   duration,
+
   errorMessage = null,
 ) {
   await pool
+
     .request()
+
     .input("id", sql.Int, runId)
+
     .input("status", sql.VarChar, status)
+
     .input("completed_at", sql.DateTime, new Date())
+
     .input("duration_ms", sql.Int, duration)
+
     .input("error_message", sql.NVarChar(sql.MAX), errorMessage).query(`
-      UPDATE dbo.playwright_test_runs
-      SET
-        status = @status,
-        completed_at = @completed_at,
-        duration_ms = @duration_ms,
-        error_message = @error_message
-      WHERE id = @id
-    `);
+
+      UPDATE dbo.playwright_test_runs
+
+      SET
+
+        status = @status,
+
+        completed_at = @completed_at,
+
+        duration_ms = @duration_ms,
+
+        error_message = @error_message
+
+      WHERE id = @id
+
+    `);
 }
 
 async function finalizeEnhancedRun(
   pool,
+
   runId,
+
   status,
+
   locatorRecoveries,
+
   errorMessage = null,
+
   duration = null,
 ) {
   await pool
+
     .request()
+
     .input("id", sql.Int, runId)
+
     .input("status", sql.VarChar, status)
+
     .input("completed_at", sql.DateTime, new Date())
+
     .input("locator_recoveries", sql.Int, locatorRecoveries)
+
     .input("error_message", sql.NVarChar(sql.MAX), errorMessage)
+
     .input("duration_ms", sql.Int, duration).query(`
-      UPDATE dbo.playwright_test_runs
-      SET
-        status = @status,
-        completed_at = @completed_at,
-        locator_recoveries = @locator_recoveries,
-        error_message = @error_message,
-        duration_ms = @duration_ms
-      WHERE id = @id
-    `);
+
+      UPDATE dbo.playwright_test_runs
+
+      SET
+
+        status = @status,
+
+        completed_at = @completed_at,
+
+        locator_recoveries = @locator_recoveries,
+
+        error_message = @error_message,
+
+        duration_ms = @duration_ms
+
+      WHERE id = @id
+
+    `);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Exports                                                                    */
+
+/* Exports                                                                    */
+
 /* -------------------------------------------------------------------------- */
 
 module.exports = {
@@ -2137,11 +2533,13 @@ module.exports = {
 
   waitForPageReady,
 
-  waitForLocatorReady,
+  waitForLocatorReady /*
 
-  /*
-   * Exported mainly for debugging/testing
-   * data-driven execution.
-   */
+   \* Exported mainly for debugging/testing
+
+   \* data-driven execution.
+
+   */,
+
   resolveDataPoints,
 };

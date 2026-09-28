@@ -108,6 +108,7 @@ cron.schedule("0 * * * *", () => {
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
+const menuRoutes = require("./routes/menuRoutes");
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
@@ -131,7 +132,8 @@ app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/sprints", require("./routes/sprintRoutes"));
 app.use("/api/permissions", require("./routes/permissions.routes"));
 app.use("/api/advanced", require("./routes/advancedTestingRoutes"));
-app.use("/api/data-testing", require("./routes/dataTestingRoutes")); 
+app.use("/api/data-testing", require("./routes/dataTestingRoutes"));
+app.use("/api/menus", require("./routes/menuRoutes"));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "Test Case Manager API" });

@@ -13,6 +13,7 @@ import AdvancedAutomation from "./pages/TestManagement/Playwright/AdvancedAutoma
 import BugReports from "./pages/BugReports/BugReports";
 import TestCaseApprovals from "./pages/TestManagement/TestCaseApprovals";
 import TestDataSources from "./pages/TestDataSources";
+import MenuManagement from "./pages/System/MenuManagement";
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/AuthPages/SignIn"));
@@ -158,9 +159,9 @@ export default function App() {
               <Route path="/test-suites" element={<TestSuites />} />
               <Route path="/test-cases" element={<TestCases />} />
               <Route
-  path="/test-case-approvals"
-  element={<TestCaseApprovals />}
-/>
+                path="/test-case-approvals"
+                element={<TestCaseApprovals />}
+              />
               <Route path="/test-cases/:id" element={<TestCaseDetails />} />
 
               <Route path="/script/recorder" element={<PlaywrightRecorder />} />
@@ -192,6 +193,7 @@ export default function App() {
                 element={<PlaywrightPreview />}
               />
               <Route path="/bug-reports" element={<BugReports />} />
+              <Route path="/menu-management" element={<MenuManagement />} />
             </Route>
           </Route>
 

@@ -1,572 +1,953 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { Link, useLocation } from "react-router-dom";
+
+import { FaChevronDown } from "react-icons/fa";
+
 import API from "../services/api";
 
-import {
-  FaBug,
-  FaCalendarAlt,
-  FaChartPie,
-  FaChevronDown,
-  FaClipboardCheck,
-  FaFolderOpen,
-  FaHome,
-  FaTasks,
-  FaUserCircle,
-  FaUsersCog,
-  FaWrench,
-} from "react-icons/fa";
 import { useSidebar } from "../context/SidebarContext";
 
-type SubItem = {
-  name: string;
-  path: string;
-  pro?: boolean;
-  new?: boolean;
+import { getMenuIcon } from "../config/menuIcons";
+
+import type { MenuItem, UserPermission } from "../types/menu";
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+const normalizePermissionPath = (path?: string | null) => {
+  if (!path) {
+    return null;
+  }
+
+  return path.trim();
 };
 
-type NavItem = {
-  name: string;
-  icon: React.ReactNode;
-  path?: string;
-  subItems?: SubItem[];
-};
+/* ============================================================
+   FILTER MENU TREE BY PERMISSION
+   ============================================================ */
 
-interface UserPermission {
-  menu_name: string;
-  path: string;
-}
+const filterMenuTreeByPermissions = (
+  menus: MenuItem[],
+  allowedPaths: Set<string> | null,
+): MenuItem[] => {
+  if (allowedPaths === null) {
+    return menus;
+  }
 
-const navItems: NavItem[] = [
-  // =========================
-  // MAIN
-  // =========================
+  return menus
+    .map((menu) => {
+      const children = filterMenuTreeByPermissions(
+        menu.children || [],
+        allowedPaths,
+      );
 
-  {
-    icon: <FaHome />,
-    name: "Dashboard",
-    path: "/home",
-  },
+      const path = normalizePermissionPath(menu.path);
 
-  {
-    icon: <FaCalendarAlt />,
-    name: "Calendar",
-    path: "/calendar",
-  },
+      const ownAllowed =
+        !path ||
+        menu.menu_type === "group" ||
+        menu.menu_type === "heading" ||
+        allowedPaths.has(path);
 
-  {
-    icon: <FaUserCircle />,
-    name: "User Profile",
-    path: "/profile",
-  },
-
-  // =========================
-  // PROJECT MANAGEMENT
-  // =========================
-
-  {
-    icon: <FaFolderOpen />,
-    name: "Projects",
-    path: "/projects",
-  },
-
-  {
-    icon: <FaTasks />,
-    name: "Tasks",
-    path: "/tasks",
-  },
-
-  // =========================
-  // TEST MANAGEMENT
-  // =========================
-
-  {
-    name: "Test Repository",
-    icon: <FaClipboardCheck />,
-    subItems: [
-      {
-        name: "Test Suites",
-        path: "/test-suites",
-      },
-      {
-        name: "Test Cases",
-        path: "/test-cases",
-      },
-      {
-        name: "Test Case Approval",
-        path: "/test-case-approvals",
-      },
-      {
-        name: "Recorder",
-        path: "/script/recorder",
-      },
-      {
-        name: "Editor",
-        path: "/script/editor",
-      },
-      {
-        name: "Runner",
-        path: "/script/runner",
-      },
-      {
-        name: "Preview",
-        path: "/script/preview",
-      },
-      {
-        name: "Sprints",
-        path: "/sprints",
-      },
-      {
-        name: "Advanced Automation",
-        path: "/script/advanced",
-      },
-      // {
-      //   name: "Sprint Board",
-      //   path: "/sprintboard",
-      // },
-    ],
-  },
-
-  // =========================
-  // DEFECT MANAGEMENT
-  // =========================
-
-  {
-    icon: <FaBug />,
-    name: "Log Defect",
-    path: "/bug-reports",
-  },
-
-  // =========================
-  // REPORTS
-  // =========================
-
-  {
-    name: "Reports",
-    icon: <FaChartPie />,
-    subItems: [
-      {
-        name: "Users",
-        path: "/reports/users",
-      },
-      {
-        name: "Tasks",
-        path: "/reports/tasks",
-      },
-      {
-        name: "Bugs",
-        path: "/reports/bugs",
-      },
-    ],
-  },
-
-  // =========================
-  // SYSTEM
-  // =========================
-
-  {
-    name: "System Configuration",
-    icon: <FaUsersCog />,
-    subItems: [
-      {
-        name: "User Management",
-        path: "/users",
-      },
-      {
-        name: "Roles",
-        path: "/roles",
-      },
-      {
-        name: "Departments",
-        path: "/departments",
-      },
-      {
-        name: "Teams",
-        path: "/teams",
-      },
-      {
-        name: "Test Data Sources",
-        path: "/test-data-sources",
-      },
-    ],
-  },
-];
-
-const othersItems: NavItem[] = [
-  {
-    icon: <FaChartPie />,
-    name: "Charts",
-    subItems: [
-      {
-        name: "Line Chart",
-        path: "/line-chart",
-      },
-      {
-        name: "Bar Chart",
-        path: "/bar-chart",
-      },
-    ],
-  },
-
-  {
-    icon: <FaWrench />,
-    name: "UI Elements",
-    subItems: [
-      {
-        name: "Alerts",
-        path: "/alerts",
-      },
-      {
-        name: "Avatar",
-        path: "/avatars",
-      },
-      {
-        name: "Badge",
-        path: "/badge",
-      },
-      {
-        name: "Buttons",
-        path: "/buttons",
-      },
-      {
-        name: "Images",
-        path: "/images",
-      },
-      {
-        name: "Videos",
-        path: "/videos",
-      },
-    ],
-  },
-
-  {
-    icon: <FaUserCircle />,
-    name: "Authentication",
-    subItems: [
-      {
-        name: "Sign In",
-        path: "/signin",
-      },
-      {
-        name: "Sign Up",
-        path: "/signup",
-      },
-    ],
-  },
-];
-
-function filterMenuByPermissions(
-  items: NavItem[],
-  allowedPaths: Set<string>,
-): NavItem[] {
-  return items
-    .map((item) => {
-      if (item.path) {
-        return allowedPaths.has(item.path) ? item : null;
+      /*
+       * Parent/group stays visible if
+       * at least one permitted child exists.
+       */
+      if (children.length > 0) {
+        return {
+          ...menu,
+          children,
+        };
       }
-      if (item.subItems) {
-        const filteredSubs = item.subItems.filter((s) =>
-          allowedPaths.has(s.path),
-        );
-        return filteredSubs.length === 0
-          ? null
-          : { ...item, subItems: filteredSubs };
+
+      /*
+       * Normal menu / external link.
+       */
+      if (ownAllowed && path) {
+        return {
+          ...menu,
+          children: [],
+        };
       }
+
+      /*
+       * Empty heading or group.
+       */
+      if (
+        ownAllowed &&
+        !path &&
+        (menu.menu_type === "heading" || menu.menu_type === "group")
+      ) {
+        return {
+          ...menu,
+          children: [],
+        };
+      }
+
       return null;
     })
-    .filter(Boolean) as NavItem[];
-}
+    .filter(Boolean) as MenuItem[];
+};
+
+/* ============================================================
+   FIND MENU
+   ============================================================ */
+
+const findMenuById = (menus: MenuItem[], id: number): MenuItem | null => {
+  for (const menu of menus) {
+    if (menu.id === id) {
+      return menu;
+    }
+
+    const found = findMenuById(menu.children || [], id);
+
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+};
+
+/* ============================================================
+   FIND PARENT
+   ============================================================ */
+
+const findParentMenu = (
+  menus: MenuItem[],
+  childId: number,
+): MenuItem | null => {
+  for (const menu of menus) {
+    const children = menu.children || [];
+
+    if (children.some((child) => child.id === childId)) {
+      return menu;
+    }
+
+    const found = findParentMenu(children, childId);
+
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+};
+
+/* ============================================================
+   GET DESCENDANT IDS
+   ============================================================ */
+
+const getDescendantIds = (menu: MenuItem): number[] => {
+  const ids: number[] = [];
+
+  const walk = (item: MenuItem) => {
+    (item.children || []).forEach((child) => {
+      ids.push(child.id);
+
+      walk(child);
+    });
+  };
+
+  walk(menu);
+
+  return ids;
+};
+
+/* ============================================================
+   GET SIBLING IDS
+   ============================================================ */
+
+const getSiblingIds = (menus: MenuItem[], id: number): number[] => {
+  const parent = findParentMenu(menus, id);
+
+  /*
+   * Root menu.
+   */
+  if (!parent) {
+    return menus.map((item) => item.id);
+  }
+
+  /*
+   * Nested menu.
+   */
+  return (parent.children || []).map((item) => item.id);
+};
+
+/* ============================================================
+   APP SIDEBAR
+   ============================================================ */
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+
   const location = useLocation();
 
+  const [menus, setMenus] = useState<MenuItem[]>([]);
+
   const [allowedPaths, setAllowedPaths] = useState<Set<string> | null>(null);
-  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
-  const [openSubmenu, setOpenSubmenu] = useState<{
-    type: "main" | "others";
-    index: number;
-  } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
-    {},
-  );
-  const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  /*
+   * A Set is still useful because
+   * nested active parent chains may
+   * contain several open IDs.
+   *
+   * Accordion logic controls siblings.
+   */
+  const [openMenus, setOpenMenus] = useState<Set<number>>(new Set());
 
   const isOpen = isExpanded || isHovered || isMobileOpen;
 
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      try {
-        const res = await API.get("/api/roles/my-permissions");
-        const data: UserPermission[] = res.data?.data ?? res.data;
-        if (Array.isArray(data)) {
-          setAllowedPaths(new Set(data.map((p) => p.path)));
-        } else {
-          setAllowedPaths(null);
-        }
-      } catch {
+  /* ==========================================================
+     LOAD NAVIGATION
+     ========================================================== */
+
+  const loadNavigation = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const [menuResponse, permissionResponse] = await Promise.all([
+        API.get("/api/menus/navigation"),
+
+        API.get("/api/roles/my-permissions"),
+      ]);
+
+      /* -----------------------------------------------
+           MENU DATA
+           ----------------------------------------------- */
+
+      const menuData = menuResponse.data?.data ?? [];
+
+      setMenus(Array.isArray(menuData) ? menuData : []);
+
+      /* -----------------------------------------------
+           PERMISSION DATA
+           ----------------------------------------------- */
+
+      const permissionData: UserPermission[] =
+        permissionResponse.data?.data ?? permissionResponse.data ?? [];
+
+      if (Array.isArray(permissionData)) {
+        const paths = permissionData
+          .filter(
+            (permission) =>
+              Boolean(permission.path) && permission.can_view !== false,
+          )
+          .map((permission) => permission.path);
+
+        setAllowedPaths(new Set(paths));
+      } else {
         setAllowedPaths(null);
-      } finally {
-        setPermissionsLoaded(true);
       }
-    };
-    fetchPermissions();
+    } catch (error) {
+      console.error("Failed to load sidebar:", error);
+
+      setMenus([]);
+
+      setAllowedPaths(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const filteredNavItems =
-    allowedPaths === null
-      ? navItems
-      : filterMenuByPermissions(navItems, allowedPaths);
+  useEffect(() => {
+    loadNavigation();
+  }, [loadNavigation]);
 
-  const filteredOthersItems =
-    allowedPaths === null
-      ? othersItems
-      : filterMenuByPermissions(othersItems, allowedPaths);
+  /* ==========================================================
+     FILTERED MENUS
+     ========================================================== */
+
+  const filteredMenus = useMemo(
+    () => filterMenuTreeByPermissions(menus, allowedPaths),
+    [menus, allowedPaths],
+  );
+
+  /* ==========================================================
+     ACTIVE PATH
+     ========================================================== */
 
   const isActive = useCallback(
-    (path: string) =>
-      location.pathname === path || location.pathname.startsWith(`${path}/`),
-    [location.pathname],
-  );
-
-  const isParentActive = useCallback(
-    (nav: NavItem) =>
-      nav.subItems?.some(
-        (s) =>
-          location.pathname === s.path ||
-          location.pathname.startsWith(`${s.path}/`),
-      ) ?? false,
-    [location.pathname],
-  );
-
-  useEffect(() => {
-    let matched = false;
-    for (const [menuType, items] of [
-      ["main", filteredNavItems],
-      ["others", filteredOthersItems],
-    ] as const) {
-      (items as NavItem[]).forEach((nav, index) => {
-        nav.subItems?.forEach((sub) => {
-          if (location.pathname.startsWith(sub.path)) {
-            setOpenSubmenu({ type: menuType, index });
-            matched = true;
-          }
-        });
-      });
-    }
-    if (!matched) setOpenSubmenu(null);
-  }, [location.pathname, permissionsLoaded]);
-
-  useEffect(() => {
-    if (openSubmenu !== null) {
-      const key = `${openSubmenu.type}-${openSubmenu.index}`;
-      const el = subMenuRefs.current[key];
-      if (el) {
-        setSubMenuHeight((prev) => ({ ...prev, [key]: el.scrollHeight }));
+    (path?: string | null) => {
+      if (!path) {
+        return false;
       }
-    }
-  }, [openSubmenu]);
 
-  const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
-    setOpenSubmenu((prev) =>
-      prev?.type === menuType && prev.index === index
-        ? null
-        : { type: menuType, index },
+      return (
+        location.pathname === path || location.pathname.startsWith(`${path}/`)
+      );
+    },
+    [location.pathname],
+  );
+
+  /* ==========================================================
+     CHECK ACTIVE CHILD
+     ========================================================== */
+
+  const containsActiveChild = useCallback(
+    (menu: MenuItem): boolean => {
+      if (isActive(menu.path)) {
+        return true;
+      }
+
+      return (menu.children || []).some(containsActiveChild);
+    },
+    [isActive],
+  );
+
+  /* ==========================================================
+     AUTO OPEN ACTIVE PARENT CHAIN
+     ========================================================== */
+
+  useEffect(() => {
+    const activeChain = new Set<number>();
+
+    const walk = (items: MenuItem[], parents: number[] = []) => {
+      items.forEach((item) => {
+        const itemIsActive = containsActiveChild(item);
+
+        if (itemIsActive) {
+          parents.forEach((parentId) => {
+            activeChain.add(parentId);
+          });
+
+          if ((item.children || []).length > 0) {
+            activeChain.add(item.id);
+          }
+        }
+
+        walk(item.children || [], [...parents, item.id]);
+      });
+    };
+
+    walk(filteredMenus);
+
+    /*
+     * Important:
+     * when route changes, only keep
+     * the active hierarchy expanded.
+     *
+     * This prevents previously opened
+     * unrelated menus from remaining open.
+     */
+    if (activeChain.size > 0) {
+      setOpenMenus(activeChain);
+    }
+  }, [filteredMenus, location.pathname, containsActiveChild]);
+
+  /* ==========================================================
+     ACCORDION TOGGLE
+     ========================================================== */
+
+  const toggleMenu = (id: number) => {
+    setOpenMenus((previous) => {
+      const next = new Set(previous);
+
+      const selectedMenu = findMenuById(filteredMenus, id);
+
+      if (!selectedMenu) {
+        return next;
+      }
+
+      /* --------------------------------------------------
+           MENU ALREADY OPEN
+           -------------------------------------------------- */
+
+      if (next.has(id)) {
+        /*
+         * Close current menu.
+         */
+        next.delete(id);
+
+        /*
+         * Also close all descendants.
+         */
+        getDescendantIds(selectedMenu).forEach((descendantId) => {
+          next.delete(descendantId);
+        });
+
+        return next;
+      }
+
+      /* --------------------------------------------------
+           FIND SIBLINGS
+           -------------------------------------------------- */
+
+      const siblingIds = getSiblingIds(filteredMenus, id);
+
+      /*
+       * Close every sibling.
+       */
+      siblingIds.forEach((siblingId) => {
+        if (siblingId === id) {
+          return;
+        }
+
+        next.delete(siblingId);
+
+        const siblingMenu = findMenuById(filteredMenus, siblingId);
+
+        if (siblingMenu) {
+          /*
+           * Collapse all nested menus
+           * inside that sibling as well.
+           */
+          getDescendantIds(siblingMenu).forEach((descendantId) => {
+            next.delete(descendantId);
+          });
+        }
+      });
+
+      /*
+       * Finally open selected menu.
+       */
+      next.add(id);
+
+      return next;
+    });
+  };
+
+  /* ==========================================================
+     STANDARD MENU ICON
+     ========================================================== */
+
+  const renderMenuIcon = (menu: MenuItem, active = false) => {
+    const Icon = getMenuIcon(menu.icon);
+
+    return (
+      <span
+        className={`
+          flex
+          h-5
+          w-5
+          min-h-5
+          min-w-5
+          flex-shrink-0
+          items-center
+          justify-center
+
+          ${active ? "text-white" : "text-slate-400"}
+        `}
+      >
+        <Icon
+          className="
+            block
+            h-[15px]
+            w-[15px]
+            flex-shrink-0
+          "
+        />
+      </span>
     );
   };
 
-  const renderMenuItems = (items: NavItem[], menuType: "main" | "others") => (
-    <ul className="flex flex-col gap-0.5">
-      {items.map((nav, index) => {
-        const isSubmenuOpen =
-          openSubmenu?.type === menuType && openSubmenu?.index === index;
-        const parentActive = isParentActive(nav);
+  /* ==========================================================
+     ITEM PADDING
+     ========================================================== */
 
-        return (
-          <li key={nav.name}>
-            {nav.subItems ? (
-              <button
-                onClick={() => handleSubmenuToggle(index, menuType)}
+  const getItemPadding = (level: number) => {
+    if (level === 0) {
+      return "px-3";
+    }
+
+    if (level === 1) {
+      return "pl-3 pr-2";
+    }
+
+    if (level === 2) {
+      return "pl-4 pr-2";
+    }
+
+    return "pl-5 pr-2";
+  };
+
+  /* ==========================================================
+     RENDER MENU ITEM
+     ========================================================== */
+
+  const renderMenuItem = (menu: MenuItem, level = 0): React.ReactNode => {
+    const children = menu.children || [];
+
+    const hasChildren = children.length > 0;
+
+    const expanded = openMenus.has(menu.id);
+
+    const active = isActive(menu.path);
+
+    const childActive = containsActiveChild(menu);
+
+    const itemActive = active || childActive;
+
+    const itemPadding = getItemPadding(level);
+
+    /* --------------------------------------------------------
+       HEADING
+       -------------------------------------------------------- */
+
+    if (menu.menu_type === "heading") {
+      if (!isOpen) {
+        return null;
+      }
+
+      return (
+        <li
+          key={menu.id}
+          className="
+            px-3
+            pt-4
+            pb-1.5
+          "
+        >
+          <span
+            className="
+              text-[10px]
+              font-semibold
+              uppercase
+              tracking-[0.08em]
+              text-slate-500
+            "
+          >
+            {menu.menu_name}
+          </span>
+        </li>
+      );
+    }
+
+    /* --------------------------------------------------------
+       PARENT / GROUP
+       -------------------------------------------------------- */
+
+    if (hasChildren) {
+      return (
+        <li key={menu.id} className="w-full">
+          <button
+            type="button"
+            onClick={() => toggleMenu(menu.id)}
+            title={!isOpen ? menu.menu_name : undefined}
+            className={`
+              flex
+              h-10
+              w-full
+              items-center
+              gap-2.5
+              ${itemPadding}
+
+              rounded-lg
+
+              text-sm
+              font-medium
+
+              transition-colors
+              duration-150
+
+              ${
+                itemActive
+                  ? `
+                    bg-white/10
+                    text-white
+                  `
+                  : `
+                    text-slate-300
+                    hover:bg-white/10
+                    hover:text-white
+                  `
+              }
+
+              ${!isOpen ? "justify-center px-0" : ""}
+            `}
+          >
+            {renderMenuIcon(menu, itemActive)}
+
+            {isOpen && (
+              <>
+                <span
+                  className="
+                    min-w-0
+                    flex-1
+                    truncate
+                    text-left
+                    leading-none
+                  "
+                >
+                  {menu.menu_name}
+                </span>
+
+                <FaChevronDown
+                  className={`
+                    h-3
+                    w-3
+                    flex-shrink-0
+
+                    text-slate-500
+
+                    transition-transform
+                    duration-200
+
+                    ${expanded ? "rotate-180" : ""}
+                  `}
+                />
+              </>
+            )}
+          </button>
+
+          {/* -----------------------------------------------
+              CHILDREN
+              ----------------------------------------------- */}
+
+          {isOpen && (
+            <div
+              className={`
+                overflow-hidden
+
+                transition-all
+                duration-200
+
+                ${
+                  expanded
+                    ? `
+                      max-h-[1400px]
+                      opacity-100
+                    `
+                    : `
+                      max-h-0
+                      opacity-0
+                    `
+                }
+              `}
+            >
+              <ul
                 className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                  transition-colors duration-150 cursor-pointer
+                  mt-1
+                  space-y-0.5
+
                   ${
-                    parentActive || isSubmenuOpen
-                      ? "bg-white/10 text-slate-100"
-                      : "text-slate-300 hover:bg-white/10 hover:text-slate-100"
+                    level === 0
+                      ? `
+                        ml-[18px]
+                        border-l
+                        border-white/10
+                        pl-2
+                      `
+                      : `
+                        ml-3
+                        border-l
+                        border-white/10
+                        pl-2
+                      `
                   }
                 `}
               >
-                <span
-                  className={`flex-shrink-0 w-5 h-5 flex items-center justify-center [&>svg]:w-[18px] [&>svg]:h-[18px] ${
-                    parentActive || isSubmenuOpen
-                      ? "text-slate-100"
-                      : "text-slate-300"
-                  }`}
-                >
-                  {nav.icon}
-                </span>
+                {children.map((child) => renderMenuItem(child, level + 1))}
+              </ul>
+            </div>
+          )}
+        </li>
+      );
+    }
 
-                {isOpen && (
-                  <span className="flex-1 text-left leading-snug">
-                    {nav.name}
-                  </span>
-                )}
+    /* --------------------------------------------------------
+       GROUP WITHOUT CHILDREN
+       -------------------------------------------------------- */
 
-                {isOpen && (
-                  <FaChevronDown
-                    className={`flex-shrink-0 w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                      isSubmenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                )}
-              </button>
-            ) : (
-              nav.path && (
-                <Link
-                  to={nav.path}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                    transition-colors duration-150
-                    ${
-                      isActive(nav.path)
-                        ? "bg-white/10 text-slate-100"
-                        : "text-slate-300 hover:bg-white/10 hover:text-slate-100"
-                    }
-                  `}
-                >
-                  <span
-                    className={`flex-shrink-0 w-5 h-5 flex items-center justify-center [&>svg]:w-[18px] [&>svg]:h-[18px] ${
-                      isActive(nav.path) ? "text-slate-100" : "text-slate-300"
-                    }`}
-                  >
-                    {nav.icon}
-                  </span>
-                  {isOpen && (
-                    <span className="flex-1 leading-snug">{nav.name}</span>
-                  )}
-                </Link>
-              )
-            )}
+    if (!menu.path) {
+      return null;
+    }
 
-            {nav.subItems && isOpen && (
-              <div
-                ref={(el) => {
-                  subMenuRefs.current[`${menuType}-${index}`] = el;
-                }}
-                className="overflow-hidden transition-[height] duration-300 ease-in-out"
-                style={{
-                  height: isSubmenuOpen
-                    ? `${subMenuHeight[`${menuType}-${index}`] ?? 0}px`
-                    : "0px",
-                }}
+    /* --------------------------------------------------------
+       EXTERNAL LINK
+       -------------------------------------------------------- */
+
+    if (menu.menu_type === "external") {
+      return (
+        <li key={menu.id} className="w-full">
+          <a
+            href={menu.path}
+            target={menu.open_in_new_tab ? "_blank" : undefined}
+            rel={menu.open_in_new_tab ? "noreferrer" : undefined}
+            title={!isOpen ? menu.menu_name : undefined}
+            className={`
+              flex
+              h-10
+              w-full
+              items-center
+              gap-2.5
+              ${itemPadding}
+
+              rounded-lg
+
+              text-sm
+              font-medium
+
+              text-slate-300
+
+              transition-colors
+              duration-150
+
+              hover:bg-white/10
+              hover:text-white
+
+              ${!isOpen ? "justify-center px-0" : ""}
+            `}
+          >
+            {renderMenuIcon(menu, false)}
+
+            {isOpen && (
+              <span
+                className="
+                  min-w-0
+                  flex-1
+                  truncate
+                  leading-none
+                "
               >
-                <ul className="mt-1 ml-8 space-y-0.5 border-l border-white/15 pl-3">
-                  {nav.subItems.map((subItem) => (
-                    <li key={subItem.name}>
-                      <Link
-                        to={subItem.path}
-                        className={`
-                          flex items-center justify-between px-3 py-2 rounded-md text-sm
-                          transition-colors duration-150
-                          ${
-                            isActive(subItem.path)
-                              ? "text-slate-100 font-medium bg-white/10"
-                              : "text-slate-300 hover:text-slate-100 hover:bg-white/10"
-                          }
-                        `}
-                      >
-                        <span>{subItem.name}</span>
-                        <span className="flex items-center gap-1 ml-2">
-                          {subItem.new && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/15 text-slate-200">
-                              new
-                            </span>
-                          )}
-                          {subItem.pro && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-400/20 text-amber-300">
-                              pro
-                            </span>
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                {menu.menu_name}
+              </span>
             )}
-          </li>
-        );
-      })}
-    </ul>
-  );
+          </a>
+        </li>
+      );
+    }
 
-  if (!permissionsLoaded) {
+    /* --------------------------------------------------------
+       NORMAL LINK
+       -------------------------------------------------------- */
+
     return (
-      <aside
-        className={`
-          fixed top-0 left-0 h-screen z-50
-          bg-[#00013D] dark:bg-gray-900 border-r border-[#0a0e7a] dark:border-gray-800
-          transition-[width] duration-300 ease-in-out
-          ${isExpanded || isMobileOpen ? "w-[256px]" : isHovered ? "w-[256px]" : "w-[64px]"}
-          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
-        `}
-      >
-        <div className="p-4 flex justify-center border-b border-[#0a0e7a] dark:border-gray-800">
-          <div className="w-28 h-8 bg-[#0a0e7a] dark:bg-gray-700 rounded-md animate-pulse" />
-        </div>
-        <div className="p-3 flex flex-col gap-2 mt-2">
-          {[...Array(7)].map((_, i) => (
-            <div
-              key={i}
-              className="h-9 bg-[#0a0e7a] dark:bg-gray-800 rounded-lg animate-pulse"
-            />
-          ))}
-        </div>
-      </aside>
+      <li key={menu.id} className="w-full">
+        <Link
+          to={menu.path}
+          title={!isOpen ? menu.menu_name : undefined}
+          className={`
+            flex
+            h-10
+            w-full
+            items-center
+            gap-2.5
+            ${itemPadding}
+
+            rounded-lg
+
+            text-sm
+            font-medium
+
+            transition-colors
+            duration-150
+
+            ${
+              active
+                ? `
+                  bg-white/10
+                  text-white
+                `
+                : `
+                  text-slate-300
+                  hover:bg-white/10
+                  hover:text-white
+                `
+            }
+
+            ${!isOpen ? "justify-center px-0" : ""}
+          `}
+        >
+          {renderMenuIcon(menu, active)}
+
+          {isOpen && (
+            <span
+              className="
+                min-w-0
+                flex-1
+                truncate
+                leading-none
+              "
+            >
+              {menu.menu_name}
+            </span>
+          )}
+        </Link>
+      </li>
     );
-  }
+  };
+
+  /* ==========================================================
+     UI
+     ========================================================== */
 
   return (
     <aside
       className={`
-        fixed top-0 left-0 h-screen z-50 flex flex-col
-        bg-[#00013D] dark:bg-gray-900 border-r border-[#0a0e7a] dark:border-gray-800
-        transition-[width] duration-300 ease-in-out
-        ${isExpanded || isMobileOpen ? "w-[256px]" : isHovered ? "w-[256px]" : "w-[64px]"}
-        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
+        fixed
+        top-0
+        left-0
+
+        z-50
+
+        flex
+        h-screen
+        flex-col
+
+        border-r
+        border-[#0a0e7a]
+
+        bg-[#00013D]
+
+        transition-[width,transform]
+        duration-300
+        ease-in-out
+
+        dark:border-gray-800
+        dark:bg-gray-900
+
+        ${
+          isExpanded || isMobileOpen
+            ? "w-[256px]"
+            : isHovered
+              ? "w-[256px]"
+              : "w-[64px]"
+        }
+
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+
+        lg:translate-x-0
       `}
-      onMouseEnter={() => !isExpanded && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => {
+        if (!isExpanded) {
+          setIsHovered(true);
+        }
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+      }}
     >
-      {/* Logo */}
+      {/* ======================================================
+          LOGO
+          ====================================================== */}
+
       <div
         className={`
-          flex-shrink-0 flex items-center h-16 px-4
-          border-b border-[#0a0e7a] dark:border-gray-800
-          ${!isOpen ? "lg:justify-center" : "justify-start"}
+          flex
+          h-16
+          flex-shrink-0
+          items-center
+
+          border-b
+          border-[#0a0e7a]
+
+          dark:border-gray-800
+
+          ${isOpen ? "justify-start px-4" : "justify-center px-0"}
         `}
       >
-        <Link to="/" className="block">
+        <Link
+          to="/"
+          className="
+            flex
+            items-center
+            justify-center
+          "
+        >
           {isOpen ? (
-            <img className="h-8" src="/images/logo/logo-dark.svg" alt="Logo" />
+            <img
+              className="
+                h-8
+                w-auto
+                max-w-[180px]
+                object-contain
+              "
+              src="/images/logo/logo-dark.svg"
+              alt="Logo"
+            />
           ) : (
             <img
               src="/images/logo/logo-icon.svg"
               alt="Logo"
-              className="w-8 h-8"
+              className="
+                h-8
+                w-8
+                object-contain
+              "
             />
           )}
         </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 no-scrollbar">
-        {filteredNavItems.length > 0 ? (
-          renderMenuItems(filteredNavItems, "main")
+      {/* ======================================================
+          NAVIGATION
+          ====================================================== */}
+
+      <nav
+        className={`
+          flex-1
+          overflow-y-auto
+          no-scrollbar
+
+          py-4
+
+          ${isOpen ? "px-3" : "px-2"}
+        `}
+      >
+        {loading ? (
+          /* ==================================================
+             LOADING
+             ================================================== */
+
+          <div className="space-y-2">
+            {[...Array(7)].map((_, index) => (
+              <div
+                key={index}
+                className="
+                    h-10
+                    rounded-lg
+
+                    bg-[#0a0e7a]
+
+                    animate-pulse
+
+                    dark:bg-gray-800
+                  "
+              />
+            ))}
+          </div>
+        ) : filteredMenus.length ? (
+          /* ==================================================
+             MENU
+             ================================================== */
+
+          <ul
+            className="
+              flex
+              flex-col
+              gap-0.5
+            "
+          >
+            {filteredMenus.map((menu) => renderMenuItem(menu))}
+          </ul>
         ) : (
-          <p className="text-xs text-slate-400 px-3 py-2">No menu access</p>
+          /* ==================================================
+             EMPTY
+             ================================================== */
+
+          isOpen && (
+            <div
+              className="
+                px-3
+                py-6
+                text-center
+              "
+            >
+              <p
+                className="
+                  text-xs
+                  text-slate-400
+                "
+              >
+                No menu access
+              </p>
+            </div>
+          )
         )}
       </nav>
     </aside>

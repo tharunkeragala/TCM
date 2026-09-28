@@ -35,9 +35,7 @@ const validate = ({ suite_id, title, priority, steps }) => {
 };
 
 const replaceSteps = async (tx, testCaseId, steps) => {
-  await new sql.Request(tx)
-    .input("id", sql.Int, testCaseId)
-    .query(`
+  await new sql.Request(tx).input("id", sql.Int, testCaseId).query(`
       DELETE FROM ${DB}.test_steps
       WHERE test_case_id = @id
     `);
@@ -51,8 +49,7 @@ const replaceSteps = async (tx, testCaseId, steps) => {
         "expected_result",
         sql.VarChar(sql.MAX),
         step.expected_result || null,
-      )
-      .query(`
+      ).query(`
         INSERT INTO ${DB}.test_steps
           (test_case_id, step_number, action, expected_result)
         VALUES
@@ -68,15 +65,13 @@ exports.getTestCases = async (req, res) => {
 
     const userResult = await pool
       .request()
-      .input("user_id", sql.Int, req.user.id)
-      .query(`
+      .input("user_id", sql.Int, req.user.id).query(`
         SELECT department_id
         FROM ${DB}.users
         WHERE id = @user_id
       `);
 
-    const departmentId =
-      userResult.recordset[0]?.department_id ?? null;
+    const departmentId = userResult.recordset[0]?.department_id ?? null;
 
     const request = pool
       .request()
@@ -165,9 +160,7 @@ exports.getTestCaseById = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("id", sql.Int, req.params.id)
+    const result = await pool.request().input("id", sql.Int, req.params.id)
       .query(`
         SELECT
           tc.id,
@@ -237,9 +230,7 @@ exports.getTestCaseById = async (req, res) => {
 
     const tc = result.recordset[0];
 
-    const steps = await pool
-      .request()
-      .input("id", sql.Int, req.params.id)
+    const steps = await pool.request().input("id", sql.Int, req.params.id)
       .query(`
         SELECT
           step_number,
@@ -285,9 +276,7 @@ exports.getTestCaseStepCount = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("id", sql.Int, req.params.id)
+    const result = await pool.request().input("id", sql.Int, req.params.id)
       .query(`
         SELECT COUNT(*) AS step_count
         FROM ${DB}.test_steps
@@ -344,19 +333,10 @@ exports.createTestCase = async (req, res) => {
     const inserted = await new sql.Request(tx)
       .input("suite_id", sql.Int, suite_id)
       .input("title", sql.VarChar(500), String(title).trim())
-      .input(
-        "preconditions",
-        sql.VarChar(sql.MAX),
-        preconditions || null,
-      )
+      .input("preconditions", sql.VarChar(sql.MAX), preconditions || null)
       .input("priority", sql.VarChar(20), priority)
-      .input(
-        "script",
-        sql.NVarChar(sql.MAX),
-        playwright_script || null,
-      )
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input("script", sql.NVarChar(sql.MAX), playwright_script || null)
+      .input("user_id", sql.Int, userId).query(`
         INSERT INTO ${DB}.test_cases
         (
           suite_id,
@@ -436,8 +416,7 @@ exports.submitForReview = async (req, res) => {
 
     await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
 
-    const found = await new sql.Request(tx)
-      .input("id", sql.Int, testCaseId)
+    const found = await new sql.Request(tx).input("id", sql.Int, testCaseId)
       .query(`
         SELECT *
         FROM ${DB}.test_cases WITH (UPDLOCK, HOLDLOCK)
@@ -467,8 +446,7 @@ exports.submitForReview = async (req, res) => {
       });
     }
 
-    const pending = await new sql.Request(tx)
-      .input("id", sql.Int, testCaseId)
+    const pending = await new sql.Request(tx).input("id", sql.Int, testCaseId)
       .query(`
         SELECT TOP 1 id
         FROM ${DB}.test_case_change_requests
@@ -485,8 +463,7 @@ exports.submitForReview = async (req, res) => {
       });
     }
 
-    const returned = await new sql.Request(tx)
-      .input("id", sql.Int, testCaseId)
+    const returned = await new sql.Request(tx).input("id", sql.Int, testCaseId)
       .query(`
         SELECT TOP 1 *
         FROM ${DB}.test_case_change_requests WITH (UPDLOCK, HOLDLOCK)
@@ -508,8 +485,7 @@ exports.submitForReview = async (req, res) => {
       });
     }
 
-    const steps = await new sql.Request(tx)
-      .input("id", sql.Int, testCaseId)
+    const steps = await new sql.Request(tx).input("id", sql.Int, testCaseId)
       .query(`
         SELECT
           step_number,
@@ -521,42 +497,19 @@ exports.submitForReview = async (req, res) => {
       `);
 
     const requestType =
-      tc.approved_at || Number(tc.version_no || 0) > 1
-        ? "UPDATE"
-        : "CREATE";
+      tc.approved_at || Number(tc.version_no || 0) > 1 ? "UPDATE" : "CREATE";
 
     const inserted = await new sql.Request(tx)
       .input("test_case_id", sql.Int, testCaseId)
-      .input(
-        "request_type",
-        sql.VarChar(20),
-        requestType,
-      )
-      .input(
-        "from_status",
-        sql.VarChar(20),
-        tc.workflow_status || "Draft",
-      )
+      .input("request_type", sql.VarChar(20), requestType)
+      .input("from_status", sql.VarChar(20), tc.workflow_status || "Draft")
       .input("suite_id", sql.Int, tc.suite_id)
       .input("title", sql.VarChar(500), tc.title)
-      .input(
-        "preconditions",
-        sql.VarChar(sql.MAX),
-        tc.preconditions || null,
-      )
+      .input("preconditions", sql.VarChar(sql.MAX), tc.preconditions || null)
       .input("priority", sql.VarChar(20), tc.priority)
-      .input(
-        "script",
-        sql.NVarChar(sql.MAX),
-        tc.playwright_script || null,
-      )
-      .input(
-        "steps",
-        sql.NVarChar(sql.MAX),
-        JSON.stringify(steps.recordset),
-      )
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input("script", sql.NVarChar(sql.MAX), tc.playwright_script || null)
+      .input("steps", sql.NVarChar(sql.MAX), JSON.stringify(steps.recordset))
+      .input("user_id", sql.Int, userId).query(`
         INSERT INTO ${DB}.test_case_change_requests
         (
           test_case_id,
@@ -595,8 +548,7 @@ exports.submitForReview = async (req, res) => {
     await new sql.Request(tx)
       .input("id", sql.Int, testCaseId)
       .input("request_id", sql.Int, requestId)
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input("user_id", sql.Int, userId).query(`
         UPDATE ${DB}.test_cases
         SET
           workflow_status = 'Review',
@@ -615,8 +567,7 @@ exports.submitForReview = async (req, res) => {
       entityType: "TEST_CASE",
       entityId: testCaseId,
       entityName: tc.title,
-      description:
-        `Submitted test case #${testCaseId} for approval as request #${requestId}`,
+      description: `Submitted test case #${testCaseId} for approval as request #${requestId}`,
       oldValues: {
         workflow_status: "Draft",
       },
@@ -684,8 +635,7 @@ exports.updateTestCase = async (req, res) => {
 
     await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
 
-    const oldResult = await new sql.Request(tx)
-      .input("id", sql.Int, testCaseId)
+    const oldResult = await new sql.Request(tx).input("id", sql.Int, testCaseId)
       .query(`
         SELECT *
         FROM ${DB}.test_cases WITH (UPDLOCK, HOLDLOCK)
@@ -703,9 +653,11 @@ exports.updateTestCase = async (req, res) => {
       });
     }
 
-    const openResult = await new sql.Request(tx)
-      .input("id", sql.Int, testCaseId)
-      .query(`
+    const openResult = await new sql.Request(tx).input(
+      "id",
+      sql.Int,
+      testCaseId,
+    ).query(`
         SELECT TOP 1 *
         FROM ${DB}.test_case_change_requests WITH (UPDLOCK, HOLDLOCK)
         WHERE test_case_id = @id
@@ -745,22 +697,10 @@ exports.updateTestCase = async (req, res) => {
         .input("request_id", sql.Int, open.id)
         .input("suite_id", sql.Int, suite_id)
         .input("title", sql.VarChar(500), String(title).trim())
-        .input(
-          "preconditions",
-          sql.VarChar(sql.MAX),
-          preconditions || null,
-        )
+        .input("preconditions", sql.VarChar(sql.MAX), preconditions || null)
         .input("priority", sql.VarChar(20), priority)
-        .input(
-          "script",
-          sql.NVarChar(sql.MAX),
-          playwright_script || null,
-        )
-        .input(
-          "steps",
-          sql.NVarChar(sql.MAX),
-          JSON.stringify(normalizedSteps),
-        )
+        .input("script", sql.NVarChar(sql.MAX), playwright_script || null)
+        .input("steps", sql.NVarChar(sql.MAX), JSON.stringify(normalizedSteps))
         .query(`
           UPDATE ${DB}.test_case_change_requests
           SET
@@ -783,8 +723,7 @@ exports.updateTestCase = async (req, res) => {
       await new sql.Request(tx)
         .input("id", sql.Int, testCaseId)
         .input("request_id", sql.Int, open.id)
-        .input("user_id", sql.Int, userId)
-        .query(`
+        .input("user_id", sql.Int, userId).query(`
           UPDATE ${DB}.test_cases
           SET
             workflow_status = 'Review',
@@ -803,8 +742,7 @@ exports.updateTestCase = async (req, res) => {
         entityType: "TEST_CASE",
         entityId: testCaseId,
         entityName: String(title).trim(),
-        description:
-          `Corrected and resubmitted test case change request #${open.id}`,
+        description: `Corrected and resubmitted test case change request #${open.id}`,
         oldValues: oldCase,
         newValues: {
           suite_id,
@@ -837,19 +775,10 @@ exports.updateTestCase = async (req, res) => {
         .input("id", sql.Int, testCaseId)
         .input("suite_id", sql.Int, suite_id)
         .input("title", sql.VarChar(500), String(title).trim())
-        .input(
-          "preconditions",
-          sql.VarChar(sql.MAX),
-          preconditions || null,
-        )
+        .input("preconditions", sql.VarChar(sql.MAX), preconditions || null)
         .input("priority", sql.VarChar(20), priority)
-        .input(
-          "script",
-          sql.NVarChar(sql.MAX),
-          playwright_script || null,
-        )
-        .input("user_id", sql.Int, userId)
-        .query(`
+        .input("script", sql.NVarChar(sql.MAX), playwright_script || null)
+        .input("user_id", sql.Int, userId).query(`
           UPDATE ${DB}.test_cases
           SET
             suite_id = @suite_id,
@@ -864,11 +793,7 @@ exports.updateTestCase = async (req, res) => {
           WHERE id = @id
         `);
 
-      await replaceSteps(
-        tx,
-        testCaseId,
-        normalizedSteps,
-      );
+      await replaceSteps(tx, testCaseId, normalizedSteps);
 
       await tx.commit();
 
@@ -895,8 +820,7 @@ exports.updateTestCase = async (req, res) => {
 
       return res.json({
         success: true,
-        message:
-          "Draft saved. Submit it for review when it is ready.",
+        message: "Draft saved. Submit it for review when it is ready.",
         workflow_status: "Draft",
       });
     }
@@ -909,31 +833,14 @@ exports.updateTestCase = async (req, res) => {
     if (oldCase.workflow_status === "Approved") {
       const inserted = await new sql.Request(tx)
         .input("test_case_id", sql.Int, testCaseId)
-        .input(
-          "from_status",
-          sql.VarChar(20),
-          "Approved",
-        )
+        .input("from_status", sql.VarChar(20), "Approved")
         .input("suite_id", sql.Int, suite_id)
         .input("title", sql.VarChar(500), String(title).trim())
-        .input(
-          "preconditions",
-          sql.VarChar(sql.MAX),
-          preconditions || null,
-        )
+        .input("preconditions", sql.VarChar(sql.MAX), preconditions || null)
         .input("priority", sql.VarChar(20), priority)
-        .input(
-          "script",
-          sql.NVarChar(sql.MAX),
-          playwright_script || null,
-        )
-        .input(
-          "steps",
-          sql.NVarChar(sql.MAX),
-          JSON.stringify(normalizedSteps),
-        )
-        .input("user_id", sql.Int, userId)
-        .query(`
+        .input("script", sql.NVarChar(sql.MAX), playwright_script || null)
+        .input("steps", sql.NVarChar(sql.MAX), JSON.stringify(normalizedSteps))
+        .input("user_id", sql.Int, userId).query(`
           INSERT INTO ${DB}.test_case_change_requests
           (
             test_case_id,
@@ -972,8 +879,7 @@ exports.updateTestCase = async (req, res) => {
       await new sql.Request(tx)
         .input("id", sql.Int, testCaseId)
         .input("request_id", sql.Int, requestId)
-        .input("user_id", sql.Int, userId)
-        .query(`
+        .input("user_id", sql.Int, userId).query(`
           UPDATE ${DB}.test_cases
           SET
             workflow_status = 'Review',
@@ -992,8 +898,7 @@ exports.updateTestCase = async (req, res) => {
         entityType: "TEST_CASE",
         entityId: testCaseId,
         entityName: String(title).trim(),
-        description:
-          `Submitted changes to approved test case #${testCaseId} for approval as request #${requestId}`,
+        description: `Submitted changes to approved test case #${testCaseId} for approval as request #${requestId}`,
         oldValues: oldCase,
         newValues: {
           suite_id,
@@ -1021,8 +926,7 @@ exports.updateTestCase = async (req, res) => {
 
     return res.status(409).json({
       success: false,
-      message:
-        "This test case cannot be edited in its current workflow state.",
+      message: "This test case cannot be edited in its current workflow state.",
     });
   } catch (err) {
     try {
@@ -1047,10 +951,7 @@ exports.deleteTestCase = async (req, res) => {
     const id = Number(req.params.id);
     const userId = req.user.id;
 
-    const found = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query(`
+    const found = await pool.request().input("id", sql.Int, id).query(`
         SELECT *
         FROM ${DB}.test_cases
         WHERE id = @id
@@ -1075,23 +976,17 @@ exports.deleteTestCase = async (req, res) => {
 
     await tx.begin();
 
-    await new sql.Request(tx)
-      .input("id", sql.Int, id)
-      .query(`
+    await new sql.Request(tx).input("id", sql.Int, id).query(`
         DELETE FROM ${DB}.test_steps
         WHERE test_case_id = @id
       `);
 
-    await new sql.Request(tx)
-      .input("id", sql.Int, id)
-      .query(`
+    await new sql.Request(tx).input("id", sql.Int, id).query(`
         DELETE FROM ${DB}.test_case_change_requests
         WHERE test_case_id = @id
       `);
 
-    await new sql.Request(tx)
-      .input("id", sql.Int, id)
-      .query(`
+    await new sql.Request(tx).input("id", sql.Int, id).query(`
         DELETE FROM ${DB}.test_cases
         WHERE id = @id
       `);
@@ -1133,9 +1028,7 @@ exports.getTestCaseActivity = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("id", sql.Int, req.params.id)
+    const result = await pool.request().input("id", sql.Int, req.params.id)
       .query(`
         SELECT
           al.*,

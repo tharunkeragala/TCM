@@ -189,19 +189,11 @@ export default function PlaywrightEditor() {
     setAlert(null);
 
     try {
-      const payload = {
-        suite_id: selectedCase.suite_id,
-        title: selectedCase.title,
-        preconditions: selectedCase.preconditions || "",
-        priority: selectedCase.priority || "Medium",
-        status: selectedCase.status || "Draft",
-        steps: selectedCase.steps || [],
-        playwright_script: script,
-      };
-
       const response = await API.put(
-        `/api/test-cases/update/${selectedCase.id}`,
-        payload,
+        `/api/playwright/test-cases/${selectedCase.id}/script`,
+        {
+          playwright_script: script,
+        },
         {
           headers: authHeaders(),
         },

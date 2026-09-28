@@ -414,29 +414,18 @@ export default function PlaywrightRecorder() {
     if (!tc) return;
 
     setSaving(true);
-
     setSaveAlert(null);
 
     try {
-      const payload = {
-        suite_id: tc.suite_id,
-
-        title: tc.title,
-
-        preconditions: tc.preconditions || "",
-
-        priority: tc.priority || "Medium",
-
-        status: tc.status || "Draft",
-
-        steps: tc.steps || [],
-
-        playwright_script: recordedScript,
-      };
-
-      const res = await API.put(`/api/test-cases/update/${tc.id}`, payload, {
-        headers: authHeaders(),
-      });
+      const res = await API.put(
+        `/api/playwright/test-cases/${tc.id}/script`,
+        {
+          playwright_script: recordedScript,
+        },
+        {
+          headers: authHeaders(),
+        },
+      );
 
       if (res.data.success) {
         setSaveAlert({
@@ -845,4 +834,3 @@ export default function PlaywrightRecorder() {
     </div>
   );
 }
-
