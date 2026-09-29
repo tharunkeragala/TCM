@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaPlus, FaSearch, FaUser, FaBell, FaTimes } from "react-icons/fa";
 
@@ -104,6 +104,91 @@ export default function Tasks() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
+
+  // ── Sorting Tasks ────────────────────────────────────────────────────────────
+  const sortedTasks = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const getStatus = (task: Task) =>
+    String(task.status || "").trim().toLowerCase();
+
+  const isCompleted = (task: Task) => getStatus(task) === "completed";
+  const isCancelled = (task: Task) => getStatus(task) === "cancelled";
+
+  const isOverdue = (task: Task) => {
+    if (
+      isCompleted(task) ||
+      isCancelled(task) ||
+      !task.due_date
+    ) {
+      return false;
+    }
+
+    const dueDate = new Date(task.due_date);
+    dueDate.setHours(0, 0, 0, 0);
+
+    return dueDate < today;
+  };
+
+  return [...tasks].sort((a, b) => {
+    const aStatus = getStatus(a);
+    const bStatus = getStatus(b);
+
+    const aCompleted = aStatus === "completed";
+    const bCompleted = bStatus === "completed";
+
+    const aCancelled = aStatus === "cancelled";
+    const bCancelled = bStatus === "cancelled";
+
+    const aOverdue = isOverdue(a);
+    const bOverdue = isOverdue(b);
+
+    // 1. Overdue active tasks always first
+    if (aOverdue !== bOverdue) {
+      return aOverdue ? -1 : 1;
+    }
+
+    // 2. Completed always very last
+    if (aCompleted !== bCompleted) {
+      return aCompleted ? 1 : -1;
+    }
+
+    // 3. Cancelled goes above completed,
+    //    but below all active tasks
+    if (aCancelled !== bCancelled) {
+      return aCancelled ? 1 : -1;
+    }
+
+    // 4. Both overdue: oldest overdue first
+    if (aOverdue && bOverdue) {
+      return (
+        new Date(a.due_date!).getTime() -
+        new Date(b.due_date!).getTime()
+      );
+    }
+
+    // 5. Active tasks: nearest due date first
+    if (
+      !aCompleted &&
+      !bCompleted &&
+      !aCancelled &&
+      !bCancelled
+    ) {
+      if (a.due_date && b.due_date) {
+        return (
+          new Date(a.due_date).getTime() -
+          new Date(b.due_date).getTime()
+        );
+      }
+
+      if (a.due_date && !b.due_date) return -1;
+      if (!a.due_date && b.due_date) return 1;
+    }
+
+    return 0;
+  });
+}, [tasks]);
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   const [reminderToast, setReminderToast] = useState<string | null>(null);
@@ -487,16 +572,16 @@ export default function Tasks() {
           </p> */}
 
           <div className="space-y-2">
-            {tasks.length > 0 ? (
-              tasks.map((task) => (
-                <TaskAccordionRow
-                  key={task.id}
-                  task={task}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  onView={handleView}
-                />
-              ))
+            {sortedTasks.length > 0 ? (
+  sortedTasks.map((task) => (
+    <TaskAccordionRow
+      key={task.id}
+      task={task}
+      onEdit={handleEdit}
+      onDelete={handleDeleteClick}
+      onView={handleView}
+    />
+  ))
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
                 <svg

@@ -1129,7 +1129,7 @@ export default function TestCases() {
                               className="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
                               title={
                                 tc.workflow_request_id
-                                  ? "Resolve workflow request before deleting"
+                                  ? "Approve the change request before deleting"
                                   : "Delete"
                               }
                             >

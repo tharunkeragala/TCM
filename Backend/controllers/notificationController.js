@@ -6,10 +6,8 @@ exports.getUserNotifications = async (req, res) => {
     const userId = req.user.id;
     const pool = await poolPromise;
 
-    const result = await pool
-  .request()
-  .input("user_id", sql.Int, userId)
-  .query(`
+    const result = await pool.request().input("user_id", sql.Int, userId)
+      .query(`
     SELECT TOP 20 
       n.id,
       n.task_id,
@@ -58,8 +56,7 @@ exports.markNotificationRead = async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("user_id", sql.Int, userId)
-      .query(`
+      .input("user_id", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.notifications
         SET is_read = 1
         WHERE id = @id AND user_id = @user_id
@@ -77,10 +74,7 @@ exports.markAllNotificationsRead = async (req, res) => {
     const userId = req.user.id;
     const pool = await poolPromise;
 
-    await pool
-      .request()
-      .input("user_id", sql.Int, userId)
-      .query(`
+    await pool.request().input("user_id", sql.Int, userId).query(`
         UPDATE test_case_manager.dbo.notifications
         SET is_read = 1
         WHERE user_id = @user_id AND is_read = 0

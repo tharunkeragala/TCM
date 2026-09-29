@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   FaEdit,
@@ -24,11 +24,20 @@ import RichTextEditor from "../../components/common/RichTextEditor";
 import DOMPurify from "dompurify";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface ProjectUser {
+  id: number;
+  username: string;
+}
+
 interface Project {
   id: number;
   project_name: string;
   description: string;
   is_active: boolean;
+  project_manager_id?: number | null;
+  project_manager_name?: string | null;
+  project_assignees?: ProjectUser[];
+  project_assignee_ids?: number[];
   created_by_name?: string;
   updated_by_name?: string;
   created_at?: string;
@@ -1489,7 +1498,7 @@ function ProjectAccordion({
 }
 
 // ─── Project Form Modal ───────────────────────────────────────────────────────
-function ProjectFormModal({
+export function ProjectFormModal({
   editing,
   onClose,
   onSaved,
@@ -1502,26 +1511,208 @@ function ProjectFormModal({
     project_name: editing?.project_name ?? "",
     description: editing?.description ?? "",
     is_active: editing?.is_active ?? true,
+    project_manager_id: editing?.project_manager_id
+      ? String(editing.project_manager_id)
+      : "",
   });
+
+  const [projectAssigneeIds, setProjectAssigneeIds] = useState<number[]>(
+    editing?.project_assignee_ids ??
+      editing?.project_assignees?.map((user) => user.id) ??
+      [],
+  );
+  const [selectedAssignees, setSelectedAssignees] = useState<ProjectUser[]>(
+    editing?.project_assignees ?? [],
+  );
+  const [selectedManager, setSelectedManager] = useState<ProjectUser | null>(
+    editing?.project_manager_id && editing?.project_manager_name
+      ? {
+          id: editing.project_manager_id,
+          username: editing.project_manager_name,
+        }
+      : null,
+  );
+
+  const [managerSearch, setManagerSearch] = useState("");
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [managerResults, setManagerResults] = useState<ProjectUser[]>([]);
+  const [assigneeResults, setAssigneeResults] = useState<ProjectUser[]>([]);
+  const [managerSearching, setManagerSearching] = useState(false);
+  const [assigneeSearching, setAssigneeSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [alert, setAlert] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !submitting) onClose();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [onClose, submitting]);
+
+  // Always hydrate edit mode from the detail endpoint so existing manager and
+  // additional assignees are shown even if the list/overview payload is stale.
+  useEffect(() => {
+    if (!editing?.id) return;
+
+    let active = true;
+    (async () => {
+      try {
+        const res = await API.get(`/api/projects/${editing.id}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!active || !res.data?.success) return;
+
+        const project = res.data.data as Project;
+        setFormData({
+          project_name: project.project_name ?? "",
+          description: project.description ?? "",
+          is_active: project.is_active ?? true,
+          project_manager_id: project.project_manager_id
+            ? String(project.project_manager_id)
+            : "",
+        });
+        const assigned = project.project_assignees ?? [];
+        setSelectedAssignees(assigned);
+        setProjectAssigneeIds(
+          project.project_assignee_ids ?? assigned.map((user) => user.id),
+        );
+        setSelectedManager(
+          project.project_manager_id && project.project_manager_name
+            ? {
+                id: project.project_manager_id,
+                username: project.project_manager_name,
+              }
+            : null,
+        );
+      } catch {
+        // Existing list data remains as a safe fallback.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [editing?.id]);
+
+  const searchUsers = useCallback(async (query: string) => {
+    const q = query.trim();
+    if (q.length < 2) return [] as ProjectUser[];
+    const res = await API.get("/api/projects/user-search", {
+      params: { q },
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    return (res.data?.data ?? []) as ProjectUser[];
+  }, []);
+
+  useEffect(() => {
+    const q = managerSearch.trim();
+    if (q.length < 2) {
+      setManagerResults([]);
+      setManagerSearching(false);
+      return;
+    }
+
+    let active = true;
+    setManagerSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const rows = await searchUsers(q);
+        if (active) setManagerResults(rows);
+      } catch {
+        if (active) setManagerResults([]);
+      } finally {
+        if (active) setManagerSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [managerSearch, searchUsers]);
+
+  useEffect(() => {
+    const q = assigneeSearch.trim();
+    if (q.length < 2) {
+      setAssigneeResults([]);
+      setAssigneeSearching(false);
+      return;
+    }
+
+    let active = true;
+    setAssigneeSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const rows = await searchUsers(q);
+        if (active) setAssigneeResults(rows);
+      } catch {
+        if (active) setAssigneeResults([]);
+      } finally {
+        if (active) setAssigneeSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [assigneeSearch, searchUsers]);
+
+  const addAssignee = (user: ProjectUser) => {
+    if (!projectAssigneeIds.includes(user.id)) {
+      setProjectAssigneeIds((prev) => [...prev, user.id]);
+      setSelectedAssignees((prev) => [...prev, user]);
+    }
+    setAssigneeSearch("");
+    setAssigneeResults([]);
+  };
+
+  const removeAssignee = (userId: number) => {
+    setProjectAssigneeIds((prev) => prev.filter((id) => id !== userId));
+    setSelectedAssignees((prev) => prev.filter((user) => user.id !== userId));
+  };
+
+  const selectManager = (user: ProjectUser) => {
+    setSelectedManager(user);
+    setFormData((prev) => ({ ...prev, project_manager_id: String(user.id) }));
+    setManagerSearch("");
+    setManagerResults([]);
+  };
+
+  const clearManager = () => {
+    setSelectedManager(null);
+    setFormData((prev) => ({ ...prev, project_manager_id: "" }));
+  };
+
   const handleSave = async () => {
-    if (!formData.project_name.trim())
+    if (!formData.project_name.trim()) {
       return setAlert({ type: "error", message: "Project name is required." });
+    }
+
     setSubmitting(true);
     setAlert(null);
+
     try {
       const url = editing
         ? `/api/projects/update/${editing.id}`
         : "/api/projects/create";
       const method = editing ? API.put : API.post;
-      const res = await method(url, formData, {
+      const payload = {
+        ...formData,
+        project_manager_id: formData.project_manager_id
+          ? Number(formData.project_manager_id)
+          : null,
+        project_assignee_ids: projectAssigneeIds,
+      };
+
+      const res = await method(url, payload, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+
       if (res.data.success) {
         setAlert({
           type: "success",
@@ -1530,7 +1721,7 @@ function ProjectFormModal({
         setTimeout(() => {
           onClose();
           onSaved();
-        }, 1000);
+        }, 700);
       }
     } catch (err: any) {
       setAlert({
@@ -1542,83 +1733,231 @@ function ProjectFormModal({
     }
   };
 
+  const resultBox =
+    "absolute z-20 mt-1 w-full max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800";
+
   return (
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="flex w-full max-w-xl max-h-[84vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             {editing ? "Edit Project" : "Create Project"}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
+            disabled={submitting}
+            className="text-xl font-bold text-gray-400 hover:text-gray-600 disabled:opacity-50 dark:hover:text-gray-200"
+            title="Close (Esc)"
           >
             &times;
           </button>
         </div>
-        {alert && (
-          <div className="mb-4">
-            <Alert
-              variant={alert.type}
-              title={alert.type === "success" ? "Success" : "Error"}
-              message={alert.message}
-            />
-          </div>
-        )}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Project Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={formData.project_name}
-            onChange={(e) =>
-              setFormData({ ...formData, project_name: e.target.value })
-            }
-            placeholder="e.g. E-Commerce Platform"
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Description
-          </label>
 
-          <RichTextEditor
-            value={formData.description}
-            onChange={(description) =>
-              setFormData({
-                ...formData,
-                description,
-              })
-            }
-            placeholder="Optional description..."
-          />
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {alert && (
+            <div className="mb-4">
+              <Alert
+                variant={alert.type}
+                title={alert.type === "success" ? "Success" : "Error"}
+                message={alert.message}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Project Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.project_name}
+                onChange={(e) =>
+                  setFormData({ ...formData, project_name: e.target.value })
+                }
+                placeholder="e.g. E-Commerce Platform"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div className="sm:min-w-[140px]">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Status
+              </label>
+              <div className="flex h-[38px] items-center gap-2 rounded-lg border border-gray-200 px-3 dark:border-gray-700">
+                <Toggle
+                  value={formData.is_active}
+                  onChange={(v) => setFormData({ ...formData, is_active: v })}
+                  size="md"
+                />
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {formData.is_active ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Description
+            </label>
+
+            <div className="rounded-lg">
+              <RichTextEditor
+                value={formData.description}
+                onChange={(description) =>
+                  setFormData({ ...formData, description })
+                }
+                placeholder="Optional description..."
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Project Manager
+            </label>
+            {selectedManager && (
+              <div className="mb-2 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm dark:border-blue-900/40 dark:bg-blue-900/20">
+                <span className="font-medium text-gray-700 dark:text-gray-200">
+                  {selectedManager.username}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearManager}
+                  className="text-xs font-medium text-red-500 hover:text-red-600"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                value={managerSearch}
+                onChange={(e) => setManagerSearch(e.target.value)}
+                placeholder="Type at least 2 letters to find a manager..."
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+              {managerSearch.trim().length >= 2 && (
+                <div className={resultBox}>
+                  {managerSearching ? (
+                    <p className="px-3 py-2 text-sm text-gray-400">
+                      Searching...
+                    </p>
+                  ) : managerResults.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-400">
+                      No matching users.
+                    </p>
+                  ) : (
+                    managerResults.map((user) => (
+                      <button
+                        type="button"
+                        key={user.id}
+                        onClick={() => selectManager(user)}
+                        className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                      >
+                        {user.username}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Additional Project Assignees
+              </label>
+              <span className="text-xs text-gray-400">
+                {projectAssigneeIds.length} selected
+              </span>
+            </div>
+
+            {selectedAssignees.length > 0 && (
+              <div className="mb-2 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                {selectedAssignees.map((user) => (
+                  <span
+                    key={user.id}
+                    className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    {user.username}
+                    <button
+                      type="button"
+                      onClick={() => removeAssignee(user.id)}
+                      className="ml-0.5 text-gray-400 hover:text-red-500"
+                      title="Remove assignee"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                value={assigneeSearch}
+                onChange={(e) => setAssigneeSearch(e.target.value)}
+                placeholder="Type at least 2 letters to add an assignee..."
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+              {assigneeSearch.trim().length >= 2 && (
+                <div className={resultBox}>
+                  {assigneeSearching ? (
+                    <p className="px-3 py-2 text-sm text-gray-400">
+                      Searching...
+                    </p>
+                  ) : assigneeResults.filter(
+                      (user) => !projectAssigneeIds.includes(user.id),
+                    ).length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-400">
+                      No matching users.
+                    </p>
+                  ) : (
+                    assigneeResults
+                      .filter((user) => !projectAssigneeIds.includes(user.id))
+                      .map((user) => (
+                        <button
+                          type="button"
+                          key={user.id}
+                          onClick={() => addAssignee(user)}
+                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                        >
+                          {user.username}
+                          {Number(formData.project_manager_id) === user.id && (
+                            <span className="ml-2 text-[11px] text-blue-500">
+                              Manager
+                            </span>
+                          )}
+                        </button>
+                      ))
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+              Task assignees remain included automatically. Search only loads
+              matching users.
+            </p>
+          </div>
         </div>
-        <div className="mb-6 flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Active
-          </span>
-          <Toggle
-            value={formData.is_active}
-            onChange={(v) => setFormData({ ...formData, is_active: v })}
-            size="md"
-          />
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {formData.is_active ? "Active" : "Inactive"}
-          </span>
-        </div>
-        <div className="flex justify-end gap-3">
+
+        <div className="flex flex-shrink-0 justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg transition duration-150"
+            disabled={submitting}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition duration-150"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
           >
             {submitting
               ? editing
@@ -1648,6 +1987,16 @@ export default function Projects() {
     useFetchWithAuth<TestCase[]>("/api/test-cases");
 
   const [showCreateProject, setShowCreateProject] = useState(false);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && showCreateProject) {
+        setShowCreateProject(false);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showCreateProject]);
 
   // ─── SEARCH & FILTER STATE ──────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");

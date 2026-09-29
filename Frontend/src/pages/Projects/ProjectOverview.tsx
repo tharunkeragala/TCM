@@ -40,6 +40,7 @@ import {
   SuiteFormModal,
   TestCaseFormModal,
   TestCaseViewModal,
+  ProjectFormModal,
 } from "./Projects";
 
 import CreateEditModal from "../Tasks/components/modals/CreateEditModal";
@@ -61,6 +62,10 @@ interface Project {
   project_name: string;
   description: string;
   is_active: boolean;
+  project_manager_id?: number | null;
+  project_manager_name?: string | null;
+  project_assignees?: Assignee[];
+  project_assignee_ids?: number[];
   created_by_name?: string;
   updated_by_name?: string;
   created_at?: string;
@@ -519,6 +524,7 @@ export default function ProjectOverview() {
   >("tasks");
 
   const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [editProjectModal, setEditProjectModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -1232,6 +1238,11 @@ export default function ProjectOverview() {
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
 
+      if (editProjectModal) {
+        setEditProjectModal(false);
+        return;
+      }
+
       if (deleteFunction) {
         setDeleteFunction(null);
         return;
@@ -1308,6 +1319,7 @@ export default function ProjectOverview() {
       document.removeEventListener("keydown", handleEscapeKey);
     };
   }, [
+    editProjectModal,
     deleteFunction,
     functionModalOpen,
     showViewModal,
@@ -1470,9 +1482,9 @@ export default function ProjectOverview() {
 
               {canProjects("can_edit") && (
                 <button
-                  onClick={() => navigate("/projects")}
+                  onClick={() => setEditProjectModal(true)}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-xl transition-colors flex-shrink-0"
-                  title="Edit from the Projects list"
+                  title="Edit Project"
                 >
                   <FaEdit className="w-3.5 h-3.5" />
                   Edit
@@ -1481,6 +1493,20 @@ export default function ProjectOverview() {
             </div>
 
             <div className="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                  Project Manager
+                </span>
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-medium text-gray-700 dark:text-gray-200">
+                  <span className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold">
+                    {(project.project_manager_name || "—")
+                      .charAt(0)
+                      .toUpperCase()}
+                  </span>
+                  {project.project_manager_name || "Not assigned"}
+                </span>
+              </div>
+
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
                 <FaUsers className="w-3.5 h-3.5" />
                 Project Assignees ({assignees.length})
@@ -1488,7 +1514,7 @@ export default function ProjectOverview() {
 
               {assignees.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">
-                  No assignees are linked to project tasks yet.
+                  No project or task assignees are linked yet.
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -2502,6 +2528,17 @@ export default function ProjectOverview() {
         <TestCaseViewModal
           tc={viewingCase as any}
           onClose={() => setViewingCase(null)}
+        />
+      )}
+
+      {editProjectModal && (
+        <ProjectFormModal
+          editing={project as any}
+          onClose={() => setEditProjectModal(false)}
+          onSaved={async () => {
+            setEditProjectModal(false);
+            await fetchOverview();
+          }}
         />
       )}
 
