@@ -1,6 +1,12 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 const logAudit = require("./auditController");
+const {
+  projectAccessSql,
+  getProjectIdFromSprint,
+  getProjectIdFromBatch,
+  withProjectAccess,
+} = require("../middleware/projectAccess");
 
 const BOARD_STATUSES = ["To Do", "In Progress", "Done"];
 const SPRINT_STATUSES = ["Planned", "Active", "Completed"];
@@ -28,63 +34,18 @@ const sanitizeAuditObject = (obj = {}) => {
 exports.getSprints = async (req, res) => {
   try {
     const { project_id } = req.query;
-    const userId = req.user?.id || null;
+    const userId = req.user?.id;
     const pool = await poolPromise;
+    const request = pool.request().input("user_id", sql.Int, userId);
 
-    // 🔹 Step 1: Check role (same pattern as taskController.getTasks)
-    const roleResult = await pool.request().input("user_id", sql.Int, userId)
-      .query(`
-        SELECT d.id AS dept_id
-        FROM test_case_manager.dbo.departments d
-        WHERE d.department_head_id = @user_id
-      `);
-
-    const isDeptHead = roleResult.recordset.length > 0;
-    const deptId = isDeptHead ? roleResult.recordset[0].dept_id : null;
-
-    const request = pool.request();
-
-    let where = "WHERE 1=1";
-
-    // Role-based visibility
-    if (isDeptHead) {
-      request.input("dept_id", sql.Int, deptId);
-      request.input("user_id", sql.Int, userId);
-
-      where += `
-        AND (
-          sp.created_by IN (
-            SELECT u.id
-            FROM test_case_manager.dbo.users u
-            WHERE u.department_id = @dept_id
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM test_case_manager.dbo.sprint_assignees sa
-            WHERE sa.sprint_id = sp.id
-            AND sa.user_id = @user_id
-          )
-        )
-      `;
-    } else {
-      request.input("user_id", sql.Int, userId);
-
-      where += `
-        AND (
-          sp.created_by = @user_id
-          OR EXISTS (
-            SELECT 1
-            FROM test_case_manager.dbo.sprint_assignees sa
-            WHERE sa.sprint_id = sp.id
-            AND sa.user_id = @user_id
-          )
-        )
-      `;
-    }
+    const conditions = [
+      "ISNULL(p.is_archived, 0) = 0",
+      projectAccessSql("p"),
+    ];
 
     if (project_id) {
-      request.input("project_id", sql.Int, project_id);
-      where += " AND sp.project_id = @project_id";
+      request.input("project_id", sql.Int, Number(project_id));
+      conditions.push("sp.project_id = @project_id");
     }
 
     const result = await request.query(`
@@ -96,21 +57,21 @@ exports.getSprints = async (req, res) => {
         (SELECT COUNT(*) FROM test_case_manager.dbo.sprint_suites ss WHERE ss.sprint_id = sp.id) AS suite_count,
         (SELECT COUNT(*) FROM test_case_manager.dbo.sprint_test_cases stc WHERE stc.sprint_id = sp.id) AS case_count
       FROM test_case_manager.dbo.sprints sp
-      LEFT JOIN test_case_manager.dbo.projects p ON p.id = sp.project_id
+      INNER JOIN test_case_manager.dbo.projects p ON p.id = sp.project_id
       LEFT JOIN test_case_manager.dbo.users u1 ON u1.id = sp.created_by
       LEFT JOIN test_case_manager.dbo.users u2 ON u2.id = sp.updated_by
-      ${where}
+      WHERE ${conditions.join(" AND ")}
       ORDER BY sp.id DESC
     `);
 
-    res.status(200).json({
-      success: true,
-      is_dept_head: isDeptHead,
-      data: result.recordset,
-    });
+    return res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Sprints Error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch sprints", error: err.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch sprints",
+      error: err.message,
+    });
   }
 };
 
@@ -1773,3 +1734,46 @@ exports.cancelBatch = async (req, res) => {
     });
   }
 };
+
+// Project membership guards for every sprint-scoped operation.
+const _createSprint = exports.createSprint;
+exports.createSprint = withProjectAccess(async (req) =>
+  Number(req.body?.project_id),
+)(_createSprint);
+
+for (const name of [
+  "getSprintById",
+  "updateSprint",
+  "changeSprintStatus",
+  "deleteSprint",
+  "getSprintBoard",
+  "addSuiteToSprint",
+  "updateSuiteBoardStatus",
+  "removeSuiteFromSprint",
+  "getSprintSuiteTestCases",
+  "getAvailableTestCasesForSuite",
+  "linkTestCaseToSuite",
+  "createTestCaseInSuite",
+  "unlinkTestCaseFromSuite",
+  "notifyExecutionStarted",
+  "getExecutionProgress",
+  "getSprintAssignees",
+  "addSprintAssignee",
+  "removeSprintAssignee",
+  "getSprintComments",
+  "addSprintComment",
+  "deleteSprintComment",
+  "getSprintActivity",
+  "executeAllInSuite",
+  "getBatchRunStatus",
+]) {
+  const original = exports[name];
+  exports[name] = withProjectAccess(async (req, pool) =>
+    getProjectIdFromSprint(pool, Number(req.params.id)),
+  )(original);
+}
+
+const _cancelBatch = exports.cancelBatch;
+exports.cancelBatch = withProjectAccess(async (req, pool) =>
+  getProjectIdFromBatch(pool, Number(req.params.batchId)),
+)(_cancelBatch);

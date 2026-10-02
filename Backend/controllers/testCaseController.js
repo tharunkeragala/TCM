@@ -1,6 +1,12 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 const logAudit = require("./auditController");
+const {
+  projectAccessSql,
+  getProjectIdFromSuite,
+  getProjectIdFromTestCase,
+  withProjectAccess,
+} = require("../middleware/projectAccess");
 
 const DB = "test_case_manager.dbo";
 
@@ -62,93 +68,47 @@ exports.getTestCases = async (req, res) => {
   try {
     const pool = await poolPromise;
     const { suite_id } = req.query;
+    const userId = req.user?.id;
 
-    const userResult = await pool
-      .request()
-      .input("user_id", sql.Int, req.user.id).query(`
-        SELECT department_id
-        FROM ${DB}.users
-        WHERE id = @user_id
-      `);
-
-    const departmentId = userResult.recordset[0]?.department_id ?? null;
-
-    const request = pool
-      .request()
-      .input("department_id", sql.Int, departmentId);
-
+    const request = pool.request().input("user_id", sql.Int, userId);
     const conditions = [
-      "(u1.department_id = @department_id OR u1.department_id IS NULL)",
+      "ISNULL(p.is_archived, 0) = 0",
+      projectAccessSql("p"),
     ];
 
     if (suite_id) {
-      request.input("suite_id", sql.Int, suite_id);
+      request.input("suite_id", sql.Int, Number(suite_id));
       conditions.push("tc.suite_id = @suite_id");
     }
 
     const result = await request.query(`
       SELECT
-        tc.id,
-        tc.suite_id,
-        tc.title,
-        tc.preconditions,
-        tc.priority,
-        tc.status,
+        tc.id, tc.suite_id, tc.title, tc.preconditions, tc.priority, tc.status,
         ISNULL(tc.workflow_status, 'Draft') AS workflow_status,
-        tc.workflow_request_id,
-        tc.approved_by,
-        tc.approved_at,
-        tc.version_no,
-        tc.playwright_script,
-        tc.created_by,
-        tc.updated_by,
-        tc.created_at,
-        tc.updated_at,
-
-        ts.suite_name,
-        p.project_name,
-
+        tc.workflow_request_id, tc.approved_by, tc.approved_at, tc.version_no,
+        tc.playwright_script, tc.created_by, tc.updated_by, tc.created_at, tc.updated_at,
+        ts.suite_name, p.project_name, p.id AS project_id,
         u1.username AS created_by_name,
         u2.username AS updated_by_name,
         ua.username AS approved_by_name,
-
         cr.request_status AS active_request_status,
         cr.return_comment AS active_return_comment,
         cr.submitted_by AS active_request_submitted_by
-
       FROM ${DB}.test_cases tc
-
-      LEFT JOIN ${DB}.test_suites ts
-        ON ts.id = tc.suite_id
-
-      LEFT JOIN ${DB}.projects p
-        ON p.id = ts.project_id
-
-      LEFT JOIN ${DB}.users u1
-        ON u1.id = tc.created_by
-
-      LEFT JOIN ${DB}.users u2
-        ON u2.id = tc.updated_by
-
-      LEFT JOIN ${DB}.users ua
-        ON ua.id = tc.approved_by
-
-      LEFT JOIN ${DB}.test_case_change_requests cr
-        ON cr.id = tc.workflow_request_id
-
+      INNER JOIN ${DB}.test_suites ts ON ts.id = tc.suite_id
+      INNER JOIN ${DB}.projects p ON p.id = ts.project_id
+      LEFT JOIN ${DB}.users u1 ON u1.id = tc.created_by
+      LEFT JOIN ${DB}.users u2 ON u2.id = tc.updated_by
+      LEFT JOIN ${DB}.users ua ON ua.id = tc.approved_by
+      LEFT JOIN ${DB}.test_case_change_requests cr ON cr.id = tc.workflow_request_id
       WHERE ${conditions.join(" AND ")}
-
       ORDER BY tc.id ASC
     `);
 
-    res.json({
-      success: true,
-      data: result.recordset,
-    });
+    return res.json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Test Cases Error:", err);
-
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch test cases",
       error: err.message,
@@ -1053,3 +1013,34 @@ exports.getTestCaseActivity = async (req, res) => {
     });
   }
 };
+
+
+// Project membership guards. These complement, not replace, your route-level permissions.
+const _createTestCase = exports.createTestCase;
+exports.createTestCase = withProjectAccess(async (req, pool) =>
+  getProjectIdFromSuite(pool, Number(req.body?.suite_id)),
+)(_createTestCase);
+
+for (const name of [
+  "getTestCaseById",
+  "getTestCaseStepCount",
+  "submitForReview",
+  "deleteTestCase",
+  "getTestCaseActivity",
+]) {
+  const original = exports[name];
+  exports[name] = withProjectAccess(async (req, pool) =>
+    getProjectIdFromTestCase(pool, Number(req.params.id)),
+  )(original);
+}
+
+// Updating may also move a case to another suite, so validate both the current
+// case project and the destination suite project.
+const _updateTestCase = exports.updateTestCase;
+exports.updateTestCase = withProjectAccess(async (req, pool) =>
+  getProjectIdFromTestCase(pool, Number(req.params.id)),
+)(
+  withProjectAccess(async (req, pool) =>
+    getProjectIdFromSuite(pool, Number(req.body?.suite_id)),
+  )(_updateTestCase),
+);

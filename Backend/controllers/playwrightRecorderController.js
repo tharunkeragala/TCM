@@ -1,21 +1,35 @@
 const recorder = require("../services/playwrightRecorder");
+const { poolPromise } = require("../config/db");
+const sql = require("mssql");
+const {
+  hasProjectAccess,
+  getProjectIdFromTestCase,
+} = require("../middleware/projectAccess");
 
+// Starting/stopping the recorder itself is intentionally not tied to project_id.
+// The request has no test-case/project relationship at this point. Project access
+// is enforced when the recorded/edited script is saved to a concrete test case.
 exports.startRecording = async (req, res) => {
   try {
     const { url } = req.body;
 
     if (!url || !String(url).trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL is required" });
+      return res.status(400).json({
+        success: false,
+        message: "URL is required",
+      });
     }
 
     const sessionId = await recorder.startRecording(String(url).trim());
 
-    res.status(200).json({ success: true, sessionId });
+    return res.status(200).json({
+      success: true,
+      sessionId,
+    });
   } catch (err) {
     console.error("START Recorder Error:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: "Failed to start recorder",
       error: err.message,
@@ -28,10 +42,14 @@ exports.stopRecording = async (req, res) => {
     const { id } = req.params;
     const result = await recorder.stopRecording(id);
 
-    res.status(200).json({ success: true, ...result });
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
   } catch (err) {
     console.error("STOP Recorder Error:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: "Failed to stop recorder",
       error: err.message,
@@ -41,11 +59,9 @@ exports.stopRecording = async (req, res) => {
 
 exports.updateTestCaseScript = async (req, res) => {
   try {
-    const { poolPromise } = require("../config/db");
-    const sql = require("mssql");
-
     const testCaseId = Number(req.params.id);
     const playwrightScript = req.body?.playwright_script;
+    const userId = Number(req.user?.id);
 
     if (!Number.isInteger(testCaseId) || testCaseId <= 0) {
       return res.status(400).json({
@@ -61,59 +77,104 @@ exports.updateTestCaseScript = async (req, res) => {
       });
     }
 
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const pool = await poolPromise;
 
-    const existing = await pool.request().input("id", sql.Int, testCaseId)
-      .query(`
-        SELECT id, title, workflow_status, workflow_request_id
-        FROM dbo.test_cases
-        WHERE id = @id
-      `);
+    // Resolve the exact project through test case -> suite -> project.
+    const projectId = await getProjectIdFromTestCase(pool, testCaseId);
 
-    if (!existing.recordset.length) {
+    if (!projectId) {
       return res.status(404).json({
         success: false,
         message: "Test case not found.",
       });
     }
 
-    const userId = req.user?.id ? Number(req.user.id) : null;
+    const allowed = await hasProjectAccess(pool, userId, projectId);
 
-    const request = pool
-      .request()
-      .input("id", sql.Int, testCaseId)
-      .input("playwright_script", sql.NVarChar(sql.MAX), playwrightScript);
-
-    let updateQuery = `
-      UPDATE dbo.test_cases
-      SET playwright_script = @playwright_script,
-          updated_at = GETDATE()
-    `;
-
-    if (userId) {
-      request.input("updated_by", sql.Int, userId);
-      updateQuery += `, updated_by = @updated_by`;
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: you are not assigned to this project.",
+      });
     }
 
-    updateQuery += `
-      WHERE id = @id;
+    const existingResult = await pool
+      .request()
+      .input("id", sql.Int, testCaseId)
+      .query(`
+        SELECT
+          tc.id,
+          tc.title,
+          tc.workflow_status,
+          tc.workflow_request_id,
+          tc.playwright_script,
+          ts.project_id
+        FROM test_case_manager.dbo.test_cases tc
+        INNER JOIN test_case_manager.dbo.test_suites ts
+          ON ts.id = tc.suite_id
+        WHERE tc.id = @id
+      `);
 
-      SELECT id,
-             title,
-             playwright_script,
-             workflow_status,
-             workflow_request_id
-      FROM dbo.test_cases
-      WHERE id = @id;
-    `;
+    const existing = existingResult.recordset[0];
 
-    const result = await request.query(updateQuery);
-    const updated = result.recordsets?.[0]?.[0] || null;
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Test case not found.",
+      });
+    }
+
+    // Do the update separately so we can verify a row was actually changed.
+    const updateResult = await pool
+      .request()
+      .input("id", sql.Int, testCaseId)
+      .input("playwright_script", sql.NVarChar(sql.MAX), playwrightScript)
+      .input("updated_by", sql.Int, userId)
+      .query(`
+        UPDATE test_case_manager.dbo.test_cases
+        SET playwright_script = @playwright_script,
+            updated_by = @updated_by,
+            updated_at = GETDATE()
+        WHERE id = @id
+      `);
+
+    if (!updateResult.rowsAffected?.[0]) {
+      return res.status(500).json({
+        success: false,
+        message: "The Playwright script was not saved.",
+      });
+    }
+
+    // Read the saved row back from the database as the source of truth.
+    const savedResult = await pool
+      .request()
+      .input("id", sql.Int, testCaseId)
+      .query(`
+        SELECT
+          id,
+          title,
+          playwright_script,
+          workflow_status,
+          workflow_request_id,
+          updated_by,
+          updated_at
+        FROM test_case_manager.dbo.test_cases
+        WHERE id = @id
+      `);
+
+    const saved = savedResult.recordset[0];
 
     return res.status(200).json({
       success: true,
       message: "Playwright script saved successfully.",
-      data: updated,
+      data: saved,
     });
   } catch (err) {
     console.error("UPDATE Test Case Script Error:", err);

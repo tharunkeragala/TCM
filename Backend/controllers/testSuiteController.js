@@ -1,6 +1,11 @@
 const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 const logAudit = require("./auditController");
+const {
+  projectAccessSql,
+  getProjectIdFromSuite,
+  withProjectAccess,
+} = require("../middleware/projectAccess");
 
 // ===============================
 // REMOVE SYSTEM / UI FIELDS
@@ -25,39 +30,19 @@ const cleanAuditData = (obj = {}) => {
 exports.getTestSuites = async (req, res) => {
   try {
     const { project_id } = req.query;
+    const userId = req.user?.id;
     const pool = await poolPromise;
+    const request = pool.request().input("user_id", sql.Int, userId);
 
-    const request = pool.request();
-
-    const userResult = await pool
-      .request()
-      .input("user_id", req.user.id)
-      .query(`
-        SELECT department_id 
-        FROM users 
-        WHERE id = @user_id
-      `);
-
-    const userDeptId = userResult.recordset[0]?.department_id;
-
-    let conditions = [];
+    const conditions = [
+      "ISNULL(p.is_archived, 0) = 0",
+      projectAccessSql("p"),
+    ];
 
     if (project_id) {
-      request.input("project_id", sql.Int, project_id);
+      request.input("project_id", sql.Int, Number(project_id));
       conditions.push("ts.project_id = @project_id");
     }
-
-    request.input("department_id", userDeptId);
-    conditions.push(`
-      (
-        u1.department_id = @department_id
-        OR u1.department_id IS NULL
-      )
-    `);
-
-    const whereClause = conditions.length
-      ? `WHERE ${conditions.join(" AND ")}`
-      : "";
 
     const result = await request.query(`
       SELECT
@@ -66,23 +51,17 @@ exports.getTestSuites = async (req, res) => {
         u1.username AS created_by_name,
         u2.username AS updated_by_name
       FROM test_case_manager.dbo.test_suites ts
-      LEFT JOIN test_case_manager.dbo.projects p  
-        ON p.id = ts.project_id
-      LEFT JOIN test_case_manager.dbo.users u1    
-        ON u1.id = ts.created_by
-      LEFT JOIN test_case_manager.dbo.users u2    
-        ON u2.id = ts.updated_by
-      ${whereClause}
+      INNER JOIN test_case_manager.dbo.projects p ON p.id = ts.project_id
+      LEFT JOIN test_case_manager.dbo.users u1 ON u1.id = ts.created_by
+      LEFT JOIN test_case_manager.dbo.users u2 ON u2.id = ts.updated_by
+      WHERE ${conditions.join(" AND ")}
       ORDER BY ts.id ASC
     `);
 
-    res.status(200).json({
-      success: true,
-      data: result.recordset,
-    });
+    return res.status(200).json({ success: true, data: result.recordset });
   } catch (err) {
     console.error("GET Test Suites Error:", err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch test suites",
       error: err.message,
@@ -406,3 +385,19 @@ exports.toggleTestSuite = async (req, res) => {
     });
   }
 };
+
+// Project membership guards. Route permission middleware may still apply before these handlers.
+const _createTestSuite = exports.createTestSuite;
+exports.createTestSuite = withProjectAccess(async (req) => Number(req.body?.project_id))(_createTestSuite);
+
+for (const name of [
+  "getSuiteCaseCount",
+  "updateTestSuite",
+  "deleteTestSuite",
+  "toggleTestSuite",
+]) {
+  const original = exports[name];
+  exports[name] = withProjectAccess(async (req, pool) =>
+    getProjectIdFromSuite(pool, Number(req.params.id)),
+  )(original);
+}

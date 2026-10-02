@@ -3,128 +3,159 @@ const router = express.Router();
 
 const { verifyToken } = require("../middleware/auth");
 const checkPermission = require("../middleware/checkPermission");
+const {
+  getProjectIdFromTestCase,
+  getProjectIdFromRun,
+} = require("../middleware/projectAccess");
 
 const recorderController = require("../controllers/playwrightRecorderController");
 const runController = require("../controllers/playwrightRunController");
 
 const MENU = "/test-cases";
 
-/* =========================================================
-   PLAYWRIGHT RECORDER
-========================================================= */
+// =========================================================
+// PERMISSION HELPERS
+// =========================================================
+
+const anyProjectMemberPermission = (permissionType) =>
+  checkPermission(MENU, permissionType, {
+    allowAnyProjectMember: true,
+  });
+
+const testCasePermission = (permissionType, paramName = "id") =>
+  checkPermission(MENU, permissionType, {
+    resolveProjectId: async (req, pool) =>
+      getProjectIdFromTestCase(pool, req.params[paramName]),
+  });
+
+const runPermission = (permissionType) =>
+  checkPermission(MENU, permissionType, {
+    resolveProjectId: async (req, pool) =>
+      getProjectIdFromRun(pool, req.params.runId),
+  });
+
+// =========================================================
+// PLAYWRIGHT RECORDER
+//
+// Recorder start/stop does not yet belong to one saved test case, so there
+// is no concrete project ID to resolve. A user with normal role permission OR
+// membership in at least one project may use the recorder.
+// =========================================================
 
 router.post(
   "/recorder/start",
   verifyToken,
-  checkPermission(MENU, "can_create"),
+  anyProjectMemberPermission("can_create"),
   recorderController.startRecording,
 );
 
 router.post(
   "/recorder/stop/:id",
   verifyToken,
-  checkPermission(MENU, "can_create"),
+  anyProjectMemberPermission("can_create"),
   recorderController.stopRecording,
 );
 
-/* =========================================================
-   PLAYWRIGHT SCRIPT
-   Script-only save:
-   - does NOT update test steps
-   - does NOT trigger approval workflow
-   - does NOT change workflow status
-========================================================= */
+// =========================================================
+// PLAYWRIGHT SCRIPT / EDITOR SAVE
+//
+// Exact project is resolved from test case -> suite -> project.
+// =========================================================
 
 router.put(
   "/test-cases/:id/script",
   verifyToken,
-  checkPermission(MENU, "can_edit"),
+  testCasePermission("can_edit"),
   recorderController.updateTestCaseScript,
 );
 
-/* =========================================================
-   PARSE PLAYWRIGHT SCRIPT
-========================================================= */
+// =========================================================
+// PARSE / PREVIEW PLAYWRIGHT SCRIPT
+//
+// Parsing is stateless and has no test-case/project identifier, therefore an
+// assigned user to any project may use it if normal role permission is absent.
+// =========================================================
 
 router.post(
   "/parse-steps",
   verifyToken,
-  checkPermission(MENU, "can_view"),
+  anyProjectMemberPermission("can_view"),
   runController.parseSteps,
 );
 
-/* =========================================================
-   RUN TEST CASE
-========================================================= */
+// =========================================================
+// RUN TEST CASE
+// =========================================================
 
 router.post(
   "/test-cases/:id/run",
   verifyToken,
-  checkPermission(MENU, "can_edit"),
+  testCasePermission("can_edit"),
   runController.runTestCase,
 );
 
-/* =========================================================
-   TEST CASE RUN HISTORY
-========================================================= */
+// =========================================================
+// TEST CASE RUN HISTORY
+// =========================================================
 
 router.get(
   "/test-cases/:id/runs",
   verifyToken,
-  checkPermission(MENU, "can_view"),
+  testCasePermission("can_view"),
   runController.getRunsByTestCase,
 );
 
-/* =========================================================
-   INDIVIDUAL RUN DETAILS
-========================================================= */
+// =========================================================
+// INDIVIDUAL RUN DETAILS
+// =========================================================
 
 router.get(
   "/runs/:runId",
   verifyToken,
-  checkPermission(MENU, "can_view"),
+  runPermission("can_view"),
   runController.getRunById,
 );
 
 router.get(
   "/runs/:runId/steps",
   verifyToken,
-  checkPermission(MENU, "can_view"),
+  runPermission("can_view"),
   runController.getRunSteps,
 );
 
-/* =========================================================
-   CANCEL RUN
-========================================================= */
+// =========================================================
+// CANCEL RUN
+// =========================================================
 
 router.post(
   "/runs/:runId/cancel",
   verifyToken,
-  checkPermission(MENU, "can_edit"),
+  runPermission("can_edit"),
   runController.cancelRun,
 );
 
-/* =========================================================
-   PLAYWRIGHT STATISTICS
-========================================================= */
+// =========================================================
+// PLAYWRIGHT STATISTICS
+//
+// Controller must return only runs belonging to projects visible to the user.
+// =========================================================
 
 router.get(
   "/stats",
   verifyToken,
-  checkPermission(MENU, "can_view"),
+  anyProjectMemberPermission("can_view"),
   runController.getStats,
 );
 
-/* =========================================================
-   LEGACY TEST CASE RUN ROUTE
-   Keep only if something in the frontend still uses:
-   /api/playwright/:id/runs
-========================================================= */
+// =========================================================
+// LEGACY TEST CASE RUN ROUTE
+// Keep only while frontend references /api/playwright/:id/runs
+// =========================================================
 
 router.get(
   "/:id/runs",
   verifyToken,
-  checkPermission(MENU, "can_view"),
+  testCasePermission("can_view"),
   runController.getRunsByTestCase,
 );
 

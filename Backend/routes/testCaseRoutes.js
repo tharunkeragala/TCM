@@ -3,63 +3,95 @@ const router = express.Router();
 
 const { verifyToken } = require("../middleware/auth");
 const checkPermission = require("../middleware/checkPermission");
+const {
+  getProjectIdFromSuite,
+  getProjectIdFromTestCase,
+} = require("../middleware/projectAccess");
 
 const testCaseController = require("../controllers/testCaseController");
 const workflowController = require("../controllers/testCaseWorkflowController");
 
+const MENU = "/test-cases";
+
+// =====================================================
+// PERMISSION HELPERS
+// =====================================================
+
+const testCasePermission = (permissionType, paramName = "id") =>
+  checkPermission(MENU, permissionType, {
+    resolveProjectId: async (req, pool) =>
+      getProjectIdFromTestCase(pool, req.params[paramName]),
+  });
+
+const listPermission = (permissionType) => {
+  return (req, res, next) => {
+    const suiteId = Number(req.query?.suite_id);
+
+    const middleware = suiteId > 0
+      ? checkPermission(MENU, permissionType, {
+          resolveProjectId: async (_req, pool) =>
+            getProjectIdFromSuite(pool, suiteId),
+        })
+      : checkPermission(MENU, permissionType, {
+          allowAnyProjectMember: true,
+        });
+
+    return middleware(req, res, next);
+  };
+};
+
 // =====================================================
 // TEST CASE WORKFLOW APPROVAL PAGE
 //
-// /test-case-approvals permissions:
-//   can_view -> view queue/details
-//   can_edit -> Approve / Reject / Return
+// Approval permissions remain role-based and separate from normal
+// project-member access. Being assigned to a project does NOT make a user
+// an approver automatically.
 // =====================================================
 
 router.get(
   "/workflow/approvals",
   verifyToken,
   checkPermission("/test-case-approvals", "can_view"),
-  workflowController.getPendingApprovals
+  workflowController.getPendingApprovals,
 );
 
 router.get(
   "/workflow/requests/:requestId",
   verifyToken,
   checkPermission("/test-case-approvals", "can_view"),
-  workflowController.getWorkflowRequest
+  workflowController.getWorkflowRequest,
 );
 
 router.post(
   "/workflow/requests/:requestId/approve",
   verifyToken,
   checkPermission("/test-case-approvals", "can_edit"),
-  workflowController.approveRequest
+  workflowController.approveRequest,
 );
 
 router.post(
   "/workflow/requests/:requestId/reject",
   verifyToken,
   checkPermission("/test-case-approvals", "can_edit"),
-  workflowController.rejectRequest
+  workflowController.rejectRequest,
 );
 
 router.post(
   "/workflow/requests/:requestId/return",
   verifyToken,
   checkPermission("/test-case-approvals", "can_edit"),
-  workflowController.returnRequest
+  workflowController.returnRequest,
 );
 
 // =====================================================
 // TEST CASE WORKFLOW HISTORY
-// Uses normal Test Cases view permission.
 // =====================================================
 
 router.get(
   "/:id/workflow-history",
   verifyToken,
-  checkPermission("/test-cases", "can_view"),
-  workflowController.getTestCaseWorkflowHistory
+  testCasePermission("can_view"),
+  workflowController.getTestCaseWorkflowHistory,
 );
 
 // =====================================================
@@ -69,57 +101,60 @@ router.get(
 router.get(
   "/",
   verifyToken,
-  checkPermission("/test-cases", "can_view"),
-  testCaseController.getTestCases
+  listPermission("can_view"),
+  testCaseController.getTestCases,
 );
 
 router.get(
   "/:id/activity",
   verifyToken,
-  checkPermission("/test-cases", "can_view"),
-  testCaseController.getTestCaseActivity
+  testCasePermission("can_view"),
+  testCaseController.getTestCaseActivity,
 );
 
 router.get(
   "/:id/step-count",
   verifyToken,
-  checkPermission("/test-cases", "can_view"),
-  testCaseController.getTestCaseStepCount
+  testCasePermission("can_view"),
+  testCaseController.getTestCaseStepCount,
 );
 
 router.get(
   "/:id",
   verifyToken,
-  checkPermission("/test-cases", "can_view"),
-  testCaseController.getTestCaseById
+  testCasePermission("can_view"),
+  testCaseController.getTestCaseById,
 );
 
 router.post(
   "/create",
   verifyToken,
-  checkPermission("/test-cases", "can_create"),
-  testCaseController.createTestCase
+  checkPermission(MENU, "can_create", {
+    resolveProjectId: async (req, pool) =>
+      getProjectIdFromSuite(pool, req.body?.suite_id),
+  }),
+  testCaseController.createTestCase,
 );
 
 router.post(
   "/:id/submit-review",
   verifyToken,
-  checkPermission("/test-cases", "can_edit"),
-  testCaseController.submitForReview
+  testCasePermission("can_edit"),
+  testCaseController.submitForReview,
 );
 
 router.put(
   "/update/:id",
   verifyToken,
-  checkPermission("/test-cases", "can_edit"),
-  testCaseController.updateTestCase
+  testCasePermission("can_edit"),
+  testCaseController.updateTestCase,
 );
 
 router.delete(
   "/delete/:id",
   verifyToken,
-  checkPermission("/test-cases", "can_delete"),
-  testCaseController.deleteTestCase
+  testCasePermission("can_delete"),
+  testCaseController.deleteTestCase,
 );
 
 module.exports = router;
